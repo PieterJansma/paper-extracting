@@ -12,14 +12,7 @@ max_pages = 20
 
 
 [task]
-template_json = """{"n_included":"integer","countries":["verbatim-string"]}"""
-instructions  = """
-Extract the number of INCLUDED participants and the list of countries where the INCLUDED participants came from.
-Include ONLY countries for the final included cohort.
-Exclude screened/excluded/eligible-not-included, non-contributing sites, and author affiliations.
-Return each country verbatim. Deduplicate.
-"""
-
+name = "n_included_and_countries"
 
 [logging]
 level = "INFO"

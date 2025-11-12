@@ -5,6 +5,7 @@ from pypdf import PdfReader
 
 from .llm_client import OpenAICompatibleClient
 
+# Optional grammar; safe to ignore if your server rejects it.
 try:
     from .llm_grammar import GRAMMAR_JSON_INT_OR_NULL
 except Exception:
@@ -25,7 +26,34 @@ def load_pdf_text(path: str, max_pages: Optional[int] = None) -> str:
             log.warning("Page %d could not be extracted: %s", i + 1, e)
     return "\n\n".join(texts)
 
-# ---------- Helpers ----------
+# ---------- Prompt helpers ----------
+
+def _build_nuextract_prompt(template_json: str, instructions: Optional[str], paper_text: str) -> str:
+    # NuExtract expects: # Template:\n{json}\n# Context:\n{text}
+    # Optionally add # Instructions:
+    template_json = (template_json or "").strip()
+    instr = (instructions or "").strip()
+    blocks = ["# Template:", template_json]
+    if instr:
+        blocks += ["# Instructions:", instr]
+    blocks += ["# Context:", paper_text]
+    return "\n".join(blocks)
+
+def _call_llm_minimal(
+    client: OpenAICompatibleClient,
+    messages: List[Dict[str, str]],
+    temperature: float,
+    max_tokens: int,
+    grammar,
+) -> str:
+    # Minimal payload for llama.cpp
+    return client.chat(
+        messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        response_format=None,
+        grammar=(grammar if grammar else None),
+    )
 
 def _json_load_stripping_fences(s: str) -> Dict[str, Any]:
     import json, re
@@ -46,93 +74,8 @@ def _chunk_text(txt: str, max_chars: int = 40000):
         yield txt[start:end]
         start = end
 
-def _build_nuextract_prompt(template_json: str, instructions: Optional[str], paper_text: str) -> str:
-    template_json = (template_json or "").strip()
-    instr = (instructions or "").strip()
-    blocks = ["# Template:", template_json]
-    if instr:
-        blocks += ["# Instructions:", instr]
-    blocks += ["# Context:", paper_text]
-    return "\n".join(blocks)
-
-def _call_llm_minimal(
-    client: OpenAICompatibleClient,
-    messages: List[Dict[str, str]],
-    temperature: float,
-    max_tokens: int,
-    grammar,
-) -> str:
-    return client.chat(
-        messages,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        response_format=None,
-        grammar=(grammar if grammar else None),
-    )
-
-def _merge_json_results(acc: Dict[str, Any], cur: Dict[str, Any]) -> Dict[str, Any]:
-    from collections import Counter
-    if not acc:
-        return dict(cur)
-    for k, v in cur.items():
-        if k not in acc:
-            acc[k] = v
-            continue
-        a = acc[k]
-        if isinstance(a, list) or isinstance(v, list):
-            left = a if isinstance(a, list) else ([] if a is None else [a])
-            right = v if isinstance(v, list) else ([] if v is None else [v])
-            seen = set()
-            merged = []
-            for item in left + right:
-                if item is None:
-                    continue
-                key = ("s", item) if isinstance(item, str) else ("n", item) if isinstance(item, (int, float)) else ("o", repr(item))
-                if key not in seen:
-                    seen.add(key)
-                    merged.append(item)
-            acc[k] = merged
-            continue
-        if isinstance(a, (int, float)) or isinstance(v, (int, float)):
-            if a is None:
-                acc[k] = v
-            elif v is None:
-                pass
-            else:
-                acc[k] = Counter([a, v]).most_common(1)[0][0]
-            continue
-        if isinstance(a, str) or isinstance(v, str):
-            acc[k] = a if (isinstance(a, str) and a) else v
-            continue
-        if a is None and v is not None:
-            acc[k] = v
-    return acc
-
-# ---------- Defaults (edit these as you add fields) ----------
-
-DEFAULT_TEMPLATE = '{"n_included": "integer", "countries": ["verbatim-string"]}'
-
-DEFAULT_INSTRUCTIONS = (
-    "Extract the number of INCLUDED participants and the list of countries where the INCLUDED participants came from.\n"
-    "- Include ONLY countries for the final included cohort.\n"
-    "- EXCLUDE countries for screened/excluded/eligible-but-not-included participants, non-contributing sites, and author affiliations.\n"
-    '- Return each country name verbatim (e.g., "United Kingdom of Great Britain and Northern Ireland (the)").\n'
-    "- Deduplicate; order does not matter."
-)
-
-RETRY_INSTRUCTIONS_SUFFIX = (
-    "If the context contains country names for the included cohort, you MUST return them in `countries`.\n"
-    "Do not return an empty list when such country names are present.\n"
-    "If none are present for the included cohort, return an empty list.\n"
-    "Example:\n"
-    "# Context:\n"
-    "Countries\n"
-    "United Kingdom of Great Britain and Northern Ireland (the)\n"
-    "# Expected JSON:\n"
-    '{"n_included": null, "countries": ["United Kingdom of Great Britain and Northern Ireland (the)"]}'
-)
-
-def _windows_by_keywords(txt: str, keywords: List[str], half_window: int = 1400, max_hits: int = 10) -> List[str]:
+def _windows_by_keywords(txt: str, keywords: List[str], half_window: int = 1200, max_hits: int = 8) -> List[str]:
+    """Return small context windows around keyword hits (no regex extraction)."""
     t_low = txt.lower()
     hits = []
     for kw in keywords:
@@ -150,6 +93,7 @@ def _windows_by_keywords(txt: str, keywords: List[str], half_window: int = 1400,
                 break
         if len(hits) >= max_hits:
             break
+    # merge overlapping windows
     if not hits:
         return []
     hits.sort()
@@ -163,6 +107,73 @@ def _windows_by_keywords(txt: str, keywords: List[str], half_window: int = 1400,
             cur_l, cur_r = l, r
     merged.append((cur_l, cur_r))
     return [txt[l:r] for (l, r) in merged]
+
+def _merge_json_results(acc: Dict[str, Any], cur: Dict[str, Any]) -> Dict[str, Any]:
+    # Generic JSON merger for chunk/window results.
+    from collections import Counter
+    if not acc:
+        return dict(cur)
+    for k, v in cur.items():
+        if k not in acc:
+            acc[k] = v
+            continue
+        a = acc[k]
+        # list → union preserving order
+        if isinstance(a, list) or isinstance(v, list):
+            left = a if isinstance(a, list) else ([] if a is None else [a])
+            right = v if isinstance(v, list) else ([] if v is None else [v])
+            seen = set()
+            merged = []
+            for item in left + right:
+                if item is None:
+                    continue
+                key = ("s", item) if isinstance(item, str) else ("n", item) if isinstance(item, (int, float)) else ("o", repr(item))
+                if key not in seen:
+                    seen.add(key)
+                    merged.append(item)
+            acc[k] = merged
+            continue
+        # numbers: simple majority on [a, v]; tie → keep a
+        if isinstance(a, (int, float)) or isinstance(v, (int, float)):
+            if a is None:
+                acc[k] = v
+            elif v is None:
+                pass
+            else:
+                acc[k] = Counter([a, v]).most_common(1)[0][0]
+            continue
+        # strings: prefer non-empty
+        if isinstance(a, str) or isinstance(v, str):
+            acc[k] = a if (isinstance(a, str) and a) else v
+            continue
+        # fallback
+        if a is None and v is not None:
+            acc[k] = v
+    return acc
+
+# ---------- Defaults you can edit as you add variables ----------
+
+DEFAULT_TEMPLATE = '{"n_included": "integer", "countries": ["verbatim-string"]}'
+
+DEFAULT_INSTRUCTIONS = (
+    "Extract the number of INCLUDED participants and the list of countries where the INCLUDED participants came from.\n"
+    "- Include ONLY countries for the final included cohort.\n"
+    "- EXCLUDE countries for screened/excluded/eligible-but-not-included participants, non-contributing sites, and author affiliations.\n"
+    '- Return each country name verbatim (e.g., "United Kingdom of Great Britain and Northern Ireland (the)").\n'
+    "- Deduplicate; order does not matter."
+)
+
+RETRY_INSTRUCTIONS_SUFFIX = (
+    "If the context contains any country names for the included cohort, you MUST return them in `countries`.\n"
+    "Do not return an empty list when such country names are present.\n"
+    "If none are present for the included cohort, return an empty list.\n"
+    "Example:\n"
+    "# Context:\n"
+    "Countries\n"
+    "United Kingdom of Great Britain and Northern Ireland (the)\n"
+    "# Expected JSON:\n"
+    '{"n_included": null, "countries": ["United Kingdom of Great Britain and Northern Ireland (the)"]}'
+)
 
 COUNTRY_KEYWORDS = [
     "countries",
@@ -201,7 +212,7 @@ def extract_fields(
         "Use only double quotes, valid UTF-8, and no trailing commas."
     )
 
-    # Pass 1: full text (capped)
+    # -------- First pass on full text (capped) --------
     full_prompt = _build_nuextract_prompt(tpl, instr, paper_text[:200000])
     messages = [
         {"role": "system", "content": system_msg},
@@ -219,8 +230,11 @@ def extract_fields(
         log.warning("Full-text LLM call failed (%s).", e)
         data = {}
 
-    # If countries missing/empty, try small windows around likely phrases
-    if isinstance(data, dict) and not data.get("countries"):
+    # If countries missing/empty, try targeted keyword windows (no regex extraction)
+    need_countries_retry = (
+        isinstance(data, dict) and (not data.get("countries"))
+    )
+    if need_countries_retry:
         windows = _windows_by_keywords(paper_text, COUNTRY_KEYWORDS, half_window=1400, max_hits=10)
         for w in windows:
             retry_prompt = _build_nuextract_prompt(
@@ -246,7 +260,7 @@ def extract_fields(
     if isinstance(data, dict) and data:
         return data
 
-    # Pass 2: chunk fallback (merge results)
+    # -------- Chunk fallback if everything else failed --------
     merged: Dict[str, Any] = {}
     for part in _chunk_text(paper_text, max_chars=chunk_chars):
         part_prompt = _build_nuextract_prompt(tpl, instr, part)
@@ -260,7 +274,8 @@ def extract_fields(
                 GRAMMAR_JSON_INT_OR_NULL if use_grammar else None
             )
             cur = _json_load_stripping_fences(raw)
-            if isinstance(cur, dict) and not cur.get("countries"):
+            # If chunk missed countries, do keyword-window retries within the chunk
+            if isinstance(cur, dict) and (not cur.get("countries")):
                 wins = _windows_by_keywords(part, COUNTRY_KEYWORDS, half_window=1400, max_hits=6)
                 for w in wins:
                     rprompt = _build_nuextract_prompt(

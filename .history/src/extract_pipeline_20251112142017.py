@@ -1,6 +1,5 @@
 from __future__ import annotations
 import os
-import sys
 import logging
 from typing import Any, Dict
 
@@ -13,8 +12,10 @@ from .llm_client import OpenAICompatibleClient
 from .extract_pipeline import load_pdf_text, extract_fields
 
 def setup_logging(level: str = "INFO"):
-    logging.basicConfig(level=getattr(logging, level.upper(), logging.INFO),
-                        format="%(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=getattr(logging, level.upper(), logging.INFO),
+        format="%(levelname)s %(name)s: %(message)s",
+    )
 
 def load_config(path: str) -> Dict[str, Any]:
     with open(path, "rb") as f:
