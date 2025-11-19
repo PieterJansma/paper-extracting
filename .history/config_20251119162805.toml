@@ -7,7 +7,7 @@ max_tokens = 256
 temperature = 0.0
 
 [pdf]
-path = "data/dys064.pdf"
+path = "data/OncoLifeS.pdf"
 max_pages = 40
 
 # ---------- PASS A: structural / identity fields ----------
@@ -138,26 +138,22 @@ Extract ONLY the following fields from the paper. If a field cannot be determine
 
 - inclusion_criteria:
   List ONLY the core disease/condition(s) or essential participant category
-  that defines who enters the study, in short phrases.
+  that defines who enters the study.
 
   Examples:
-    "pregnant women"
-    "children born to enrolled pregnancies"
     "patients with cancer"
     "patients with a genetically increased risk of cancer"
     "community-dwelling adults"
+    "pregnant women"
     "general practice patients"
 
   RULES:
-  - DO NOT include age information (age goes in population_age_group).
-  - DO NOT include calendar years or periods (those belong to start_year/end_year).
-  - DO NOT include geographic locations (those belong to countries/regions).
-  - DO NOT include counts, sample sizes, or follow-up descriptions.
-  - Avoid long sentences; use short phrases (max 3–8 words).
-  - Avoid near-duplicates; prefer the simplest clear version, e.g.
-    use "pregnant women" instead of also listing
-    "pregnant women in the Bristol area of the UK during 1990–92".
-
+  - DO NOT include any age criteria (age goes in population_age_group).
+  - DO NOT include geographic location or recruitment setting.
+  - DO NOT include consent statements or administrative procedures.
+  - Avoid near-duplicates; use the shortest clear phrase.
+  - Only list disease subtypes (e.g. hereditary breast-ovarian cancer) if
+    they are explicitly separate inclusion groups.
 
 - other_inclusion_criteria:
   Non-disease, non-age, non-location eligibility details that are not already

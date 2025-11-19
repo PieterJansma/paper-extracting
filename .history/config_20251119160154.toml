@@ -1,0 +1,155 @@
+[llm]
+base_url = "http://127.0.0.1:8080/v1"
+model    = "numind/NuExtract-2.0-8B"
+api_key  = "sk-local"
+use_grammar = false
+max_tokens = 256
+temperature = 0.0
+
+[pdf]
+path = "data/OncoLifeS.pdf"
+max_pages = 40
+
+# ---------- PASS A: structural / identity fields ----------
+
+[task_main]
+template_json = """
+{
+  "pid": "string",
+  "study_name": "string",
+  "study_acronym": "string",
+  "study_types": ["string"],
+  "cohort_type": "string",
+  "website": "string",
+  "start_year": "integer",
+  "end_year": "integer",
+  "contact_email": "string",
+  "n_included": "integer",
+  "countries": ["verbatim-string"],
+  "regions": ["verbatim-string"],
+  "population_age_group": "string"
+}
+"""
+
+instructions = """
+Extract the following fields from the paper. If a field cannot be determined, return null (single value) or [] (lists).
+
+- pid:
+  Main persistent identifier of the study (usually the DOI "10.xxxx/...").
+  If several DOIs, pick the main study DOI. If none, use another clear registration ID. Otherwise null.
+
+- study_name:
+  Name of the study or cohort (e.g. "Avon Longitudinal Study of Parents and Children").
+  Prefer the named cohort/study over the article title.
+
+- study_acronym:
+  Explicit acronym of the study (e.g. "ALSPAC", "UK Biobank"). If none, null.
+
+- study_types:
+  High-level labels for the design. Use any of:
+  "Biobank", "Cohort study", "Clinical trial", "Registry", "Network", "Other type".
+  You may return more than one.
+
+- cohort_type:
+  If it is a cohort study, return a short subtype such as:
+  "birth cohort", "prospective cohort", "retrospective cohort",
+  "population-based cohort", "hospital-based cohort", "longitudinal cohort".
+  Otherwise null.
+
+- website:
+  Public website URL of the study/biobank, if given (e.g. "https://www.ukbiobank.ac.uk").
+  If none, null.
+
+- start_year / end_year:
+  Years when recruitment or baseline data collection started and ended.
+  If recruitment is ongoing, end_year = null.
+  If only one year is given, set both to that year.
+  If unclear, both null.
+
+- contact_email:
+  Main contact or study email (or corresponding author if that is all that is given).
+  If none, null.
+
+- n_included:
+  Number of participants in the final analytic cohort.
+  Exclude invited, screened, or eligible-but-not-included counts.
+  If unclear, null.
+
+- countries:
+  List of COUNTRIES of the included participants.
+  Only sovereign states, e.g. "Netherlands", "the Netherlands", "Germany", "United Kingdom".
+  Do not put cities or regions here. Deduplicate.
+
+- regions:
+  List of subnational areas where participants were recruited, e.g.:
+  "Dutch municipality of Coevorden", "Bristol area of the UK", "Greater London".
+  Do not put plain country names here. Deduplicate.
+
+- population_age_group:
+  Short description of age eligibility or follow-up range, e.g.:
+  "16+ years", "18–65 years", "birth to 18 years", "adults".
+  Avoid degenerate ranges like "18–18 years" unless that is explicit.
+  If unclear, null.
+"""
+
+# ---------- PASS B: criteria + design ONLY ----------
+
+[task_criteria]
+template_json = """
+{
+  "inclusion_criteria": ["string"],
+  "other_inclusion_criteria": ["string"],
+  "exclusion_criteria": ["string"],
+  "other_exclusion_criteria": ["string"],
+  "clinical_study_types": ["string"]
+}
+"""
+
+instructions = """
+Extract ONLY the following fields from the paper. If a field cannot be determined, return [].
+
+- inclusion_criteria:
+  Main medical/health-related or role-based inclusion criteria.
+  Use short, specific phrases, e.g.:
+  "pelvic floor symptoms", "pregnant women", "community-dwelling adults",
+  "general practice patients", "genetically increased risk of cancer".
+  If the paper clearly describes who is included, you MUST return at least
+  one phrase. Do not include age or location here.
+
+- other_inclusion_criteria:
+  Additional eligibility details not already covered in inclusion_criteria,
+  excluding age and location. Examples:
+  "able to provide informed consent", "registered at participating practices".
+  Use short phrases. If none, [].
+
+- exclusion_criteria:
+  Explicit conditions that make someone ineligible, e.g.:
+  "terminal illness", "cognitive impairment (e.g. dementia)",
+  "current psychological condition precluding informed consent",
+  "previous pelvic surgery".
+  Use short phrases. Do not include age or location. If none, [].
+
+- other_exclusion_criteria:
+  Broader or catch-all exclusions, e.g.:
+  "serious comorbidity", "unable to comply with follow-up",
+  "considered unsuitable to participate by the GP".
+  Use short phrases. If none, [].
+
+- clinical_study_types:
+  Short natural-language descriptions (3–15 words) of the study design.
+  Examples:
+    "prospective hospital-based observational data-biobank",
+    "prospective population-based cohort study",
+    "randomised controlled clinical trial",
+    "cross-sectional prevalence survey",
+    "case-control study",
+    "systematic review and meta-analysis".
+  Use design words from the paper (prospective, retrospective, observational,
+  hospital-based, population-based, biobank, data-biobank, registry, cohort,
+  randomised, cross-sectional, case-control, etc.).
+  If any such design cues are present, you MUST return at least one phrase.
+  You may return more than one. Only return [] if there is truly no design info.
+"""
+
+[logging]
+level = "INFO"

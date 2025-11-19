@@ -7,7 +7,7 @@ max_tokens = 256
 temperature = 0.0
 
 [pdf]
-path = "data/dys064.pdf"
+path = "data/OncoLifeS.pdf"
 max_pages = 40
 
 # ---------- PASS A: structural / identity fields ----------

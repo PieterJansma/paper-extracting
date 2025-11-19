@@ -7,7 +7,7 @@ max_tokens = 256
 temperature = 0.0
 
 [pdf]
-path = "data/dys064.pdf"
+path = "data/OncoLifeS.pdf"
 max_pages = 40
 
 # ---------- PASS A: structural / identity fields ----------
@@ -105,20 +105,10 @@ Extract the following fields from the paper. If a field cannot be determined, re
   Do not put plain country names here. Deduplicate.
 
 - population_age_group:
-  Short description of the age eligibility or main follow-up age range.
-
-  RULES:
-  - For pregnancy or birth cohorts where children are followed over time,
-    use the full child age span, e.g. "birth to 18 years" or "0–18 years".
-    Do NOT collapse this to a single age like "18–18 years".
-  - If only a minimum age is given (e.g. "aged 16 years or older"),
-    use "16+ years" or "≥16 years".
-  - If a bounded adult range is given (e.g. "aged 18–65 years"),
-    use that range directly, e.g. "18–65 years".
-  - If only broad terms like "adults" or "older adults" are used,
-    you may return those terms.
-  - If the age range cannot be determined, return null.
-
+  Short description of age eligibility or follow-up range, e.g.:
+  "16+ years", "18–65 years", "birth to 18 years", "adults".
+  Avoid degenerate ranges like "18–18 years" unless that is explicit.
+  If unclear, null.
 """
 
 # ---------- PASS B: criteria + design ONLY ----------
@@ -138,26 +128,22 @@ Extract ONLY the following fields from the paper. If a field cannot be determine
 
 - inclusion_criteria:
   List ONLY the core disease/condition(s) or essential participant category
-  that defines who enters the study, in short phrases.
+  that defines who enters the study.
 
   Examples:
-    "pregnant women"
-    "children born to enrolled pregnancies"
     "patients with cancer"
     "patients with a genetically increased risk of cancer"
     "community-dwelling adults"
+    "pregnant women"
     "general practice patients"
 
   RULES:
-  - DO NOT include age information (age goes in population_age_group).
-  - DO NOT include calendar years or periods (those belong to start_year/end_year).
-  - DO NOT include geographic locations (those belong to countries/regions).
-  - DO NOT include counts, sample sizes, or follow-up descriptions.
-  - Avoid long sentences; use short phrases (max 3–8 words).
-  - Avoid near-duplicates; prefer the simplest clear version, e.g.
-    use "pregnant women" instead of also listing
-    "pregnant women in the Bristol area of the UK during 1990–92".
-
+  - DO NOT include any age criteria (age goes in population_age_group).
+  - DO NOT include geographic location or recruitment setting.
+  - DO NOT include consent statements or administrative procedures.
+  - Avoid near-duplicates; use the shortest clear phrase.
+  - Only list disease subtypes (e.g. hereditary breast-ovarian cancer) if
+    they are explicitly separate inclusion groups.
 
 - other_inclusion_criteria:
   Non-disease, non-age, non-location eligibility details that are not already
