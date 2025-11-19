@@ -7,7 +7,7 @@ max_tokens = 256
 temperature = 0.0
 
 [pdf]
-path = "data/OncoLifeS.pdf"
+path = "data/dys064.pdf"
 max_pages = 40
 
 [task]
@@ -130,31 +130,15 @@ Extract the following fields from the paper. If a field cannot be determined, re
   If unclear, null.
 
 - clinical_study_types:
-  Short natural-language descriptions (3–15 words) summarising the study design.
-
-  Examples:
-    - "prospective hospital-based cohort study"
-    - "retrospective observational cohort study"
-    - "randomised controlled clinical trial"
-    - "cross-sectional prevalence survey"
-    - "case-control study"
-    - "systematic review and meta-analysis"
-
-  Use the design terminology found in the paper. Typical cues include:
-    prospective, retrospective, observational, cross-sectional, longitudinal,
-    hospital-based, population-based, biobank, data-biobank, registry, cohort,
-    trial, randomised, single-arm, pragmatic, case-control.
-
-  IMPORTANT (strong rules):
-  - If the paper contains ANY of these design cues, you MUST return at least
-    one study design phrase summarising the design.
-  - Combine multiple cues if present (e.g., “prospective observational
-    hospital-based data-biobank”).
-  - You MAY return more than one phrase.
-  - Return [] ONLY when the paper provides absolutely no study design
-    information at all (this is rare).
-
-
+  Short natural-language descriptions of the study design.
+  Each item 3–15 words, e.g.:
+  - "prospective population-based cohort study"
+  - "retrospective hospital-based cohort study"
+  - "randomised controlled clinical trial"
+  - "cross-sectional prevalence survey"
+  - "case-control study"
+  - "systematic review and meta-analysis"
+  Use the paper’s terminology. You may return more than one. If unclear, [].
 """
 
 [logging]

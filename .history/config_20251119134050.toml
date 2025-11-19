@@ -1,0 +1,143 @@
+[llm]
+base_url = "http://127.0.0.1:8080/v1"
+model    = "numind/NuExtract-2.0-8B"
+api_key  = "sk-local"
+use_grammar = false
+max_tokens = 256
+temperature = 0.0
+
+[pdf]
+path = "data/dys064.pdf"
+max_pages = 40
+
+[task]
+template_json = """
+{
+  "pid": "string",
+  "study_name": "string",
+  "study_acronym": "string",
+  "study_types": ["string"],
+  "cohort_type": "string",
+  "website": "string",
+  "start_year": "integer",
+  "end_year": "integer",
+  "contact_email": "string",
+  "n_included": "integer",
+  "countries": ["verbatim-string"],
+  "main_medical_condition": "string",
+  "other_inclusion_criteria": ["string"],
+  "population_age_group": "string"
+}
+"""
+
+instructions = """
+Extract the following fields from the paper. If a field cannot be determined, return null (for single values) or [] (for lists).
+
+- pid:
+  The persistent identifier (PID) of the study, ideally the DOI in the form "10.xxxx/...".
+  If multiple DOIs exist, pick the DOI of the main study. If none, use another registration ID (e.g., ISRCTN, ClinicalTrials.gov).
+  Otherwise return null.
+
+- study_name:
+  The full canonical name of the study or cohort (e.g., "Avon Longitudinal Study of Parents and Children").
+  Use the study name, not the paper title, if both appear.
+
+- study_acronym:
+  Extract the acronym explicitly associated with the study (e.g., "ALSPAC", "UK Biobank").
+  If no acronym is given, return null.
+
+- study_types:
+  Extract all applicable high-level study types as strings. Allowed labels:
+  "Biobank", "Cohort study", "Clinical trial", "Registry", "Network", "Other type".
+  If the study fits multiple categories, return all.
+
+  IMPORTANT:
+  - Only use "Biobank" if the paper clearly describes a biobank or systematic collection/storage of biological specimens
+    for future research (and uses terms like "biobank", "biorepository", or similar).
+  - If it is a purely questionnaire or clinical cohort with no clear biobank, do NOT use "Biobank".
+
+- cohort_type:
+  If this is a cohort study, extract the specific subtype:
+  examples: "birth cohort", "prospective cohort", "retrospective cohort",
+  "population-based cohort", "hospital-based cohort", "longitudinal cohort".
+  If not applicable or not specified, return null.
+
+- website:
+  The main public website URL of the study/biobank/cohort, if mentioned in the paper (e.g., "https://www.ukbiobank.ac.uk").
+  If multiple URLs are present, choose the one that clearly represents the study's main information site.
+  If no study website is mentioned, return null.
+
+- start_year and end_year:
+  The calendar year in which recruitment or baseline data collection for the cohort started (start_year)
+  and the year in which it ended (end_year).
+  Example: for "Participants were recruited between 2006 and 2010", start_year = 2006, end_year = 2010.
+  If recruitment is ongoing or clearly "to present", set end_year = null.
+  If only a single year is given (e.g., "baseline examination in 2012" or recruitment clearly only in 2019),
+  set both start_year and end_year to that year.
+  If recruitment years cannot be determined, use null for both.
+
+- contact_email:
+  The main contact email for the study, if given (e.g., a study coordinator or general information address).
+  If there are multiple emails, choose the most general one related to the study (e.g., "info@", or the study coordination email).
+  If no contact email is given, return null.
+
+- n_included:
+  The number of INCLUDED participants in the final analytic cohort (not screened / not eligible / not excluded).
+  Exclude numbers invited, screened, eligible but not included, or excluded before analysis.
+  If multiple analyses are presented, choose the N of the main cohort analysis.
+
+- countries:
+  List the COUNTRIES of the INCLUDED participants only.
+
+  IMPORTANT:
+  - A country must be a sovereign state (e.g., "Netherlands", "the Netherlands", "Germany", "United Kingdom").
+  - Do NOT return cities, towns, municipalities, regions, or hospitals as countries.
+    For example, "Dutch municipality of Coevorden" is NOT a country.
+  - If the text mentions a city/municipality that is clearly in a single country (e.g., "Dutch municipality of Coevorden"),
+    infer the corresponding country and return that country name (e.g., "Netherlands" or "the Netherlands"),
+    NOT the city/municipality name.
+
+  Return each country name VERBATIM if possible (for the country name itself). Deduplicate.
+  Exclude author affiliations and non-contributing sites.
+  If the paper does not explicitly state participant countries, but recruitment clearly took place in a single
+  hospital/registry/biobank in one country, infer that country from the study setting and return it.
+  Only return an empty list if you cannot identify any country from either participants or the study setting.
+
+- main_medical_condition:
+  The primary disease, disorder, or health condition the study is focused on (e.g., "colorectal cancer", "type 2 diabetes").
+  If the study is on healthy volunteers or a general population without a specific condition, return null.
+
+- other_inclusion_criteria:
+  A list of key inclusion or exclusion criteria for participants, EXCLUDING age criteria (age is captured in population_age_group).
+
+  Include criteria such as:
+  - residency or geographic requirements (e.g., "living in the Dutch municipality of Coevorden");
+  - health status (e.g., "no terminal illness", "no cognitive impairment (e.g., dementia)");
+  - psychological or consent-related conditions (e.g., "no current psychological condition precluding informed consent",
+    "able to provide informed consent");
+  - suitability or GP-based judgement (e.g., "considered suitable to participate by the GP").
+
+  Each criterion should be a short phrase; each criterion should be a separate string.
+
+  IMPORTANT:
+  - If the paper explicitly describes non-age inclusion/exclusion criteria (such as the example above),
+    you MUST return at least one item in other_inclusion_criteria summarizing these non-age criteria.
+  - Do NOT leave other_inclusion_criteria empty if such criteria are clearly present in the text.
+
+- population_age_group:
+  Describe the age eligibility as a short phrase summarizing the range.
+
+  Examples:
+  - "16+ years" or ">=16 years" for "aged 16 years or older";
+  - "18-65 years" for "aged between 18 and 65 years";
+  - "50+ years" for "aged 50 years or older".
+
+  If only a minimum age is given, use "X+ years".
+  If only broad terms are given (e.g., "adults"), return that term (e.g., "adults").
+  If the age range cannot be determined, return null.
+"""
+
+
+
+[logging]
+level = "INFO"

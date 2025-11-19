@@ -1,0 +1,105 @@
+[llm]
+base_url = "http://127.0.0.1:8080/v1"
+model    = "numind/NuExtract-2.0-8B"
+api_key  = "sk-local"
+use_grammar = false
+max_tokens = 256
+temperature = 0.0
+
+[pdf]
+path = "data/OncoLifeS.pdf"
+max_pages = 40
+
+[task]
+template_json = """
+{
+  "pid": "string",
+  "study_name": "string",
+  "study_acronym": "string",
+  "study_types": ["string"],
+  "cohort_type": "string",
+  "website": "string",
+  "start_year": "integer",
+  "end_year": "integer",
+  "contact_email": "string",
+  "n_included": "integer",
+  "countries": ["verbatim-string"],
+  "main_medical_condition": "string",
+  "other_inclusion_criteria": ["string"],
+  "population_age_group": "string"
+}
+"""
+
+instructions = """
+Extract the following fields from the paper:
+
+- pid:
+  The persistent identifier (PID) of the study, ideally the DOI in the form "10.xxxx/...".
+  If multiple DOIs exist, pick the DOI of the main study. If none, use another registration ID (e.g., ISRCTN, ClinicalTrials.gov).
+  Otherwise return null.
+
+- study_name:
+  The full canonical name of the study or cohort (e.g., "Avon Longitudinal Study of Parents and Children").
+  Use the study name, not the paper title, if both appear.
+
+- study_acronym:
+  Extract the acronym explicitly associated with the study (e.g., "ALSPAC", "UK Biobank").
+  If no acronym is given, return null.
+
+- study_types:
+  Extract all applicable high-level study types as strings. Allowed labels:
+  "Biobank", "Cohort study", "Clinical trial", "Registry", "Network", "Other type".
+  If the study fits multiple categories, return all.
+
+- cohort_type:
+  If this is a cohort study, extract the specific subtype:
+  examples: "birth cohort", "prospective cohort", "retrospective cohort", "population-based cohort",
+  "hospital-based cohort", "longitudinal cohort".
+  If not applicable or not specified, return null.
+
+- website:
+  The main public website URL of the study/biobank/cohort, if mentioned in the paper (e.g., "https://www.ukbiobank.ac.uk").
+  If multiple URLs are present, choose the one that clearly represents the study's main information site.
+  If no study website is mentioned, return null.
+
+- start_year and end_year:
+  The calendar year in which recruitment or baseline data collection for the cohort started (start_year)
+  and the year in which it ended (end_year).
+  Example: for "Participants were recruited between 2006 and 2010", start_year = 2006, end_year = 2010.
+  If recruitment is ongoing or clearly "to present", set end_year = null.
+  If only a single year is given (e.g., "baseline examination in 2012"), set both start_year and end_year to that year.
+  If recruitment years cannot be determined, use null for both.
+
+- contact_email:
+  The main contact email for the study, if given (e.g., a study coordinator or general information address).
+  If there are multiple emails, choose the most general one related to the study (e.g., "info@", or the study coordination email).
+  If no contact email is given, return null.
+
+- n_included:
+  The number of INCLUDED participants in the final analytic cohort (not screened / not eligible / not excluded).
+
+- countries:
+  List the countries of the INCLUDED participants only.
+  Return each country VERBATIM. Deduplicate. Exclude author affiliations and non-contributing sites.
+  If the paper does not explicitly state participant countries, but recruitment clearly took place in a single hospital/registry/biobank in one country, infer that country from the study setting and return it.
+  Example: if the study describes the OncoLifeS data-biobank embedded in the University Medical Center Groningen, the Netherlands,
+  then countries = ["the Netherlands"].
+  Only return an empty list if you cannot identify any country from either participants or the study setting.
+
+- main_medical_condition:
+  The primary disease, disorder, or health condition the study is focused on (e.g., "colorectal cancer", "type 2 diabetes").
+  If the study is on healthy volunteers or a general population without a specific condition, return null.
+
+- other_inclusion_criteria:
+  A list of key inclusion criteria for participants, beyond the main medical condition or age.
+  Extract specific requirements like "must be a non-smoker" or "no prior history of cancer".
+  Return an empty list if none are mentioned.
+
+- population_age_group:
+  The age range of participants. For studies following participants over time, extract the full period.
+  Example: "followed children up to 18 years" -> "0-18 years" or "birth to 18 years".
+  For others, extract the stated range (e.g., "18-65 years", "over 50"). If none, return null.
+"""
+
+[logging]
+level = "INFO"

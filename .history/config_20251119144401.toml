@@ -1,0 +1,223 @@
+[llm]
+base_url = "http://127.0.0.1:8080/v1"
+model    = "numind/NuExtract-2.0-8B"
+api_key  = "sk-local"
+use_grammar = false
+max_tokens = 256
+temperature = 0.0
+
+[pdf]
+path = "data/OncoLifeS.pdf"
+max_pages = 40
+
+[task]
+template_json = """
+{
+  "pid": "string",
+  "study_name": "string",
+  "study_acronym": "string",
+  "study_types": ["string"],
+  "cohort_type": "string",
+  "website": "string",
+  "start_year": "integer",
+  "end_year": "integer",
+  "contact_email": "string",
+  "n_included": "integer",
+  "countries": ["verbatim-string"],
+  "main_medical_condition": "string",
+  "other_inclusion_criteria": ["string"],
+  "population_age_group": "string",
+
+  "clinical_study_types": ["string"]
+}
+"""
+
+
+instructions = """
+Extract the following fields from the paper. If a field cannot be determined, return null (for single values) or [] (for lists).
+
+- pid:
+  The persistent identifier (PID) of the study, ideally the DOI in the form "10.xxxx/...".
+  If multiple DOIs exist, pick the DOI of the main study. If none, use another registration ID (e.g., ISRCTN, ClinicalTrials.gov).
+  Otherwise return null.
+
+- study_name:
+  The full canonical name of the study or cohort (e.g., "Avon Longitudinal Study of Parents and Children").
+  Use the study name, not the paper title, if both appear.
+
+- study_acronym:
+  Extract the acronym explicitly associated with the study (e.g., "ALSPAC", "UK Biobank").
+  If no acronym is given, return null.
+
+- study_types:
+  Extract all applicable high-level study types as strings. Allowed labels:
+  "Biobank", "Cohort study", "Clinical trial", "Registry", "Network", "Other type".
+  If the study fits multiple categories, return all.
+
+  IMPORTANT:
+  - Only use "Biobank" if the paper clearly describes a biobank or systematic collection/storage of biological specimens
+    for future research and uses terms like "biobank", "biorepository", or similar.
+  - If it is a purely questionnaire or clinical cohort with no clear biobank, do NOT use "Biobank".
+
+- cohort_type:
+  If this is a cohort study, extract the specific subtype:
+  examples: "birth cohort", "prospective cohort", "retrospective cohort",
+  "population-based cohort", "hospital-based cohort", "longitudinal cohort".
+  If not applicable or not specified, return null.
+
+- website:
+  The main public website URL of the study/biobank/cohort, if mentioned in the paper (e.g., "https://www.ukbiobank.ac.uk").
+  If multiple URLs are present, choose the one that clearly represents the study's main information site.
+  If no study website is mentioned, return null.
+
+- start_year and end_year:
+  The calendar year in which recruitment or baseline data collection for the cohort started (start_year)
+  and the year in which it ended (end_year).
+  Example: for "Participants were recruited between 2006 and 2010", start_year = 2006, end_year = 2010.
+  If recruitment is ongoing or clearly "to present", set end_year = null.
+  If only a single year is given (e.g., "baseline examination in 2012" or recruitment clearly only in 2019),
+  set both start_year and end_year to that year.
+  If recruitment years cannot be determined, use null for both.
+
+- contact_email:
+  The main contact email for the study, if given (e.g., a study coordinator or general information address).
+  If there are multiple emails, choose the most general one related to the study (e.g., "info@", or the study coordination email).
+  If no contact email is given, return null.
+
+- n_included:
+  The number of INCLUDED participants in the final analytic cohort (not screened / not eligible / not excluded).
+  Exclude numbers invited, screened, eligible but not included, or excluded before analysis.
+  If multiple analyses are presented, choose the N of the main cohort analysis.
+
+- countries:
+  List the COUNTRIES of the INCLUDED participants only.
+
+  IMPORTANT:
+  - A country must be a sovereign state (e.g., "Netherlands", "the Netherlands", "Germany", "United Kingdom").
+  - Do NOT return cities, towns, municipalities, regions, or hospitals as countries.
+    For example, "Bristol area of the UK" or "Dutch municipality of Coevorden" are NOT countries.
+  - If the text only gives a city/region but it clearly lies in a single country (e.g., "Bristol area of the UK"),
+    infer the corresponding country and return the country name (e.g., "United Kingdom"), not the city/region name.
+
+  Return each country name VERBATIM for the country name itself. Deduplicate.
+  Exclude author affiliations and non-contributing sites.
+  Only return an empty list if you genuinely cannot identify any country from participants or the study setting.
+
+- main_medical_condition:
+  The primary disease, disorder, or health condition the study is focused on (e.g., "colorectal cancer", "type 2 diabetes").
+  If the study is on healthy volunteers or a general population without a specific condition, return null.
+
+- other_inclusion_criteria:
+  A list of key inclusion or exclusion criteria that define who was part of the main analytic cohort,
+  EXCLUDING age, calendar time, and geographic location (these are handled elsewhere).
+
+  Include criteria such as:
+  - participant type or role (e.g., "pregnant women", "community-dwelling adults", "general practice patients");
+  - health status (e.g., "no terminal illness", "no cognitive impairment (e.g., dementia)");
+  - psychological or consent-related conditions (e.g., "no current psychological condition precluding informed consent",
+    "able to provide informed consent");
+  - suitability or doctor-based judgement (e.g., "considered suitable to participate by the GP");
+  - other explicit inclusion/exclusion rules not about age, place, or time (e.g., "no prior pelvic surgery",
+    "no history of neurological disease", "no current urinary tract infection").
+
+  Each criterion should be a short phrase; each criterion should be a separate string.
+
+  IMPORTANT:
+  - Do NOT include information about recruitment years or periods (e.g., "during 1990–92") in other_inclusion_criteria.
+  - Do NOT include geographic locations (cities, regions, municipalities, hospitals) in other_inclusion_criteria.
+  - If such non-age, non-location, non-time inclusion/exclusion criteria are clearly described,
+    you MUST return at least one item in other_inclusion_criteria summarising them.
+  - Only return [] if there are genuinely no such criteria described.
+
+- population_age_group:
+  Describe the AGE eligibility or main follow-up age range for the analytic cohort as a short phrase.
+
+  General rule:
+  - If the cohort is a pregnancy/birth/child cohort where children are followed over time, reflect the full child follow-up range.
+    Example: if children are followed from birth / early infancy up to 18 years of age, use "birth to 18 years" or "0–18 years",
+    NOT "18–18 years".
+  - If only a minimum age is given (e.g., "aged 16 years or older"), use "16+ years" or ">=16 years".
+  - If a bounded range is given (e.g., "aged 18–65 years"), use "18–65 years".
+  - If only broad terms are given (e.g., "adults"), return that term (e.g., "adults").
+
+  Avoid degenerate ranges like "18–18 years" unless the study explicitly restricts to exactly that single age.
+  If the age range cannot be determined, return null.
+
+- clinical_study_types:
+  This field captures detailed clinical study types using a controlled vocabulary.
+  Return a LIST of zero or more labels, each chosen ONLY from the list below.
+  If none apply or the design cannot be determined, return [].
+
+  Allowed labels (choose from these exact strings):
+
+  Clinical trial randomisation:
+  - "Randomised clinical trial"
+  - "Non-randomised clinical trial"
+
+  Clinical trial types:
+  - "Low-interventional clinical trial"
+  - "Single-arm trial"
+  - "Large simple trial"
+  - "Pragmatic clinical trial"
+  - "Cluster randomised trial"
+
+  Non-interventional design:
+  - "Cohort"
+  - "Case-control"
+  - "Case-only"
+  - "Cross-sectional"
+  - "Ecological"
+  - "Cluster design"
+  - "Systematic review and meta-analysis"
+  - "Other"
+
+  Clinical trial phase:
+  - "Human pharmacology (Phase I)"
+  - "Therapeutic exploratory (Phase II)"
+  - "Therapeutic confirmatory (Phase III)"
+
+  Mapping rules:
+
+  1) First decide if the study is an interventional clinical trial or non-interventional (observational):
+
+     - If study_types contains "Clinical trial" or the text clearly describes an interventional trial:
+       You may use labels from "Clinical trial randomisation", "Clinical trial types",
+       and "Clinical trial phase".
+
+       Examples:
+       - If the study is described as "randomised", "randomized controlled trial", "RCT":
+         include "Randomised clinical trial".
+       - If the trial has only one treatment arm and no control arm:
+         include "Single-arm trial".
+       - If it is explicitly described as "pragmatic", include "Pragmatic clinical trial".
+       - If it is a cluster randomised trial, include "Cluster randomised trial".
+       - If the trial phase is given:
+         "Phase I" → include "Human pharmacology (Phase I)".
+         "Phase II" or "Phase 2" → include "Therapeutic exploratory (Phase II)".
+         "Phase III" or "Phase 3" → include "Therapeutic confirmatory (Phase III)".
+
+       It is acceptable to return MULTIPLE labels for the same study, for example:
+       ["Randomised clinical trial", "Pragmatic clinical trial", "Therapeutic confirmatory (Phase III)"].
+
+     - If the design is clearly non-interventional (observational) and NOT a clinical trial:
+       Use labels from "Non-interventional design" only.
+
+       Examples:
+       - "prospective cohort study", "retrospective cohort study" → include "Cohort".
+       - "case-control study" → include "Case-control".
+       - "cross-sectional study" or "cross-sectional survey" → include "Cross-sectional".
+       - "systematic review" or "meta-analysis" → include "Systematic review and meta-analysis".
+       - If the design is observational but does not clearly match any of the named designs,
+         include "Other".
+
+  2) Do NOT invent new labels. Every element of clinical_study_types MUST be exactly
+     one of the allowed strings above.
+
+  3) If the design is not clear enough to confidently map to any of these labels, return [].
+"""
+
+
+
+
+[logging]
+level = "INFO"

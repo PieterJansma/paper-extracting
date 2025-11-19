@@ -130,30 +130,25 @@ Extract the following fields from the paper. If a field cannot be determined, re
   If unclear, null.
 
 - clinical_study_types:
-  Short natural-language descriptions (3–15 words) summarising the study design.
-
+  Short natural-language descriptions (3–15 words each) of the study design.
   Examples:
-    - "prospective hospital-based cohort study"
-    - "retrospective observational cohort study"
+    - "prospective population-based cohort study"
+    - "retrospective hospital-based cohort study"
     - "randomised controlled clinical trial"
     - "cross-sectional prevalence survey"
     - "case-control study"
     - "systematic review and meta-analysis"
 
-  Use the design terminology found in the paper. Typical cues include:
-    prospective, retrospective, observational, cross-sectional, longitudinal,
-    hospital-based, population-based, biobank, data-biobank, registry, cohort,
-    trial, randomised, single-arm, pragmatic, case-control.
+  Use the terminology in the paper (e.g., prospective, retrospective,
+  observational, hospital-based, registry, data-biobank, cross-sectional, cohort,
+  randomised, trial, case-control, single-arm).
 
-  IMPORTANT (strong rules):
-  - If the paper contains ANY of these design cues, you MUST return at least
-    one study design phrase summarising the design.
-  - Combine multiple cues if present (e.g., “prospective observational
-    hospital-based data-biobank”).
-  - You MAY return more than one phrase.
-  - Return [] ONLY when the paper provides absolutely no study design
-    information at all (this is rare).
-
+  IMPORTANT:
+  - If the paper clearly describes the design (e.g., prospective, observational,
+    hospital-based, data-biobank, cohort, registry, trial), you MUST return at
+    least one design phrase summarising it.
+  - You may include more than one phrase if multiple design aspects are stated.
+  - Only return [] if the paper provides no design information at all.
 
 """
 
