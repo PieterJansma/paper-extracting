@@ -1,0 +1,152 @@
+[llm]
+base_url = "http://127.0.0.1:8080/v1"
+model    = "numind/NuExtract-2.0-8B"
+api_key  = "sk-local"
+use_grammar = false
+# 1024 is veilig voor 8B en nodig voor lijsten
+max_tokens = 1024
+temperature = 0.0
+
+[pdf]
+# Pas dit pad aan naar de PDF die je wilt draaien (bijv. oncolifes.pdf)
+path = "data/oncolifes.pdf"
+max_pages = 40
+
+# ---------- PASS A: Structuur & Metadata ----------
+[task_main]
+template_json = """
+{
+  "pid": "string",
+  "study_name": "string",
+  "study_acronym": "string",
+  "study_types": ["string"],
+  "cohort_type": "string",
+  "website": "string",
+  "start_year": "integer",
+  "end_year": "integer",
+  "contact_email": "string",
+  "n_included": "integer",
+  "countries": ["verbatim-string"],
+  "regions": ["verbatim-string"],
+  "population_age_group": "string"
+}
+"""
+
+instructions = """
+Extract exact values from the text.
+
+- pid: 
+  Locate the DOI string. It strictly starts with "10." followed by numbers/letters (e.g. "10.1186/s12967...").
+  Return the exact ID.
+
+- study_name: Official name of the cohort.
+- study_acronym: The acronym used (e.g. "OncoLifeS").
+- study_types: Select tags: "Biobank", "Cohort study", "Clinical trial", "Registry".
+- cohort_type: Specific type (e.g. "hospital-based cohort", "population-based cohort").
+- website: Main URL.
+- contact_email: Contact email address.
+- n_included: Number of participants enrolled (e.g. 3704).
+
+- start_year: Year recruitment started.
+
+- end_year: 
+  The year recruitment PERMANENTLY ended.
+  CRITICAL: If the text says "ongoing", "continuous recruitment", or "expected to reach...", return null.
+  Do NOT return the publication year (e.g. 2019) if the study continues.
+
+- countries:
+  Country of recruitment (e.g. "Netherlands"). Use the full English name.
+
+- regions:
+  Specific region (e.g. "North of the Netherlands").
+
+- population_age_group:
+  The age range of eligible participants (e.g. "≥18 years", "Adults").
+"""
+
+# ---------- PASS B: Criteria & Design (Cleaned) ----------
+[task_criteria]
+template_json = """
+{
+  "inclusion_criteria": ["string"],
+  "other_inclusion_criteria": ["string"],
+  "exclusion_criteria": ["string"],
+  "other_exclusion_criteria": ["string"],
+  "clinical_study_types": ["string"]
+}
+"""
+
+instructions = """
+Extract specific eligibility criteria.
+Constraint: Keep phrases short (max 5-6 words).
+
+- inclusion_criteria:
+  List the **Medical Condition** or **Participant Group** only.
+  RULES:
+  1. REMOVE ages (e.g. do NOT say "patients >18 years", just say "patients").
+  2. REMOVE "informed consent".
+  3. REMOVE "all participants".
+  
+  Example Input: "adult patients (>18y) with cancer who signed consent"
+  Example Output: "patients with cancer"
+
+- other_inclusion_criteria:
+  Specific non-medical requirements.
+  RULE: IGNORE "informed consent" (it is standard).
+  Only list special requirements (e.g. "referral by GP").
+  If nothing else is mentioned, return [].
+
+- exclusion_criteria:
+  Medical exclusions. If none mentioned, return [].
+
+- other_exclusion_criteria:
+  Non-medical exclusions (e.g. "language barrier").
+
+- clinical_study_types:
+  Design keywords found in text (e.g. "prospective hospital-based data-biobank").
+"""
+
+# ---------- PASS C: Design & Data Collection ----------
+[task_design_details]
+template_json = """
+{
+  "design": ["string"],
+  "design_description": "string",
+  "data_collection_type": ["string"],
+  "data_collection_description": "string",
+  "description": "string"
+}
+"""
+
+instructions = """
+Extract study design details.
+
+- design:
+  Identify the structural architecture.
+  Choose relevant keywords from: ["Longitudinal", "Cross-sectional", "Case-control", "Cohort study", "Randomized Controlled Trial"].
+  - Longitudinal: Follow-up over time.
+  - Cross-sectional: One point in time.
+
+- design_description:
+  Locate and copy the **single best sentence** from the text that defines the study design.
+  Look in the Methods section.
+  Example: "We established a hospital-based data-biobank..."
+
+- data_collection_type:
+  Identify the timing.
+  Choose from: ["Prospective", "Retrospective"].
+  - Prospective: Future data collection.
+  - Retrospective: Using past records.
+
+- data_collection_description:
+  Locate and copy a sentence describing **HOW** data was obtained.
+  Example: "Clinical data are collected by physicians during routine clinical care..."
+
+- description:
+  Locate the "Objective" or "Aim" sentence in the Abstract or Introduction.
+  Example: "The aim of this study is to describe..."
+  Copy the text verbatim.
+"""
+
+[logging]
+level = "INFO"

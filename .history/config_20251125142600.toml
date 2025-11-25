@@ -1,0 +1,154 @@
+[llm]
+base_url = "http://127.0.0.1:8080/v1"
+model    = "numind/NuExtract-2.0-8B"
+api_key  = "sk-local"
+use_grammar = false
+max_tokens = 1024
+temperature = 0.0
+
+[pdf]
+path = "data/oncolifes.pdf"
+max_pages = 40
+
+# ---------- PASS A: Structuur & Metadata ----------
+[task_main]
+template_json = """
+{
+  "pid": "string",
+  "study_name": "string",
+  "study_acronym": "string",
+  "study_types": ["string"],
+  "cohort_type": "string",
+  "website": "string",
+  "start_year": "integer",
+  "end_year": "integer",
+  "contact_email": "string",
+  "n_included": "integer",
+  "countries": ["verbatim-string"],
+  "regions": ["verbatim-string"],
+  "population_age_group": "string"
+}
+"""
+
+instructions = """
+Extract the following fields.
+
+- pid: 
+  Scan the page headers/footers for the DOI. 
+  It usually looks like "doi:10.1093/..." or "10.1186/...".
+  Return the exact ID string found.
+
+- study_name: Name of the cohort (e.g. "Avon Longitudinal Study of Parents and Children").
+- study_acronym: Explicit acronym (e.g. "ALSPAC").
+- study_types: Labels like "Biobank", "Cohort study".
+- cohort_type: E.g. "birth cohort", "population-based cohort".
+- website: Public URL for the study.
+- contact_email: Contact email address.
+- n_included: Total number of participants enrolled (e.g. 15247).
+
+- start_year: Year recruitment started (e.g. 1990).
+- end_year: 
+  Year the study ended. 
+  RULE: If the text says "follow-up to be lifelong" or "ongoing", return null.
+  Do not use the year recruitment stopped (e.g. 1992) if the follow-up continues.
+
+- countries:
+  Country of recruitment.
+  RULE: Choose the full name (e.g. "United Kingdom"). Do NOT include the abbreviation ("UK") if the full name is present.
+  Return only ONE entry per country.
+
+- regions:
+  Region of recruitment.
+  RULE: Return the shortest specific name (e.g. "South West England"). Do not include variations.
+
+- population_age_group:
+  Main target group (e.g. "Pregnant women").
+"""
+
+# ---------- PASS B: Criteria & Design (Extreem Strict) ----------
+[task_criteria]
+template_json = """
+{
+  "inclusion_criteria": ["string"],
+  "other_inclusion_criteria": ["string"],
+  "exclusion_criteria": ["string"],
+  "other_exclusion_criteria": ["string"],
+  "clinical_study_types": ["string"]
+}
+"""
+
+instructions = """
+Extract ONLY the following fields. Use short keywords.
+
+- inclusion_criteria:
+  Identify the **Subject Group** only.
+  FORBIDDEN: Do NOT include years (1990-92), locations (Bristol), or counts (14541).
+  
+  BAD Output: "pregnant women recruited in Bristol during 1990-92"
+  GOOD Output: "pregnant women"
+  
+  BAD Output: "children eligible up to age 18"
+  GOOD Output: "children of enrolled pregnancies"
+
+- other_inclusion_criteria:
+  Procedural items (e.g. "informed consent").
+  Keep it under 5 words per item.
+
+- exclusion_criteria:
+  Medical exclusions only. If none mentioned, return [].
+
+- other_exclusion_criteria:
+  Non-medical exclusions.
+
+- clinical_study_types:
+  Design keywords.
+  Combine into a single phrase (max 6 words).
+  Example: "prospective population-based birth cohort".
+"""
+
+# ---------- PASS C: Design & Data Collection ----------
+[task_design_details]
+template_json = """
+{
+  "design": ["string"],
+  "design_description": "string",
+  "data_collection_type": ["string"],
+  "data_collection_description": "string",
+  "description": "string"
+}
+"""
+
+instructions = """
+Extract study design details.
+
+- design:
+  Identify the structural architecture.
+  Choose relevant keywords from: ["Longitudinal", "Cross-sectional", "Case-control", "Cohort study", "Randomized Controlled Trial", "Case series"].
+  - Longitudinal: Follow-up over time.
+  - Cross-sectional: One point in time.
+
+- design_description:
+  Locate and copy the **single best sentence** that defines the study design.
+  Look in the Methods section for phrases like: "We conducted a prospective..." or "This study is a...".
+  Return the verbatim text.
+
+- data_collection_type:
+  Identify the timing of data collection.
+  Choose from: ["Prospective", "Retrospective"].
+  - Prospective: Future data collection / follow-up.
+  - Retrospective: Using past records / existing samples.
+  (Return both if the study does both).
+
+- data_collection_description:
+  Locate and copy a sentence describing **HOW** data was obtained.
+  Example: "Data were retrieved from electronic health records..." or "Participants completed questionnaires at baseline...".
+
+- description:
+  A general description of the study aim and scope.
+  Locate the "Objective" or "Aim" sentence in the Abstract or Introduction.
+  Example: "The aim of this study is to describe the organization and development of a data-biobank..."
+  Copy the text verbatim.
+"""
+
+[logging]
+level = "INFO"

@@ -44,7 +44,7 @@ def cli():
     # Load all 3 task configurations
     task_main_cfg = cfg.get("task_main", {})
     task_crit_cfg = cfg.get("task_criteria", {})
-    task_design_cfg = cfg.get("task_design_details", {}) 
+    task_design_cfg = cfg.get("task_design_details", {}) # Nieuw toegevoegd
 
     client = OpenAICompatibleClient(
         base_url=llm_cfg.get("base_url", "http://127.0.0.1:8080/v1"),
@@ -63,7 +63,6 @@ def cli():
         paper_text,
         template_json=task_main_cfg.get("template_json"),
         instructions=task_main_cfg.get("instructions"),
-        use_grammar=bool(llm_cfg.get("use_grammar", False)), # Toegevoegd
         temperature=float(llm_cfg.get("temperature", 0.0)),
         max_tokens=int(llm_cfg.get("max_tokens", 1024)),
     )
@@ -75,26 +74,24 @@ def cli():
         paper_text,
         template_json=task_crit_cfg.get("template_json"),
         instructions=task_crit_cfg.get("instructions"),
-        use_grammar=bool(llm_cfg.get("use_grammar", False)), # Toegevoegd
         temperature=float(llm_cfg.get("temperature", 0.0)),
         max_tokens=int(llm_cfg.get("max_tokens", 1024)),
     )
 
-    # ----- PASS C: design details -----
+    # ----- PASS C: design details (NIEUW) -----
     log.info("Running design pass (task_design_details)")
     res_design = extract_fields(
         client,
         paper_text,
         template_json=task_design_cfg.get("template_json"),
         instructions=task_design_cfg.get("instructions"),
-        use_grammar=bool(llm_cfg.get("use_grammar", False)), # Toegevoegd
         temperature=float(llm_cfg.get("temperature", 0.0)),
         max_tokens=int(llm_cfg.get("max_tokens", 1024)),
     )
 
     # ----- MERGE ALL RESULTS -----
     merged = _merge_json_results(res_main, res_crit)
-    merged = _merge_json_results(merged, res_design)
+    merged = _merge_json_results(merged, res_design) # Merge de design results erbij
     
     _print_pretty_json(merged)
 
