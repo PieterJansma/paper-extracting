@@ -1,0 +1,343 @@
+[llm]
+base_url = "http://127.0.0.1:8080/v1"
+model    = "numind/NuExtract-2.0-8B"
+api_key  = "sk-local"
+use_grammar = false
+max_tokens = 256
+temperature = 0.0
+
+[pdf]
+path = "data/oncolifes.pdf"
+max_pages = 40
+
+# ---------- PASS A: structural / identity fields ----------
+[task_main]
+template_json = """
+{
+  "pid": "string",
+  "study_name": "string",
+  "study_acronym": "string",
+  "study_types": ["string"],
+  "cohort_type": "string",
+  "website": "string",
+  "start_year": "integer",
+  "end_year": "integer",
+  "contact_email": "string",
+  "n_included": "integer",
+  "countries": ["verbatim-string"],
+  "regions": ["verbatim-string"],
+  "population_age_group": "string"
+}
+"""
+
+instructions = """
+Extract the following fields from the paper. If a field cannot be determined, return null (single value) or [] (lists).
+
+GLOBAL META-RULES:
+- All example phrases below are ONLY EXAMPLES. You MUST NOT copy them into the output
+  unless the paper uses exactly the same words.
+- Only describe THIS study or cohort, not other cohorts mentioned for comparison or background.
+
+- pid:
+  Main persistent identifier of the study (usually the DOI "10.xxxx/...").
+  If several DOIs, pick the main study DOI. If none, use another clear registration ID. Otherwise null.
+
+- study_name:
+  Name of the study or cohort.
+  Prefer the named cohort/study over the article title.
+
+- study_acronym:
+  Explicit acronym of the study (e.g. "ALSPAC", "UK Biobank"). If none, null.
+
+- study_types:
+  High-level labels for the design. Use any of:
+  "Biobank", "Cohort study", "Clinical trial", "Registry", "Network", "Other type".
+  You may return more than one.
+
+- cohort_type:
+  If it is a cohort study, return a short subtype such as:
+  "birth cohort", "prospective cohort", "retrospective cohort",
+  "population-based cohort", "hospital-based cohort", "longitudinal cohort".
+  Otherwise null.
+
+- website:
+  Public website URL of the study/biobank, if given.
+  If none, null.
+
+- start_year / end_year:
+  Determine the years when actual participant recruitment or baseline
+  inclusion started and ended.
+
+  - start_year:
+    Use the first clear year when inclusion or data collection began.
+
+  - end_year:
+    Only assign a value if the paper explicitly states that inclusion
+    STOPPED in that year (e.g. “recruited between 2014–2018”).
+    If the paper describes recruitment as ongoing, active, or continuing,
+    set end_year = null.
+
+    IMPORTANT:
+    - Do NOT use projected or expected future targets (e.g. “expected
+      to reach 10,000 participants by 2025”) as end_year.
+    - Do NOT use follow-up end dates, analysis dates, or publication
+      years as end_year unless they also clearly indicate the end of
+      inclusion.
+
+  If only a single start year is given and no recruitment stop year
+  is described, set start_year = that year and end_year = null.
+
+- contact_email:
+  Main contact or study email (or corresponding author if that is all that is given).
+  If none, null.
+
+- n_included:
+  Number of participants in the final analytic cohort.
+  Exclude invited, screened, or eligible-but-not-included counts.
+  If unclear, null.
+
+- countries:
+  List of COUNTRIES where the participants of THIS study/biobank were actually
+  recruited or where they live.
+
+  GOAL:
+  Only include countries that clearly belong to THIS study’s own participants
+  or study setting.
+
+  RULES:
+  - Include a country only if:
+      - participants were recruited there, OR
+      - the cohort is explicitly described as being based there.
+  - IGNORE countries that are:
+      - only mentioned as comparison cohorts in other countries,
+      - only mentioned in the introduction/discussion as examples,
+      - only author or institution locations without recruitment.
+  - A place that is clearly a city, region, province or state
+    (e.g. "Bristol", "South West of England", "California", "Paris", "Munich")
+    MUST NOT be put in countries. These belong in "regions" instead.
+  - Use country names or common abbreviations, e.g. "United Kingdom", "UK", "Netherlands".
+  - Deduplicate the list.
+  - Limit countries to a maximum of 3 items. If more are mentioned,
+    keep only those that are clearly recruitment locations.
+
+  BEFORE RETURNING countries (MANDATORY CHECK):
+  - For each element in the list:
+      * If it is a city or region name (e.g. "Bristol", "South West of England"),
+        remove it from countries. Such names may instead appear in "regions".
+      * If it contains words like "area", "region", "county", "city", "province",
+        treat it as a region, not a country.
+
+- regions:
+  List of subnational areas where participants were recruited, e.g.:
+  city names, regions, provinces, federal states.
+
+  RULES:
+  - Do NOT put plain country names here.
+  - Only include areas that clearly describe where THIS study’s participants
+    were recruited or live.
+  - Examples: "South West of England", "Bristol", "Greater London".
+  - Deduplicate.
+
+- population_age_group:
+  Short description of the age eligibility or main follow-up age range.
+
+  RULES:
+  - For pregnancy or birth cohorts where children are followed over time,
+    use the full child age span, e.g. "birth to 18 years" or "0–18 years".
+    Do NOT collapse this to a single age like "18–18 years".
+  - If only a minimum age is given (e.g. "aged 16 years or older"),
+    use "16+ years" or "≥16 years".
+  - If a bounded adult range is given (e.g. "aged 18–65 years"),
+    use that range directly, e.g. "18–65 years".
+  - If only broad terms like "adults" or "older adults" are used,
+    you may return those terms.
+  - If the age range cannot be determined, return null.
+
+"""
+
+
+# ---------- PASS B: criteria + design ONLY ----------
+[task_criteria]
+template_json = """
+{
+  "inclusion_criteria": ["string"],
+  "other_inclusion_criteria": ["string"],
+  "exclusion_criteria": ["string"],
+  "other_exclusion_criteria": ["string"],
+  "clinical_study_types": ["string"]
+}
+"""
+
+instructions = """
+Extract ONLY the following fields from the paper. If a field cannot be determined, return [].
+
+GLOBAL META-RULES:
+- Always return SHORT phrases (typically 2–8 words).
+- Do NOT copy full sentences from the paper.
+- All example phrases below are ONLY EXAMPLES. You MUST NOT copy them into the output
+  unless the paper uses exactly the same words.
+- Only describe THIS study; ignore text about other cohorts or external comparison studies.
+- Do NOT invent generic categories that are not clearly present in this paper.
+  Every phrase you output must be supported by the wording of the paper
+  (possibly shortened), not by the examples in these instructions.
+
+--------------------------------------------------
+INCLUSION_CRITERIA
+--------------------------------------------------
+- inclusion_criteria:
+  List ONLY the core disease/condition(s) or essential participant category
+  that defines who enters the study, in short phrases.
+
+  Examples of GOOD inclusion_criteria (do not output unless literally present):
+    "pregnant women"
+    "children born to enrolled pregnancies"
+    "patients with cancer"
+    "patients with a genetically increased risk of cancer"
+    "general practice patients"
+
+  RULES:
+  - Only include criteria that clearly define WHO can enter THIS study.
+    Typical patterns: "we recruited [group]", "eligible participants were [group]",
+    "all [group] were invited".
+  - DO NOT include age information (age belongs in population_age_group).
+  - DO NOT include calendar years or time periods.
+  - DO NOT include geographic locations (cities, regions, countries).
+  - DO NOT include sample sizes, numbers of participants, or follow-up descriptions.
+  - Each phrase should be short (2–6 words) and contain no commas.
+  - Do NOT copy long descriptive phrases such as
+      "pregnant women in the Bristol area of the UK during 1990–92".
+    From such a sentence you must reduce to a minimal category phrase like
+      "pregnant women".
+  - Avoid near-duplicates; prefer the simplest clear version.
+  - Limit inclusion_criteria to a maximum of 3 distinct phrases.
+
+  HANDLING NUMBERS / LONG DESCRIPTIONS:
+  - If a sentence contains both a participant group AND numbers/years/locations,
+    you MUST rewrite it to a short generic phrase that contains ONLY the group,
+    for example:
+      "pregnant women in the [region] of [country] during 1990–92"
+         → "pregnant women"
+  - If a sentence only describes counts or changes over time and does NOT add a
+    new participant category (e.g. “increased to 15 247 pregnancies by the age of 18 years”),
+    you MUST ignore it and NOT include it in inclusion_criteria.
+  - If several phrases differ only by numbers, dates, or locations, keep only one
+    short generic version.
+
+  CLEANUP STEPS (MANDATORY BEFORE RETURNING):
+  For the list inclusion_criteria that you propose:
+  1. Remove any phrase that contains a digit (0–9).
+  2. Remove any phrase that contains words like "during", "between",
+     "recruited", "increased", "area", "region".
+  3. Remove any phrase that contains a city, region or country name
+     (e.g. "Bristol", "England", "UK", "Russia", "Greece") or other place names.
+  4. Remove any phrase longer than about 40 characters.
+  5. Remove phrases that are only example text from these instructions
+     (e.g. "community-dwelling adults", "general practice patients") unless
+     the same wording appears in the paper.
+  6. Deduplicate the remaining phrases.
+  7. Sort by simplicity/shortness and keep at most 3 phrases.
+
+  The final inclusion_criteria list should contain only very short, generic
+  participant category labels, such as:
+    ["pregnant women", "children born to enrolled pregnancies"]
+  when the text supports those.
+
+--------------------------------------------------
+OTHER_INCLUSION_CRITERIA
+--------------------------------------------------
+- other_inclusion_criteria:
+  Non-disease, non-age, non-location eligibility details that are not already
+  covered in inclusion_criteria.
+
+  Examples (do not output unless literally present):
+    "informed consent obtained"
+    "participation in routine care processes"
+    "registered at participating practices"
+    "able to provide informed consent"
+
+  RULES:
+  - DO NOT repeat or restate disease/condition names.
+  - DO NOT include age or location.
+  - Prefer administrative or procedural phrases (e.g. about consent, registration,
+    ability to complete questionnaires).
+  - If multiple phrases describe essentially the same requirement, merge/reduce them
+    to one generic phrase. For example, if the paper has both
+      "informed consent obtained" and "able to provide informed consent",
+    you should output at most one consent-related phrase.
+  - Avoid very broad or generic phrases that are not clearly stated in the paper.
+  - Limit other_inclusion_criteria to a maximum of 3–5 phrases.
+  - If there are no clear such criteria, return [].
+
+--------------------------------------------------
+EXCLUSION_CRITERIA
+--------------------------------------------------
+- exclusion_criteria:
+  Explicit conditions that make someone ineligible for THIS study.
+
+  Examples (do not output unless literally present):
+    "terminal illness"
+    "cognitive impairment (e.g. dementia)"
+    "current psychological condition precluding informed consent"
+    "previous pelvic surgery"
+
+  RULES:
+  - Look for words and sections like "Exclusion criteria", "excluded if",
+    "were not eligible if", "were excluded when".
+  - Include medical or functional reasons for non-eligibility as short phrases.
+  - DO NOT include age or location as exclusions.
+  - DO NOT include vague background statements that are not clearly exclusion rules.
+  - Use short phrases, not full sentences.
+  - If no explicit exclusions are stated anywhere in the paper, return [].
+
+--------------------------------------------------
+OTHER_EXCLUSION_CRITERIA
+--------------------------------------------------
+- other_exclusion_criteria:
+  Broader or judgement-based exclusions that do not fit as specific medical
+  exclusions.
+
+  Examples (do not output unless literally present):
+    "serious comorbidity"
+    "unable to comply with follow-up"
+    "considered unsuitable to participate by the GP"
+
+  RULES:
+  - DO NOT repeat exclusions already listed in exclusion_criteria.
+  - DO NOT include age or location.
+  - Use short, generic phrases.
+  - If none are mentioned, return [].
+
+--------------------------------------------------
+CLINICAL_STUDY_TYPES
+--------------------------------------------------
+- clinical_study_types:
+  Short natural-language descriptions (3–15 words) summarising the
+  study design of THIS study.
+
+  Examples (do not output unless literally present):
+    "prospective hospital-based observational data-biobank"
+    "prospective population-based cohort study"
+    "randomised controlled clinical trial"
+    "case-control study"
+    "cross-sectional prevalence survey"
+
+  Use the design cues found in the paper, such as:
+    prospective, retrospective, observational, cross-sectional,
+    longitudinal, cohort, biobank, data-biobank, registry,
+    hospital-based, population-based, randomised, trial,
+    case-control.
+
+  RULES:
+  - Only describe the main design of THIS study, not other studies mentioned
+    in the background or discussion.
+  - If ANY design cues appear anywhere in the description of THIS study, you MUST
+    return at least one study design phrase.
+  - Combine cues when appropriate (e.g. prospective + observational +
+    population-based → "prospective population-based observational cohort study").
+  - Avoid near-duplicates; keep 1–3 clean phrases.
+  - Return [] ONLY when truly no design information is present.
+"""
+
+
+[logging]
+level = "INFO"

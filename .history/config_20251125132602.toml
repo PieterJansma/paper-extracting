@@ -3,12 +3,12 @@ base_url = "http://127.0.0.1:8080/v1"
 model    = "numind/NuExtract-2.0-8B"
 api_key  = "sk-local"
 use_grammar = false
-# BELANGRIJK: Verhoogd naar 1024 zodat de lijsten met criteria niet worden afgekapt
+# BELANGRIJK: Verhoogd van 256 naar 1024 om ruimte te geven voor de lijsten
 max_tokens = 1024
 temperature = 0.0
 
 [pdf]
-path = "data/dys064.pdf"
+path = "data/oncolifes.pdf"
 max_pages = 40
 
 # ---------- PASS A: structural / identity fields ----------
@@ -34,39 +34,33 @@ template_json = """
 instructions = """
 Extract the following fields from the paper. If a field cannot be determined, return null (single value) or [] (lists).
 
-- pid: 
-  Find the actual DOI string in the text (usually starts with "10.").
-  Example text to look for: "https://doi.org/10.1186/..."
-  IMPORTANT: Do NOT output the placeholder "10.xxxx/...". Extract the real numbers.
-
+- pid: Main DOI (e.g. "10.xxxx/...") or registration ID.
 - study_name: Name of the cohort (e.g. "OncoLifeS").
 - study_acronym: Explicit acronym (e.g. "OncoLifeS").
-
-- study_types: 
-  High-level labels. Choose from: "Biobank", "Cohort study", "Clinical trial", "Registry", "Network".
-  
-- cohort_type: 
-  Specific subtype. E.g. "hospital-based cohort", "population-based cohort", "prospective cohort".
-
+- study_types: Choose from: "Biobank", "Cohort study", "Clinical trial", "Registry", "Network".
+- cohort_type: E.g. "hospital-based cohort", "population-based cohort", "prospective cohort".
 - website: Public URL for the study.
 - contact_email: Contact email address.
-- n_included: Number of participants included in the analysis or biobank (e.g. 3704).
+- n_included: Number of participants actually included in the analysis or biobank so far.
 
-- start_year: The year when recruitment or data collection began (e.g. 2014).
-
+- start_year: The year when recruitment or data collection began.
 - end_year: 
   The year when recruitment explicitly STOPPED. 
-  CRITICAL RULE: If the study is "ongoing", "continuous", or if the date is a future projection (e.g. "expected to reach... by 2023"), return null.
+  IMPORTANT: If the study is described as "ongoing", "continuous", or "prospective" without a stop date, return null.
+  Do NOT use future projections (e.g. "expected to reach... by 2023").
 
 - countries:
   List of countries where recruitment took place.
-  If the study is hospital-based, include the country of the hospital (e.g. "Netherlands").
+  If the study is hospital-based, include the country of the hospital mentioned in the "Setting" or "Methods".
+  Example: "Netherlands", "United Kingdom".
 
 - regions:
-  Specific cities or sub-national regions (e.g. "Groningen", "North of the Netherlands").
+  Specific cities, provinces, or sub-national regions where recruitment took place.
+  Example: "Groningen", "North of the Netherlands".
 
 - population_age_group:
-  The age range of eligible participants (e.g. "≥18 years").
+  The age range of eligible participants.
+  Examples: "≥18 years", "18-65 years", "adults".
 """
 
 # ---------- PASS B: criteria + design ONLY ----------
@@ -108,6 +102,3 @@ Extract ONLY the following fields. Return short, concise phrases.
   Look for keywords like: "prospective", "retrospective", "observational", "hospital-based", "biobank", "cohort".
   Combine them into a phrase like: "prospective hospital-based data-biobank".
 """
-
-[logging]
-level = "INFO"
