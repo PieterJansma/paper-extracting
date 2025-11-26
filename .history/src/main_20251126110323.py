@@ -74,7 +74,7 @@ def cli():
             instructions=task_cfg.get("instructions"),
             use_grammar=bool(llm_cfg.get("use_grammar", False)),
             temperature=float(llm_cfg.get("temperature", 0.0)),
-            max_tokens=int(llm_cfg.get("max_tokens", 1024)),
+            max_tokens=int(llm_cfg.get("max_tokens", 2048)),
         )
 
     # De lijst met taken, nu inclusief G

@@ -32,16 +32,18 @@ def _print_pretty_json(data: Any) -> None:
 
 
 def cli():
+    # 1. Argument Parser
     parser = argparse.ArgumentParser(description="Run PDF extraction passes.")
     parser.add_argument(
         "-p", "--passes", 
         nargs="+", 
         default=["all"],
-        help="Specify passes: A, B, C, D, E, F, G. Default: 'all'"
+        help="Specify passes to run: A, B, C, D, E, F. Default: 'all'"
     )
     args = parser.parse_args()
     selected_passes = [p.upper() for p in args.passes]
     
+    # 2. Load Config
     cfg_path = os.environ.get("PDF_EXTRACT_CONFIG", "config.toml")
     cfg = load_config(cfg_path)
 
@@ -61,6 +63,7 @@ def cli():
     paper_text = load_pdf_text(pdf_cfg["path"], max_pages=pdf_cfg.get("max_pages"))
     log.info("PDF loaded (%d chars)", len(paper_text))
 
+    # 3. Helper function
     def run_pass(name, cfg_section_key):
         task_cfg = cfg.get(cfg_section_key, {})
         if not task_cfg:
@@ -77,7 +80,7 @@ def cli():
             max_tokens=int(llm_cfg.get("max_tokens", 1024)),
         )
 
-    # De lijst met taken, nu inclusief G
+    # 4. Define Tasks (Alle 6 passes)
     all_tasks = [
         ("A", "Pass A (Main)", "task_main"),
         ("B", "Pass B (Criteria)", "task_criteria"),
@@ -85,11 +88,11 @@ def cli():
         ("D", "Pass D (Population)", "task_population"),
         ("E", "Pass E (Access)", "task_access"),
         ("F", "Pass F (Contributors)", "task_contributors"),
-        ("G", "Pass G (Data Model)", "task_datamodel"), # <--- NIEUW
     ]
 
     merged_results = {}
 
+    # 5. Execute
     for code, name, section in all_tasks:
         if "ALL" in selected_passes or code in selected_passes:
             res = run_pass(f"{name} [{code}]", section)
