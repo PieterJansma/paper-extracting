@@ -49,7 +49,9 @@ Extract exact values from the text.
   Choose best fit from: "Planning", "Recruiting", "Ongoing", "Completed", "Terminated", "Unknown".
 - website: Main URL.
 - contact_email: Contact email address.
-- n_included: Number of participants enrolled (e.g. 3704).
+- n_included:
+  The number of participants who actually entered the study (e.g. signed consent or provided data).
+  **CRITICAL EXCLUSION:** Do NOT extract the number of people "invited", "approached", or the total "source population" size. Only count the actual participants.
 
 - start_year: Year recruitment started.
 
@@ -159,6 +161,8 @@ Extract study design details.
 - description:
   Copy the "Aim" or "Objective" sentence verbatim from the Abstract.
 - time_span_description:
+  Text describing the specific duration of storage or follow-up (e.g. "Stored for 110 years", "Follow-up until death").
+  If not explicitly stated, return null. Do NOT copy examples.
   Text describing the duration or specific time coverage of the data collection (e.g. "Follow-up for 10 years", "Data collected between 1990 and 2020").
 """
 # ---------- PASS D: Population & Samples (Final Polish) ----------
@@ -188,7 +192,10 @@ instructions = """
 Extract population details.
 
 - number_of_participants_with_samples:
-  Count of individuals with stored samples. If the paper implies not everyone has samples (e.g. "available for 80%"), return null.
+  Count of individuals with stored BIOLOGICAL samples (e.g. blood, tissue, dna).
+  **CRITICAL:** If the study ONLY collects data (questionnaires, medical records, imaging) and NO biological material, return null. 
+  Do NOT output the total number of participants if they don't have samples.
+
 
 - underlying_population:
   "Hospital patients" (if clinical) or "General population" (if registry/community).
@@ -423,9 +430,9 @@ Extract data standards, vocabularies, and datasets.
 3. **Vocabularies:** Do not guess. Use strict extraction.
 
 - datasets_resource:
-  Names of administrative databases, registries, or external cohorts linked to this study.
-  **Instruction:** Look for capitalized names of registries or databases mentioned in the context of "record linkage" or "data retrieval".
-  **Exclude:** Comparison studies in the Discussion.
+  Names of administrative databases or registries that are LINKED to or INTEGRATED into this resource.
+  **CRITICAL EXCLUSION:** Do NOT list other biobanks/cohorts mentioned in the text for comparison purposes (e.g. "Comparable biobanks are..."). 
+  Only list datasets that are actually PART of this resource.
 
 - datasets_name:
   (Same as above).
@@ -853,15 +860,21 @@ Extract metadata regarding Identifiers, Documentation, Legislation, and Dates.
   - 'resource': URL or 'Available on website'.
 
 - internal_identifiers:
-  List registration numbers or codes assigned by the study owner itself.
-  - 'resource': The name of the institute or department issuing the ID.
-  - 'identifier': The explicit code or number found in the text.
-  **CRITICAL:** If no internal registration number is mentioned, return [].
+  List administrative codes assigned specifically to the resource/biobank by the hosting institute to identify the DATASET or COLLECTION.
+
+  **ROBUST EXCLUSION (CRITICAL):**
+  You must ignore numbers that serve a different purpose. 
+  Do NOT include:
+  - Ethics / Governance approvals (keywords: METC, IRB, Ethics Committee, Approval).
+  - Grant / Funding awards.
+  - Clinical Trial Registry IDs (unless explicitly stated as internal).
+  
+  If the only numbers found are related to ethics or funding, return [].
 
 - external_identifiers:
   List identifiers assigned by EXTERNAL registries or databases.
-  - 'resource': Name of the external database (e.g. "ClinicalTrials.gov", "BBMRI", "EUPASS").
-  - 'identifier': The ID string (e.g. "NCT01234567").
+  - 'resource': Name of the external database .
+  - 'identifier': The ID string.
 
 - supplementary_information: Relevant notes on access.
 - theme: Keywords describing the medical domain from Title/Abstract.

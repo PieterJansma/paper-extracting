@@ -5,8 +5,8 @@ import json
 from typing import Optional, Dict, Any, List
 from pypdf import PdfReader
 
-from .llm_client import OpenAICompatibleClient
-
+# GOED (zonder punt)
+from llm_client import OpenAICompatibleClient
 # Probeer grammar te laden, maar faal niet als het mist
 try:
     from .llm_grammar import GRAMMAR_JSON_INT_OR_NULL

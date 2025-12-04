@@ -13,8 +13,8 @@ try:
 except ModuleNotFoundError:
     import tomli as toml
 
-from .llm_client import OpenAICompatibleClient
-from .extract_pipeline import load_pdf_text, extract_fields, _merge_json_results
+from llm_client import OpenAICompatibleClient
+from extract_pipeline import load_pdf_text, extract_fields, _merge_json_results
 
 # ==============================================================================
 # 1. DE OFFICIËLE VOLGORDE (Je Target Excel Headers)
@@ -95,7 +95,7 @@ KEY_MAPPING = {
     # --- Pass A ---
     "pid": "pid",
     "study_name": "name",
-    "local_name": "local name",          # <--- NIEUW
+    "local_name": "local name",         
     "study_acronym": "acronym",
     "study_types": "type",
     "cohort_type": "cohort type",
@@ -108,7 +108,7 @@ KEY_MAPPING = {
     "countries": "countries",
     "regions": "regions",
     "population_age_group": "population age groups",
-    "keywords": "keywords",              # <--- NIEUW
+    "keywords": "keywords",         
 
     # --- Pass B ---
     "inclusion_criteria": "inclusion criteria",
@@ -116,17 +116,17 @@ KEY_MAPPING = {
     "exclusion_criteria": "exclusion criteria",
     "other_exclusion_criteria": "other exclusion criteria",
     "clinical_study_types": "clinical study type",
-    "type_other": "type other",          # <--- NIEUW
-    "rwd_type": "RWD type",              # <--- NIEUW
-    "network_type": "network type",      # <--- NIEUW
+    "type_other": "type other",      
+    "rwd_type": "RWD type",        
+    "network_type": "network type",   
 
     # --- Pass C ---
     "design": "design",
     "design_description": "design description",
     "data_collection_type": "data collection type",
     "data_collection_description": "data collection description",
-    "description": "description", # Algemene beschrijving / Aim
-    "time_span_description": "time span description", # <--- NIEUW
+    "description": "description", 
+    "time_span_description": "time span description", 
 
     # --- Pass D ---
     "number_of_participants_with_samples": "number of participants with samples",
@@ -273,12 +273,8 @@ KEY_MAPPING = {
     "acknowledgements": "acknowledgements",
     "provenance_statement": "provenance statement",
     "documentation": "documentation.resource",
-    
-    # Identifiers: We mappen de JSON-lijst naar de .resource kolom.
-    # De bijbehorende .identifier kolom blijft in Excel leeg (maar aanwezig).
-    "internal_identifiers": "internal identifiers.resource", # <--- NIEUW
-    "external_identifiers": "external identifiers.resource", # <--- NIEUW
-    
+    "internal_identifiers": "internal identifiers.resource",
+    "external_identifiers": "external identifiers.resource", 
     "supplementary_information": "supplementary information",
     "theme": "theme",
     "applicable_legislation": "applicable legislation",
@@ -286,7 +282,7 @@ KEY_MAPPING = {
     "collection_start_actual": "collection start actual",
     "analysis_start_planned": "analysis start planned",
     "analysis_start_actual": "analysis start actual",
-    "metadata_issued": "issued",         # <--- NIEUW
+    "metadata_issued": "issued",  
     "metadata_modified": "modified",
 
     # --- Pass N ---
