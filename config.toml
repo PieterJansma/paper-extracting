@@ -369,7 +369,6 @@ Extract contributor and network details mapping to the requested schema.
 
 - publisher_id:
   External ID of publisher (if mentioned). Otherwise null.
-
 - creator_resource:
   Name of the organisation that created the resource.
 
