@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-import sys  # <--- NODIG
+import sys  # <--- REQUIRED
 import tempfile
 import json
 import logging
@@ -10,28 +10,28 @@ from bs4 import BeautifulSoup
 from io import BytesIO
 
 # ==============================================================================
-# BELANGRIJK: Voeg de 'src' map toe aan het pad
+# IMPORTANT: Add the 'src' directory to the path
 # ==============================================================================
-# Dit zorgt ervoor dat Python de bestanden in de map 'src' kan vinden
+# This ensures Python can find the files inside the 'src' folder
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
-# Nu kunnen we gewoon importeren alsof de bestanden naast app.py staan
+# Now we can import as if the files are located right next to app.py
 try:
-    # Let op: Zorg dat in src/ bestand imports GEEN punt (.) hebben
+    # Note: Ensure that imports within src/ files do NOT use dots (.)
     from llm_client import OpenAICompatibleClient
     from extract_pipeline import load_pdf_text, extract_fields, _merge_json_results
 except ImportError as e:
-    st.error(f"Fout bij importeren: {e}. Check of de bestanden in de map 'src' staan en geen relatieve imports (met punten) gebruiken.")
+    st.error(f"Error importing: {e}. Check if the files are in the 'src' folder and do not use relative imports (with dots).")
     st.stop()
 
-# Importeer toml
+# Import toml
 try:
     import tomllib as toml
 except ModuleNotFoundError:
     import tomli as toml
 
 # ==============================================================================
-# 1. CONFIGURATIE & CONSTANTEN
+# 1. CONFIGURATION & CONSTANTS
 # ==============================================================================
 
 OFFICIAL_ORDER = [
@@ -239,17 +239,17 @@ TASKS_INFO = {
 }
 
 # ==============================================================================
-# 2. HELPER FUNCTIES
+# 2. HELPER FUNCTIONS
 # ==============================================================================
 
 def load_app_config():
-    """Laad config.toml."""
+    """Load config.toml."""
     cfg_path = os.environ.get("PDF_EXTRACT_CONFIG", "config.toml")
     with open(cfg_path, "rb") as f:
         return toml.load(f)
 
 def scrape_site_for_images(url: str):
-    """Probeert logo te scrapen van website."""
+    """Attempts to scrape a logo from the website."""
     if not url or not url.startswith("http"):
         return None
     
@@ -260,28 +260,28 @@ def scrape_site_for_images(url: str):
         
         soup = BeautifulSoup(r.text, 'html.parser')
         
-        # 1. Check Open Graph image (Facebook/LinkedIn plaatje)
+        # 1. Check Open Graph image (Facebook/LinkedIn image)
         og_image = soup.find("meta", property="og:image")
         if og_image and og_image.get("content"):
             return og_image["content"]
             
-        # 2. Check voor 'logo' in img src
+        # 2. Check for 'logo' in img src
         for img in soup.find_all('img'):
             src = img.get('src', '')
             if 'logo' in src.lower():
-                # Maak absolute URL als het relatief is
+                # Make absolute URL if it is relative
                 if not src.startswith("http"):
                     return requests.compat.urljoin(url, src)
                 return src
                 
     except Exception as e:
-        # We willen niet crashen als website niet werkt
+        # We don't want to crash if the website doesn't work
         return None
     return None
 
 def create_excel_bytes(raw_data: dict) -> BytesIO:
-    """Maakt Excel bestand in geheugen (voor download knop)."""
-    # 1. Transformeer
+    """Creates an Excel file in memory (for the download button)."""
+    # 1. Transform
     transformed = {col: None for col in OFFICIAL_ORDER}
     for extraction_key, official_col in KEY_MAPPING.items():
         if extraction_key in raw_data:
@@ -289,7 +289,7 @@ def create_excel_bytes(raw_data: dict) -> BytesIO:
             if val is not None:
                 transformed[official_col] = val
 
-    # 2. Plat slaan
+    # 2. Flatten
     flat_data = {}
     for k, v in transformed.items():
         if v is None:
@@ -299,13 +299,13 @@ def create_excel_bytes(raw_data: dict) -> BytesIO:
         else:
             flat_data[k] = str(v)
 
-    # 3. Naar Excel bytes
+    # 3. To Excel bytes
     df = pd.DataFrame([flat_data])
     df = df.reindex(columns=OFFICIAL_ORDER)
     
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Extractie')
+        df.to_excel(writer, index=False, sheet_name='Extraction')
     return output
 
 # ==============================================================================
@@ -315,42 +315,41 @@ def create_excel_bytes(raw_data: dict) -> BytesIO:
 st.set_page_config(page_title="PDF Biobank Extractor", layout="wide")
 
 st.title("📄 PDF Biobank Extractor")
-st.markdown("Upload een PDF, selecteer de extractie-taken en download het resultaat direct in Excel formaat.")
+st.markdown("Upload a PDF, select the extraction tasks, and download the result directly in Excel format.")
 
-# --- SIDEBAR: Instellingen ---
+# --- SIDEBAR: Settings ---
 with st.sidebar:
-    st.header("Instellingen")
+    st.header("Settings")
     
     # PDF Upload
-    uploaded_file = st.file_uploader("Kies een PDF bestand", type=["pdf"])
+    uploaded_file = st.file_uploader("Choose a PDF file", type=["pdf"])
     
     st.divider()
     
-    # Pass Selectie
-    st.subheader("Selecteer Taken")
-    all_passes = st.checkbox("Alles Selecteren", value=True)
+    # Pass Selection
+    st.subheader("Select Tasks")
+    all_passes = st.checkbox("Select All", value=True)
     
     selected_passes = []
     if all_passes:
         selected_passes = list(TASKS_INFO.keys())
-        st.info("Alle 14 taken worden uitgevoerd.")
+        st.info("All 14 tasks will be executed.")
     else:
         for code, desc in TASKS_INFO.items():
             if st.checkbox(desc, value=False):
                 selected_passes.append(code)
     
     st.divider()
-    run_btn = st.button("🚀 Start Extractie", type="primary", disabled=(not uploaded_file or not selected_passes))
+    run_btn = st.button("🚀 Start Extraction", type="primary", disabled=(not uploaded_file or not selected_passes))
 
-# --- MAIN: Uitvoering ---
-# --- MAIN: Uitvoering ---
+# --- MAIN: Execution ---
 if run_btn and uploaded_file:
-    # 1. Tijdelijk opslaan PDF
+    # 1. Temporarily save PDF
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
         tmp_pdf.write(uploaded_file.read())
         tmp_pdf_path = tmp_pdf.name
 
-    # 2. Config laden
+    # 2. Load Config
     cfg = load_app_config()
     llm_cfg = cfg["llm"]
     
@@ -362,32 +361,32 @@ if run_btn and uploaded_file:
         use_grammar=bool(llm_cfg.get("use_grammar", False)),
     )
 
-    # 4. PDF Tekst Laden
-    with st.spinner("PDF Tekst aan het inlezen..."):
+    # 4. Load PDF Text
+    with st.spinner("Reading PDF Text..."):
         paper_text = load_pdf_text(tmp_pdf_path, max_pages=cfg["pdf"].get("max_pages", 40))
     
-    st.success(f"PDF geladen ({len(paper_text)} karakters). Extractie start nu...")
+    st.success(f"PDF loaded ({len(paper_text)} characters). Extraction starting now...")
     st.divider()
 
-    # --- LAYOUT SETUP VOOR LIVE RESULTATEN ---
-    # We maken hier alvast de kolommen aan, zodat we ze tijdens het runnen kunnen vullen
+    # --- LAYOUT SETUP FOR LIVE RESULTS ---
+    # We create the columns here so we can fill them while running
     col_status, col_result = st.columns([1, 1])
 
     merged_results = {}
 
-    # Rechts: Hier komt de JSON die steeds update. We maken een 'leeg vak' (placeholder)
+    # Right: Here comes the JSON that updates constantly. We make an 'empty slot' (placeholder)
     with col_result:
-        st.subheader("📊 Live Resultaten")
-        json_placeholder = st.empty() # Dit vakje kunnen we steeds overschrijven
-        json_placeholder.info("Wachten op data...")
+        st.subheader("📊 Live Results")
+        json_placeholder = st.empty() # We can overwrite this slot
+        json_placeholder.info("Waiting for data...")
 
-    # Links: De voortgang en status updates
+    # Left: The progress and status updates
     with col_status:
-        st.subheader("⚙️ Voortgang")
-        # We gebruiken st.status voor de logs
-        with st.status("Extractie loopt...", expanded=True) as status:
+        st.subheader("⚙️ Progress")
+        # We use st.status for the logs
+        with st.status("Extraction running...", expanded=True) as status:
             
-            # Mapping van Code -> Config Sectie
+            # Mapping from Code -> Config Section
             pass_mapping = {
                 "A": "task_main", "B": "task_criteria", "C": "task_design_details",
                 "D": "task_population", "E": "task_access", "F": "task_contributors",
@@ -396,15 +395,15 @@ if run_btn and uploaded_file:
                 "M": "task_docs_legislation_dates", "N": "task_study_content"
             }
 
-            # 5. Loop door Passes
-            for code in TASKS_INFO.keys(): # Volgorde behouden
+            # 5. Loop through Passes
+            for code in TASKS_INFO.keys(): # Keep order
                 if code in selected_passes:
                     desc = TASKS_INFO[code]
                     section = pass_mapping[code]
                     
                     st.write(f"⏳ **{desc}**...")
                     
-                    # Voer taak uit
+                    # Execute task
                     task_cfg = cfg.get(section, {})
                     if task_cfg:
                         res = extract_fields(
@@ -415,45 +414,45 @@ if run_btn and uploaded_file:
                             temperature=0.0,
                             max_tokens=2048
                         )
-                        # Resultaten samenvoegen
+                        # Merge results
                         merged_results = _merge_json_results(merged_results, res)
                         
-                        # --- HIER IS DE MAGIE: UPDATE DE JSON LIVE ---
+                        # --- HERE IS THE MAGIC: UPDATE THE JSON LIVE ---
                         json_placeholder.json(merged_results, expanded=False)
                         
                     else:
-                        st.warning(f"Config sectie {section} ontbreekt!")
+                        st.warning(f"Config section {section} missing!")
             
-            # 6. Scraping (Optioneel)
+            # 6. Scraping (Optional)
             if "website" in merged_results and merged_results["website"]:
-                st.write("🌐 Website gevonden. Zoeken naar logo...")
+                st.write("🌐 Website found. Searching for logo...")
                 logo_url = scrape_site_for_images(merged_results["website"])
                 if logo_url:
                     merged_results["logo"] = logo_url
-                    st.write(f"✅ Logo gevonden: {logo_url}")
-                    # Laatste update van JSON met logo erbij
+                    st.write(f"✅ Logo found: {logo_url}")
+                    # Last update of JSON with logo included
                     json_placeholder.json(merged_results, expanded=False)
                 else:
-                    st.write("❌ Geen logo gevonden.")
+                    st.write("❌ No logo found.")
 
-            status.update(label="Extractie Voltooid!", state="complete", expanded=False)
+            status.update(label="Extraction Complete!", state="complete", expanded=False)
 
-    # 7. Download Knop (verschijnt pas als alles klaar is)
+    # 7. Download Button (appears only when everything is done)
     st.divider()
-    st.success("✅ Alles klaar! Je kunt de Excel nu downloaden.")
+    st.success("✅ All done! You can now download the Excel file.")
     
     excel_data = create_excel_bytes(merged_results)
     
     st.download_button(
         label="📥 Download Excel (.xlsx)",
         data=excel_data.getvalue(),
-        file_name=f"extractie_{uploaded_file.name.replace('.pdf', '')}.xlsx",
+        file_name=f"extraction_{uploaded_file.name.replace('.pdf', '')}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         type="primary"
     )
 
-    # Opruimen tmp file
+    # Cleanup tmp file
     os.remove(tmp_pdf_path)
 
 elif not uploaded_file:
-    st.info("👈 Upload eerst een PDF in de zijbalk om te beginnen.")
+    st.info("👈 Please upload a PDF in the sidebar to start.")
