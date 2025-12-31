@@ -18,7 +18,7 @@ NGL=999
 LOG_DIR="${PWD}/logs"
 mkdir -p "$LOG_DIR"
 
-DEFAULT_CMD=(python3 main.py -p all -o final_result.xlsx)
+DEFAULT_CMD=(python3 src/main.py -p all -o final_result.xlsx)
 if [[ $# -gt 0 ]]; then RUN_CMD=("$@"); else RUN_CMD=("${DEFAULT_CMD[@]}"); fi
 
 if command -v module >/dev/null 2>&1; then
