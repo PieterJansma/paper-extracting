@@ -55,17 +55,72 @@ fi
 echo "[0/4] Runtime config maken met base_url via Load Balancer..."
 RUNTIME_CFG="${PWD}/config.runtime.toml"
 cp -f "config.toml" "$RUNTIME_CFG"
-
 sed -i -E "s|^(base_url[[:space:]]*=[[:space:]]*\").*(\"[[:space:]]*)$|\1http://127.0.0.1:${PORT_LB}/v1\2|g" "$RUNTIME_CFG"
 export PDF_EXTRACT_CONFIG="$RUNTIME_CFG"
 
-echo "[1/4] Starten Load Balancer..."
+pids=()
+LB_PID=""
+
+cleanup() {
+  echo "[CLEANUP] Stoppen..."
+  if [[ -n "${LB_PID}" ]]; then kill "${LB_PID}" 2>/dev/null || true; fi
+  if [[ ${#pids[@]} -gt 0 ]]; then kill "${pids[@]}" 2>/dev/null || true; fi
+  rm -f tcp_lb.py
+  rm -f "$RUNTIME_CFG"
+}
+trap cleanup EXIT INT TERM
+
+start_server() {
+  local gpu="$1" model="$2" port="$3" log="$4"
+  echo "[START] Qwen 32B op GPU ${gpu} (Poort ${port})..."
+  CUDA_VISIBLE_DEVICES="$gpu" nohup "$LLAMA_BIN" \
+    -m "$model" -fa on \
+    -ngl "$NGL" -c "$CTX" --parallel "$SLOTS" \
+    --host 127.0.0.1 --port "$port" >>"$log" 2>&1 &
+  local pid=$!
+  pids+=("$pid")
+}
+
+# Wacht totdat chat/completions echt werkt (dus niet alleen /health)
+wait_chat_ready() {
+  local port="$1"
+  echo -n "  ⏳ Wachten tot /v1/chat/completions klaar is op poort $port..."
+
+  local payload
+  payload='{"model":"local","messages":[{"role":"user","content":"ping"}],"temperature":0.0,"max_tokens":1}'
+
+  for i in {1..240}; do
+    if curl -sS -m 5 \
+      -H "Content-Type: application/json" \
+      -d "$payload" \
+      "http://127.0.0.1:${port}/v1/chat/completions" >/dev/null 2>&1; then
+      echo " ✅ READY"
+      return 0
+    fi
+    sleep 2
+    echo -n "."
+  done
+
+  echo " ❌ TIMEOUT"
+  return 1
+}
+
+echo "[1/4] Starten Servers..."
+start_server 0 "$MODEL_GPU0" "$PORT_GPU0" "$LOG_DIR/gpu0.log"
+start_server 1 "$MODEL_GPU1" "$PORT_GPU1" "$LOG_DIR/gpu1.log"
+
+echo "[2/4] Wachten tot modellen echt klaar zijn..."
+wait_chat_ready "$PORT_GPU0" || exit 1
+wait_chat_ready "$PORT_GPU1" || exit 1
+
+echo "[3/4] Starten Load Balancer (na readiness)..."
 cat > tcp_lb.py <<EOF
-import socket, threading, select, random
+import socket, threading, select, itertools
 BIND_ADDR = ('0.0.0.0', $PORT_LB)
 BACKENDS = [('127.0.0.1', $PORT_GPU0), ('127.0.0.1', $PORT_GPU1)]
+rr = itertools.cycle(BACKENDS)
 def handle_conn(client_sock):
-    target = random.choice(BACKENDS)
+    target = next(rr)  # round-robin (stabieler dan random)
     try:
         server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_sock.connect(target)
@@ -83,14 +138,15 @@ def handle_conn(client_sock):
     except:
         pass
     finally:
-        client_sock.close()
+        try: client_sock.close()
+        except: pass
         try: server_sock.close()
         except: pass
 def main():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind(BIND_ADDR)
-    s.listen(10)
+    s.listen(128)
     while True:
         conn, _ = s.accept()
         t = threading.Thread(target=handle_conn, args=(conn,))
@@ -102,51 +158,6 @@ EOF
 
 python3 tcp_lb.py > "$LOG_DIR/lb.log" 2>&1 &
 LB_PID=$!
-
-pids=()
-start_server() {
-  local gpu="$1" model="$2" port="$3" log="$4"
-  echo "[START] Qwen 32B op GPU ${gpu} (Poort ${port})..."
-  CUDA_VISIBLE_DEVICES="$gpu" nohup "$LLAMA_BIN" \
-    -m "$model" -fa on \
-    -ngl "$NGL" -c "$CTX" --parallel "$SLOTS" \
-    --host 127.0.0.1 --port "$port" >>"$log" 2>&1 &
-  local pid=$!
-  pids+=("$pid")
-}
-
-cleanup() {
-  echo "[CLEANUP] Stoppen..."
-  kill $LB_PID "${pids[@]}" 2>/dev/null || true
-  rm -f tcp_lb.py
-  rm -f "$RUNTIME_CFG"
-}
-trap cleanup EXIT INT TERM
-
-echo "[2/4] Starten Servers..."
-start_server 0 "$MODEL_GPU0" "$PORT_GPU0" "$LOG_DIR/gpu0.log"
-start_server 1 "$MODEL_GPU1" "$PORT_GPU1" "$LOG_DIR/gpu1.log"
-
-wait_health() {
-  local port="$1"
-  echo -n "  ⏳ Wachten op poort $port..."
-  for i in {1..180}; do
-    if curl -s "http://127.0.0.1:${port}/health" >/dev/null 2>&1; then
-      if curl -s "http://127.0.0.1:${port}/v1/models" >/dev/null 2>&1; then
-        echo " ✅ OK"
-        return 0
-      fi
-    fi
-    sleep 2
-    echo -n "."
-  done
-  echo " ❌ TIMEOUT"
-  return 1
-}
-
-echo "[3/4] Wachten tot modellen geladen zijn..."
-wait_health "$PORT_GPU0" || exit 1
-wait_health "$PORT_GPU1" || exit 1
 
 echo "[4/4] Starten main.py (PDF extractie → Excel)..."
 echo "  PDF_EXTRACT_CONFIG=$PDF_EXTRACT_CONFIG"
