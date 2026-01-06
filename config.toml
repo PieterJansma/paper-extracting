@@ -22,7 +22,7 @@ template_json = """
   "study_name": "string",
   "local_name": "string",
   "study_acronym": "string",
-  "study_types": ["string"],
+  "resource_type": ["string"],
   "cohort_type": "string",
   "study_status": "string",
   "website": "string",
@@ -38,43 +38,41 @@ template_json = """
 """
 
 instructions = """
-Extract exact values.
+Extract exact values only.
+
+- resource_type:
+  Type of RESOURCE (not design, not methodology).
+  Allowed values only:
+  - "cohort"
+  - "registry"
+  - "biobank"
+  - "clinical trial"
+  - "database"
+  Return one or more if explicitly stated.
+  Do NOT use terms like "observational", "prospective", "pragmatic".
 
 - study_name:
-  Official name of the study/cohort/program.
-  HARD: If only the paper title is found, return null. Do not invent.
+  Official name of the study/cohort.
+  If only the paper title is present → return null.
 
-- local_name: 
-  The name in the local national language (e.g. Dutch names) if explicitly mentioned.
+- local_name:
+  Local or participant-facing name if explicitly mentioned.
 
-- study_acronym: 
-  The short acronym (e.g. "VeCaS", "LOFIT", "CONCRETE").
+- study_acronym:
+  Acronym only if explicitly stated.
 
-- cohort_type: 
-  Classify based on recruitment setting:
-  - "Primary care-based" (if recruited by GPs, Midwives, or First Line care).
-  - "Hospital-based" (if recruited in Clinical/Academic Hospital departments).
-  - "Population-based" (if recruited from the general public registry).
+- cohort_type:
+  One of:
+  "Primary care-based", "Hospital-based", "Population-based".
 
 - n_included:
-  The target number of **INDIVIDUAL PATIENTS**.
-  **CRITICAL LOGIC:** 
-  - If the text mentions "clusters" (e.g. GP practices, Schools, Hospitals), IGNORE that number.
-  - Find the number of *patients* or *participants* nested within those clusters.
-  - Example: "80 practices with 1600 patients" -> Return **1600**.
-
-- countries:
-  Full country name (e.g. "Netherlands"). 
-  If cities like "Groningen" or "Amsterdam" are mentioned, infer "Netherlands".
-
-- regions:
-  Specific provinces (e.g. "Noord-Holland", "Groningen", "Limburg"). List ALL mentioned.
+  Number of INDIVIDUAL participants.
+  Ignore clusters (GPs, centers).
 
 - population_age_group:
-  Copy exact age wording from paper.
-  HARD: Do not infer. If not explicit, return null.
-
+  Copy literal wording if present (e.g. "Men ≥40, women ≥45"), else null.
 """
+
 
 # ---------- PASS B: Criteria & Design ----------
 [task_criteria]
