@@ -98,7 +98,11 @@ def _merge_json_results(acc: Dict[str, Any], cur: Dict[str, Any]) -> Dict[str, A
         return acc
 
     for k, v in cur.items():
+        # Keep explicit nulls so schema stays complete across passes/papers.
+        # Never overwrite an existing non-null value with null.
         if v is None:
+            if k not in acc:
+                acc[k] = None
             continue
 
         if k not in acc:
