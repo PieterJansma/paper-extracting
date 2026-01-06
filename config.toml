@@ -7,7 +7,7 @@ max_tokens = 4096
 temperature = 0.0
 
 [pdf]
-path = "data/dys064.pdf"
+path = "data/coevorden.pdf"
 max_pages = 40
 
 # =============================================================================
