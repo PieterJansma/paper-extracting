@@ -38,40 +38,54 @@ template_json = """
 """
 
 instructions = """
-Extract exact values only.
+Extract exact values only. Do not infer.
+
+- pid:
+  Only if an explicit ID is present (e.g. trial registration, registry ID, database ID).
+  Do NOT use acronym as pid. If none → null.
 
 - resource_type:
   Type of RESOURCE (not design, not methodology).
-  Allowed values only:
+  Allowed only:
   - "cohort"
   - "registry"
   - "biobank"
   - "clinical trial"
   - "database"
-  Return one or more if explicitly stated.
-  Do NOT use terms like "observational", "prospective", "pragmatic".
+  Use only if explicitly stated.
 
 - study_name:
   Official name of the study/cohort.
-  If only the paper title is present → return null.
+  If only the paper title is present → null.
 
 - local_name:
-  Local or participant-facing name if explicitly mentioned.
+  Local / participant-facing name if explicitly mentioned.
 
 - study_acronym:
   Acronym only if explicitly stated.
 
 - cohort_type:
-  One of:
-  "Primary care-based", "Hospital-based", "Population-based".
+  One of: "Primary care-based", "Hospital-based", "Population-based".
+
+- study_status:
+  Only: "ongoing", "completed", "planned" (lowercase). Else null.
 
 - n_included:
-  Number of INDIVIDUAL participants.
-  Ignore clusters (GPs, centers).
+  Number of INDIVIDUAL participants. Ignore clusters (GPs, centers).
+
+- countries:
+  Use official name, normalize "The Netherlands" → "Netherlands".
+
+- regions:
+  Use most specific places mentioned (city/province). Avoid broad regions if specific ones exist.
 
 - population_age_group:
   Copy literal wording if present (e.g. "Men ≥40, women ≥45"), else null.
+
+- keywords:
+  Max 10. Only terms that appear verbatim in the text. No generic words.
 """
+
 
 
 # ---------- PASS B: Criteria & Design ----------
