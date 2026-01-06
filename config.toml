@@ -7,7 +7,7 @@ max_tokens = 4096
 temperature = 0.0
 
 [pdf]
-path = "data/concrete.pdf"
+path = "data/oncolifes.pdf"
 max_pages = 40
 
 # =============================================================================
