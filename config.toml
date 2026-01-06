@@ -238,35 +238,34 @@ template_json = """
 """
 
 instructions = """
-Extract only if explicitly stated; otherwise return null or [] (not empty string).
+Extract only if explicitly stated; otherwise null or [].
 
 - informed_consent_type:
-  "Written" if signed consent form.
+  "Written" if signed consent.
   "Opt-out" if non-response = included.
 
 - informed_consent_required:
-  "Yes" if Written OR Opt-out consent model is used.
-  Only "No" if paper explicitly states no consent required.
+  "Yes" if Written OR Opt-out.
+  Only "No" if explicitly stated.
 
 - access_rights:
-  One of: "Open access", "Supported access", "Restricted", "Not specified".
-  If not stated → "Not specified".
-
-- data_access_conditions:
-  Steps/requirements to obtain access (e.g. proposal, committee approval, DUA).
-
-- data_use_conditions:
-  Conditions on use/publication/sharing (e.g. cite correctly, no re-identification).
-  Do NOT include process steps like dataset creation or analysis support.
+  "Open access" ONLY if explicitly stated (open/publicly available).
+  Otherwise choose: "Supported access" / "Restricted" / "Not specified".
 
 - access_identifiable_data:
-  If pseudonymized/coded/privacy protected → "No".
+  If pseudonymized/coded/privacy protected -> "No".
   Only "Yes" if explicitly stated.
 
 - access_identifiable_data_route:
-  If access_identifiable_data="No" and text says pseudonymized/coded → "Pseudonymized".
-  Else null.
+  Return "Pseudonymized" ONLY if explicitly stated.
+  Otherwise null.
+
+- access_subject_details:
+  true if access to participant-level/record-level data is described (proposal/application/process).
+  false if explicitly stated no access.
+  else null.
 """
+
 
 
 # ---------- PASS F: Contributors ----------
