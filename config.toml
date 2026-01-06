@@ -163,6 +163,7 @@ instructions = """
 - description:
   Copy the "Aim" or "Objective" sentence verbatim.
 """
+
 # ---------- PASS D: Population & Samples (STRICT LOGIC) ----------
 [task_population]
 template_json = """
@@ -187,33 +188,30 @@ template_json = """
 """
 
 instructions = """
-Extract population details (verbatim where possible).
-
-- underlying_population:
-  Who the base source population is (1 sentence).
-
-- population_of_interest:
-  Target participant groups (short phrases).
-
-- population_entry:
-  ENTRY TRIGGER/EVENT only (start with a verb): e.g. "invited and completed baseline questionnaire", "presented to GP with stable chest discomfort and GP decided further evaluation".
-  Do NOT repeat target population text. If not explicit -> [].
-
-- population_exit:
-  Only explicit stop criteria (e.g. "withdraw consent", "death"). 
-  Do NOT use "lost to follow-up/untraceable" unless paper says this is an exit rule. If not explicit -> [].
+Extract population details.
 
 - number_of_participants_with_samples:
-  Count with stored physical biosamples. If none -> null. Never reuse n_included.
+  Count of individuals with stored PHYSICAL BIOLOGICAL SAMPLES (Blood, DNA, Urine, Tissue).
+  If NO explicit stored samples count is given, return null.
+  Do NOT reuse total study size. Do NOT count data records or GP practices.
 
 - part_of_networks:
-  Explicit named consortia only, else [].
+  Only include if the text says the study is PART OF / MEMBER OF a named network/consortium.
+  Do NOT include parent projects (e.g. ELSPAC) unless explicit membership is stated.
+
+- population_entry:
+  The ENTRY TRIGGER event (e.g. "presentation to GP with stable chest pain", "pregnancy with EDD...").
+  Do NOT restate target population labels.
+
+- population_exit:
+  Only if explicit (e.g. "withdrawal of consent", "lost to follow-up").
+  If not explicit, return [].
 
 - population_disease:
-  Primary disease categories only (e.g. "coronary artery disease"). If general population -> [].
+  List ALL primary disease categories mentioned. If none, [].
 
-- age_min/age_max:
-  Integers only. If only ">=X" -> age_min=X, age_max=null. If sex-specific thresholds -> age_min = lowest.
+- age_max:
+  If "no upper limit" or ">=X", return null. Do NOT invent.
 """
 
 
