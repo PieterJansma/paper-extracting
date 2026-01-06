@@ -104,24 +104,39 @@ template_json = """
 """
 
 instructions = """
-Extract eligibility.
+Extract eligibility and study type.
 
 - inclusion_criteria:
-  List criteria for the **PATIENTS/SUBJECTS** only.
-  **Constraint:** Ignore eligibility criteria for the *Centers* or *GPs* (e.g. "Must use EHR").
-  **Completeness:** Include criteria for ALL study arms (Intervention + Control).
+  List ALL patient eligibility conditions (age, symptoms, condition, care setting).
+  Include full clinical context, not only age/sex.
+  Ignore eligibility of centers, GPs, hospitals.
 
 - other_inclusion_criteria:
-  Administrative requirements. 
-  **Constraint:** If the text only says "Informed consent", return [].
+  Administrative requirements only (e.g. insurance, registration).
+  If only "informed consent" is mentioned → return [].
 
 - exclusion_criteria:
-  Medical/Demographic exclusions (e.g. "Pregnancy", "Prior diagnosis").
-  **Constraint:** Do not list study outcomes (e.g. "incomplete data") as exclusion criteria.
+  Medical/demographic exclusions only.
+  Do NOT list outcomes or missing data.
+
+- other_exclusion_criteria:
+  Administrative/logistical exclusions only.
 
 - clinical_study_types:
-  Select from: "Randomized Controlled Trial", "Cluster Randomized Trial", "Prospective Cohort", "Registry".
+  Select exactly one of:
+  - "Randomized Controlled Trial"
+  - "Cluster Randomized Trial"
+  - "Prospective Cohort"
+  - "Registry"
+
+- rwd_type:
+  If routine care data, GP records, registries or questionnaires are used, list them here.
+  Do NOT leave empty if such data are described.
+
+- network_type:
+  List formal networks or consortia ONLY if explicitly named, else [].
 """
+
 
 # ---------- PASS C: Design & Data Collection ----------
 [task_design_details]
