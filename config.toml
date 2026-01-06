@@ -214,7 +214,6 @@ Extract population details.
   If "no upper limit" or ">=X", return null. Do NOT invent.
 """
 
-
 # ---------- PASS E: Access & Governance ----------
 [task_access]
 template_json = """
@@ -239,14 +238,36 @@ template_json = """
 """
 
 instructions = """
+Extract only if explicitly stated; otherwise return null or [] (not empty string).
+
 - informed_consent_type:
-  **Logic:**
-  - If participants must "sign" a form, return "Written".
-  - If participants must "object" to be excluded, return "Opt-out".
+  "Written" if signed consent form.
+  "Opt-out" if non-response = included.
+
+- informed_consent_required:
+  "Yes" if Written OR Opt-out consent model is used.
+  Only "No" if paper explicitly states no consent required.
+
+- access_rights:
+  One of: "Open access", "Supported access", "Restricted", "Not specified".
+  If not stated → "Not specified".
+
+- data_access_conditions:
+  Steps/requirements to obtain access (e.g. proposal, committee approval, DUA).
+
+- data_use_conditions:
+  Conditions on use/publication/sharing (e.g. cite correctly, no re-identification).
+  Do NOT include process steps like dataset creation or analysis support.
 
 - access_identifiable_data:
-  **Logic:** If text mentions "pseudonymized", "coded", or "privacy protected", return "No".
+  If pseudonymized/coded/privacy protected → "No".
+  Only "Yes" if explicitly stated.
+
+- access_identifiable_data_route:
+  If access_identifiable_data="No" and text says pseudonymized/coded → "Pseudonymized".
+  Else null.
 """
+
 
 # ---------- PASS F: Contributors ----------
 [task_contributors]
