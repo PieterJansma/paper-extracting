@@ -450,12 +450,23 @@ instructions = """
 Extract quality control details.
 
 - standard_operating_procedures:
-  **Logic:** Return **true** if text mentions:
-  - "SOPs" / "Standard Operating Procedures"
-  - "Protocol" / "Guidelines"
-  - "Declaration of Helsinki" / "WMO" / "CONSORT"
-  - "Ethics approval"
+  Return true if the text explicitly mentions ANY of:
+  - "SOP" / "Standard Operating Procedures"
+  - protocol / study protocol
+  - guidelines
+  - "CONSORT" / "Declaration of Helsinki" / "WMO"
+  - ethics approval / ethical approval
+  - ethics committee / Ethics and Law Committee / IRB
+
+- audit_possible:
+  Return true ONLY if the text explicitly mentions:
+  - audit
+  - auditing
+  - audit trail
+  - full audit-trail support
+  Otherwise false. Do NOT infer from ISO certification alone.
 """
+
 
 # ---------- PASS J: Linkage & Specs ----------
 [task_linkage_specs]
