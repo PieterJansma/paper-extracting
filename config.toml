@@ -340,10 +340,33 @@ template_json = """
 """
 
 instructions = """
-Extract data standards.
-- diagnosis_medical_event_vocabulary: e.g. ICPC, ICD-10.
-- quality_of_life_measures: e.g. EQ-5D, SF-36, HeartQoL.
+Extract data standards and instruments ONLY if explicitly stated in the paper text. Do NOT infer or guess.
+
+Return rules:
+- If a field is not explicitly mentioned: return null (for scalars/booleans) or [] (for lists).
+- Do NOT output examples from this prompt unless they appear verbatim in the text.
+
+Fields:
+- diagnosis_medical_event_vocabulary:
+  Return only if a coding/terminology system is explicitly named.
+  Allowed outputs (use exact mention if possible):
+  ICPC, ICD-9, ICD-10, SNOMED CT, Read codes, ICPC-2.
+  If none -> null.
+
+- quality_of_life_measures:
+  Return only QoL questionnaire/instrument names that appear verbatim in the text.
+  Examples of what counts (ONLY if present in text): EQ-5D, EQ-5D-5L, SF-36, HeartQoL.
+  If none -> [].
+
+- data_dictionary_available:
+  true ONLY if the paper explicitly states a data dictionary/codebook is available.
+  If not stated -> null.
+
+For all other vocabulary fields:
+- Return a standard name ONLY if explicitly stated (e.g., ATC, LOINC).
+- If not stated -> null.
 """
+
 
 # ---------- PASS H: Biobank Updates ----------
 [task_biobank_updates]
@@ -535,7 +558,7 @@ template_json = """
   "analysis_start_actual": "string",
   "metadata_issued": "string",
   "metadata_modified": "string"
-}
+
 """
 
 instructions = """
