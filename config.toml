@@ -404,8 +404,9 @@ Targeted rules for this block:
   copy 1–2 sentences verbatim or near-verbatim. If not stated -> null.
 
 - governance_details:
-  If the paper explicitly describes access procedure, proposal process, executive committee, or supported access model,
-  copy 1–2 sentences verbatim or near-verbatim. If not stated -> null.
+  If access or governance is described (e.g. supported access, proposal form, executive committee, review process, fees, data buddy),
+  copy 1–2 sentences verbatim or near-verbatim.
+  It is allowed if this overlaps in content with release_description.
 
 - release_type:
   If the paper explicitly states an access model (e.g. "supported access", "open access"), return that string. Else -> null.
