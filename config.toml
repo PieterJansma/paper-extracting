@@ -140,10 +140,15 @@ Extract eligibility and study type.
   Use "Cluster Randomized Trial" ONLY if the text explicitly states cluster randomization (e.g. by practice, center, GP, hospital).
   If not explicit → use "Randomized Controlled Trial".
 
-
 - rwd_type:
-  List a source ONLY if the paper explicitly states that data are extracted from or collected from that source.
+  List a source ONLY if the paper explicitly states that data are collected from or extracted from that source.
+
+  Always include "questionnaires" if the paper explicitly mentions questionnaires, surveys, or forms completed by participants or parents.
+
   Diagnosis, recruitment, or referral by a GP alone does NOT imply use of GP records as a data source.
+
+  Do NOT leave empty if questionnaires, routine care data, registries, or medical records are explicitly described as data sources.
+
 
 - network_type:
   List formal networks or consortia ONLY if the text explicitly states that the study is part of, member of, or conducted within that network/consortium.
