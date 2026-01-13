@@ -549,11 +549,10 @@ GENERAL:
   Do NOT use recruitment statistics or participation rates.
 
 - record_trigger:
-  The event/process that adds an individual to the study (e.g., invited, enrolled, consented, baseline questionnaire completed, diagnosis).
-  If the paper is not clinical-care based, do NOT use "First consultation" unless explicitly stated.
+  Return a short phrase describing the event/process (e.g. "invited to participate", "enrolled after diagnosis"), not a single verb.
 
 - unit_of_observation:
-  "Patient" or "Individual".
+  Always return "Patient" unless the paper explicitly states the unit is not a patient.
 
 - subpopulations_name:
   List explicit subgroups of participants (e.g., age/sex groups, disease subtypes) only if stated. Else [].
@@ -562,7 +561,7 @@ GENERAL:
   Short textual labels for the same subpopulations (not links). If none -> [].
 
 - collection_events_name:
-  List explicit collection events (baseline visit, follow-up, questionnaire wave) only if stated. Else [].
+  Include baseline, follow-up, questionnaire waves, and clinical assessments if explicitly mentioned.
 
 - collection_events_resource:
   Short textual labels for the same collection events (not links). If none -> [].
