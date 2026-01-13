@@ -41,9 +41,9 @@ which python
 nvidia-smi
 
 # --- run your cluster script, single pass example ---
-bash src/run_cluster.sh -p E \
-  --pdfs data/coevorden.pdf data/concrete.pdf data/dys064.pdf \
-  -o batch.xlsx
+bash src/run_cluster.sh \
+  --pdfs data/oncolifes.pdf \
+  -o batch_test_13_01_2026.xlsx
 
 echo "=== JOB END ==="
 date
