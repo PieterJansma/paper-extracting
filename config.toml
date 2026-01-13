@@ -63,7 +63,6 @@ Extract exact values only. Do not infer.
   OR if it is a single-token abbreviation label (no spaces).
   If the candidate contains whitespace or reads like an intervention/program name → return null.
 
-
 - cohort_type:
   One of: "Primary care-based", "Hospital-based", "Population-based".
 
@@ -126,11 +125,10 @@ Extract eligibility and study type.
   If only "informed consent" is mentioned → return [].
 
 - exclusion_criteria:
-  Medical/demographic exclusions only.
-  Do NOT list outcomes or missing data.
+  Medical/demographic exclusions only (diseases, conditions, clinical status).
 
 - other_exclusion_criteria:
-  Administrative/logistical exclusions only.
+  Administrative, geographic, logistical, or follow-up related exclusions (e.g. moving away, unreachable, consent not obtainable).
 
 - clinical_study_types:
   Select exactly one of:
@@ -139,12 +137,19 @@ Extract eligibility and study type.
   - "Prospective Cohort"
   - "Registry"
 
+  Use "Cluster Randomized Trial" ONLY if the text explicitly states cluster randomization (e.g. by practice, center, GP, hospital).
+  If not explicit → use "Randomized Controlled Trial".
+
+
 - rwd_type:
-  If routine care data, GP records, registries or questionnaires are used, list them here.
-  Do NOT leave empty if such data are described.
+  List a source ONLY if the paper explicitly states that data are extracted from or collected from that source.
+  Diagnosis, recruitment, or referral by a GP alone does NOT imply use of GP records as a data source.
 
 - network_type:
-  List formal networks or consortia ONLY if explicitly named, else [].
+  List formal networks or consortia ONLY if the text explicitly states that the study is part of, member of, or conducted within that network/consortium.
+  Mere mention, collaboration, or contextual reference is NOT sufficient.
+  If not explicit → return [].
+
 """
 
 
