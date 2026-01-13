@@ -555,7 +555,7 @@ GENERAL:
   Always return "Patient" unless the paper explicitly states the unit is not a patient.
 
 - subpopulations_name:
-  List explicit subgroups of participants (e.g., age/sex groups, disease subtypes) only if stated. Else [].
+  Only include explicitly defined subgroups within the study population. Do NOT list disease categories.
 
 - subpopulations_resource:
   Short textual labels for the same subpopulations (not links). If none -> [].
@@ -564,7 +564,7 @@ GENERAL:
   Include baseline, follow-up, questionnaire waves, and clinical assessments if explicitly mentioned.
 
 - collection_events_resource:
-  Short textual labels for the same collection events (not links). If none -> [].
+  Use short labels for the same events as in collection_events_name. Do NOT list timepoints separately.
 
 - data_resources_included:
   List explicit data sources (questionnaires, GP records, registries, clinical assessments) only if stated. Else [].
