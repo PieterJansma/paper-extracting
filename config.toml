@@ -45,24 +45,25 @@ Extract exact values only. Do not infer.
   Do NOT use acronym as pid. If none → null.
 
 - resource_type:
-  Type of RESOURCE (not design, not methodology).
-  Allowed only:
-  - "cohort"
-  - "registry"
-  - "biobank"
-  - "clinical trial"
-  - "database"
-  Use only if explicitly stated.
+  Use only if one of the allowed resource words is explicitly used to describe the resource
+  (cohort, registry, biobank, clinical trial, database).
+  If it only describes the study design (e.g., "randomized controlled trial") without stating the resource type word → return [].
+  # CHANGED: block RCT-as-design leakage
 
 - study_name:
-  Official name of the study/cohort.
-  If only the paper title is present → null.
+  Return ONLY if the text explicitly labels a name as the study/cohort name using wording like:
+  "<name> study", "<name> trial", "<name> cohort", "<name> registry", or "We present/describe the <name> study".
+  If the only available name is the article title or a descriptive sentence → null.
+  # CHANGED: blocks paper title leakage
 
 - local_name:
   Local / participant-facing name if explicitly mentioned.
 
 - study_acronym:
-  Acronym only if explicitly stated.
+  Return ONLY if explicitly marked as an acronym or abbreviation
+  (e.g., "abbreviated as", "acronym", or a parenthetical abbreviation pattern).
+  Do NOT treat intervention or program names as acronyms.
+  # CHANGED: blocks intervention-name misuse
 
 - cohort_type:
   One of: "Primary care-based", "Hospital-based", "Population-based".
@@ -77,13 +78,22 @@ Extract exact values only. Do not infer.
   Use official name, normalize "The Netherlands" → "Netherlands".
 
 - regions:
-  Use most specific places mentioned (city/province). Avoid broad regions if specific ones exist.
+  Use most specific places mentioned (city/province).
+  If none are explicitly mentioned → return [].
+  # CHANGED: enforce list consistency (no null)
 
 - population_age_group:
   Copy literal wording if present (e.g. "Men ≥40, women ≥45"), else null.
 
 - keywords:
   Max 10. Only terms that appear verbatim in the text. No generic words.
+
+- start_year / end_year:
+  Return a year ONLY if an explicit calendar year is stated for start/end using wording like:
+  "started in YYYY", "began in YYYY", "ended in YYYY", "from YYYY to YYYY".
+  Do NOT infer from publication year, ethics approval year, registration date, or planned timelines.
+  If not explicit → null.
+  # CHANGED: blocks inferred years
 """
 
 
