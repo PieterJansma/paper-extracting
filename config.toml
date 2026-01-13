@@ -239,12 +239,13 @@ template_json = """
 """
 
 instructions = """
-Extract only if explicitly stated in the paper; otherwise return null or [] (not empty string).
+Extract only if explicitly stated in the paper; otherwise return null or [].
 Do NOT infer, assume, or use general research practice knowledge.
 
 IMPORTANT:
 - Open access article ≠ open access data. Only mark "Open access" if data access is explicitly stated.
 - Do NOT assume pseudonymization, anonymization, DUA, ethics approval, or fees unless explicitly described.
+- Do NOT output placeholder strings such as "Not specified", "Unknown", "N/A". Use null instead.
 
 - informed_consent_type:
   "Written" if signed consent form is explicitly mentioned.
@@ -255,24 +256,43 @@ IMPORTANT:
   Only "No" if paper explicitly states no consent required.
 
 - access_rights:
-  One of: "Open access", "Supported access", "Restricted", "Not specified".
-  Use "Not specified" if the paper does not describe a data access model.
+  One of: "Open access", "Supported access", "Restricted".
+  If the paper does not describe a data access model -> null.
 
 - data_access_conditions:
   Steps/requirements to obtain access (e.g. proposal, committee approval, DUA) ONLY if explicitly described.
 
 - data_use_conditions:
-  Conditions on use/publication/sharing (e.g. cite correctly, no re-identification) ONLY if explicitly stated.
-  Do NOT include best practices, ethical norms, or assumed restrictions.
+  Conditions on use/publication/sharing ONLY if explicitly stated.
+
+- data_access_fee:
+  true ONLY if a fee/payment is explicitly mentioned.
+  false ONLY if the paper explicitly states "no fee" / "free of charge".
+  Otherwise null.
+
+- access_subject_details:
+  true ONLY if the paper explicitly states participants can access/inspect their own data.
+  false ONLY if explicitly stated they cannot.
+  Otherwise null.
+
+- access_third_party:
+  true ONLY if explicitly states data can be shared with third parties.
+  false ONLY if explicitly states it cannot.
+  Otherwise null.
+
+- access_non_eu:
+  true ONLY if explicitly states access/transfer outside EU is allowed.
+  false ONLY if explicitly states it is not allowed.
+  Otherwise null.
 
 - access_identifiable_data:
   "Yes" only if explicitly stated that identifiable data can be accessed.
   "No" only if explicitly stated that data are anonymized/pseudonymized/coded.
-  Otherwise: null.
+  Otherwise null.
 
 - access_identifiable_data_route:
   Only fill if access_identifiable_data="No" AND the route (e.g. "Pseudonymized") is explicitly stated.
-  Otherwise: null.
+  Otherwise null.
 """
 
 
@@ -355,7 +375,6 @@ Fields:
 
 - quality_of_life_measures:
   Return only QoL questionnaire/instrument names that appear verbatim in the text.
-  Examples of what counts (ONLY if present in text): EQ-5D, EQ-5D-5L, SF-36, HeartQoL.
   If none -> [].
 
 - data_dictionary_available:
@@ -363,7 +382,7 @@ Fields:
   If not stated -> null.
 
 For all other vocabulary fields:
-- Return a standard name ONLY if explicitly stated (e.g., ATC, LOINC).
+- Return a standard name ONLY if explicitly stated.
 - If not stated -> null.
 """
 
@@ -400,16 +419,14 @@ Do NOT infer biobank logistics from data-only studies.
 
 Targeted rules for this block:
 - biospecimen_access_conditions:
-  If the paper explicitly describes collected biological samples and storage (e.g. blood, urine, DNA, aliquots, long-term storage),
+  If the paper explicitly describes collected biological samples and storage,
   copy 1–2 sentences verbatim or near-verbatim. If not stated -> null.
 
 - governance_details:
-  If access or governance is described (e.g. supported access, proposal form, executive committee, review process, fees, data buddy),
-  copy 1–2 sentences verbatim or near-verbatim.
-  It is allowed if this overlaps in content with release_description.
+  If access or governance is described, copy 1–2 sentences verbatim or near-verbatim.
 
 - release_type:
-  If the paper explicitly states an access model (e.g. "supported access", "open access"), return that string. Else -> null.
+  If the paper explicitly states an access model, return that string. Else -> null.
 
 - release_description:
   If the paper explicitly describes how access is obtained, summarise in 1 short sentence. Else -> null.
@@ -449,8 +466,8 @@ instructions = """
 Extract quality control details. Do NOT infer.
 
 - standard_operating_procedures:
-  Return true if the text contains (case-insensitive) any of these words: "sop", "protocol", "guideline", "consort", "helsinki", "wmo", or "ethic".
-  Otherwise return null.
+  Return true ONLY if the text explicitly mentions SOP/standard operating procedure OR a data collection protocol/guideline for how procedures are performed.
+  If not explicitly mentioned -> null.
 
 - audit_possible:
   If the text contains the substring "audit" (case-insensitive), return true.
@@ -459,13 +476,13 @@ Extract quality control details. Do NOT infer.
 
 - quality_marks:
   List only certifications/standards like ISO (e.g., strings containing "ISO").
-  Do NOT include ethics/guidelines terms (e.g., Helsinki, WMO, IRB, ethics approval).
-  If none -> [].  
+  If none -> [].
 
-- For boolean fields (qualification, audit_possible, access_for_validation):
+- For boolean fields (qualification, access_for_validation):
   If the paper does NOT explicitly mention it, return null.
   Return false ONLY if the text explicitly states it is not possible / not done / not available.
 """
+
 
 # ---------- PASS J: Linkage & Specs ----------
 [task_linkage_specs]
@@ -522,6 +539,7 @@ instructions = """
   If the name is not a proper name, return [].
 """
 
+
 # ---------- PASS K: Triggers ----------
 [task_triggers_subpops]
 template_json = """
@@ -549,7 +567,8 @@ GENERAL:
   Do NOT use recruitment statistics or participation rates.
 
 - record_trigger:
-  Return a short phrase describing the event/process (e.g. "invited to participate", "enrolled after diagnosis"), not a single verb.
+  The CLINICAL event that makes a patient eligible/entered (e.g. first consultation, diagnosis, presenting with symptoms).
+  If the text only describes recruitment/selection/invitation (e.g. "invited", "recruited", "selected by GP"), return null.
 
 - unit_of_observation:
   Always return "Patient" unless the paper explicitly states the unit is not a patient.
@@ -570,6 +589,8 @@ GENERAL:
 - data_resources_included:
   List explicit data sources (questionnaires, GP records, registries, clinical assessments) only if stated. Else [].
 """
+
+
 # ---------- PASS L: CDM & Funding ----------
 [task_cdm_funding]
 template_json = """
@@ -597,11 +618,11 @@ instructions = """
 Extract Funding and Data Models. Do NOT infer.
 For all list fields: if nothing is mentioned, return [] (not null).
 
-
 - cdm_other:
-  Use ONLY for CDM/mapping/data-model details. Do NOT describe study design, outcomes, or questionnaires.
+  Use ONLY for CDM/mapping/data-model details.
   If no CDM/mapping is mentioned, return null.
 """
+
 
 # ---------- PASS M: Documentation ----------
 [task_docs_legislation_dates]
@@ -643,16 +664,18 @@ template_json = """
 instructions = """
 Extract Dates and Legislation.
 
-  - applicable_legislation:
-  Include all explicitly mentioned laws/regulations (can be multiple). Do not return only one if more are listed.
+- applicable_legislation:
+  Include all explicitly mentioned laws/regulations.
+  Do NOT include ethics guidelines (e.g. Declaration of Helsinki) in this field.
 
-
-  - collection_start_planned / collection_start_actual:
+- collection_start_planned / collection_start_actual:
   Return a date ONLY if explicitly written in the text; do NOT infer or normalize.
 
-  - collection_start_planned:
-  Use only if the text explicitly says "planned" or "will start". Otherwise null (even if actual is known).
+- collection_start_planned:
+  Use only if the text explicitly says "planned" or "will start".
+  Otherwise null (even if actual is known).
 """
+
 
 # ---------- PASS N: Content ----------
 [task_study_content]
@@ -669,11 +692,17 @@ template_json = """
 
 instructions = """
 Extract Content.
+
 - data_sources:
-  List types of sources (e.g., questionnaires, GP records, registries, clinical assessments, biospecimens). Do NOT return only the study/biobank name as a data source.
+  List types of sources (e.g., questionnaires, GP records, registries, clinical assessments, biospecimens).
+  Do NOT return only the study/biobank name as a data source.
+
 - data_extraction_date:
   Return a date ONLY if the paper explicitly states the data were extracted on that date. Otherwise null.
+
 - analysis_plan:
-  Copy only the explicitly stated "statistical analysis" / "analysis plan" description; do not list methods from multiple sections.
-- objectives: Primary aim.
+  Copy only the explicitly stated "statistical analysis" / "analysis plan" description.
+
+- objectives:
+  Primary aim.
 """
