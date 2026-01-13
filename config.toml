@@ -176,12 +176,22 @@ instructions = """
   Select from: ["Longitudinal", "Cross-sectional", "Cohort study", "Randomized Controlled Trial"].
   (Note: Cluster RCT is a type of Randomized Controlled Trial).
 
-- data_collection_description:
-  Describe HOW data is captured (e.g. "Web-based questionnaires", "Extraction from Electronic Patient Files").
-  **Constraint:** Describe the data gathering method, not the medical treatment.
+- data_collection_type:
+  Select ONLY from this list (use exact strings):
+  - "Web-based questionnaires"
+  - "Extraction from Electronic Patient Files"
+  - "Clinical assessments"
+  - "Record linkage"
+  If multiple apply, list all that are explicitly mentioned.
+  If none are explicitly mentioned → return [].
+
 
 - description:
-  Copy the "Aim" or "Objective" sentence verbatim.
+  Copy ONE sentence verbatim that explicitly states the Aim/Objectives.
+  It must contain an explicit aim cue such as: "aim", "aims", "objective", "objectives", "primary aim", "primary objective", "purpose", "we aim", "this study aims", "the aim of this study".
+  Do NOT use sentences starting with or containing "we hypothesise/hypothesize", "we hypothesize that", "originated", or purely historical/background context.
+  If no explicit aim/objective sentence is present → return null.
+
 """
 
 # ---------- PASS D: Population & Samples (STRICT LOGIC) ----------
