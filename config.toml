@@ -182,12 +182,11 @@ instructions = """
   - "Record linkage"
 
   Rules:
-  - "Clinical assessments" ONLY if the paper explicitly mentions assessment visits or examinations performed as part of the study.
+  - "Clinical assessments" ONLY if the paper explicitly mentions assessment visits or examinations performed as part of the study protocol.
     Do NOT use for routine clinical care or "clinical data".
   - "Extraction from Electronic Patient Files" ONLY if the paper explicitly states extraction from EHR/EMR/GP dossier/hospital record system.
   - "Record linkage" ONLY if the paper explicitly says linkage/linked to registries or administrative records.
   If none apply → return [].
-
 
 - data_collection_description:
   Copy ONE full sentence (verbatim or near-verbatim) from the paper that describes the METHOD or SOURCE of data collection
