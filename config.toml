@@ -555,7 +555,7 @@ GENERAL:
   Always return "Patient" unless the paper explicitly states the unit is not a patient.
 
 - subpopulations_name:
-  Only include explicitly defined subgroups within the study population. Do NOT list disease categories.
+  Only include explicitly defined subgroups within the study population. Do NOT list disease categories or inclusion criteria.
 
 - subpopulations_resource:
   Short textual labels for the same subpopulations (not links). If none -> [].
