@@ -240,10 +240,11 @@ instructions = """
 Extract population details.
 
 - number_of_participants_with_samples:
-  Count of individuals with stored PHYSICAL BIOLOGICAL SAMPLES (Blood, DNA, Urine, Tissue).
-  Return ONLY if the text explicitly states a number of participants who provided or have stored biological samples.
-  If NO explicit stored samples count is given, return null.
-  Do NOT reuse total study size. Do NOT infer. Do NOT guess.
+  Return a number ONLY if the paper explicitly links a count to biological samples,
+  e.g. wording like "X participants provided/ donated/ collected/ stored samples" AND the sample type is mentioned (blood/saliva/DNA/urine/tissue).
+  If the paper only states overall cohort size or mentions that samples exist without a specific count -> return null.
+  Do NOT reuse n_included. Do NOT infer.
+
 
 - part_of_networks:
   Return [] unless the text explicitly says "part of", "member of", "network member", or "consortium member".
@@ -254,8 +255,10 @@ Extract population details.
   If you only find eligibility or location criteria (e.g. "living in Coevorden"), return [].
 
 - population_exit:
-  Return ONLY if an explicit exit event is described (e.g. "withdrawal of consent", "lost to follow-up", "dropped out").
-  If not explicit, return [].
+  Only include exit events if they are explicitly described in the text with concrete wording (e.g., "withdrew", "withdrawal of consent", "lost to follow-up", "dropped out").
+  If not explicitly stated -> [].
+  Do NOT list generic attrition reasons.
+
 
 - population_disease:
   List ALL primary disease categories mentioned.
