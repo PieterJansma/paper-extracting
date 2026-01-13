@@ -59,9 +59,10 @@ Extract exact values only. Do not infer.
   Local / participant-facing name if explicitly mentioned.
 
 - study_acronym:
-  Return ONLY if explicitly marked as an acronym/abbreviation (e.g., "abbreviated as", "acronym", "short for")
-  OR if the parenthetical token is clearly an acronym: short (≤10 chars) and mostly uppercase letters/digits (e.g., RCT, ABCD, NTR7390).
-  Do NOT treat parenthetical intervention/program/treatment names as acronyms, especially if they contain spaces or lowercase words.
+  Return ONLY if explicitly marked as an acronym/abbreviation
+  OR if it is a single-token abbreviation label (no spaces).
+  If the candidate contains whitespace or reads like an intervention/program name → return null.
+
 
 - cohort_type:
   One of: "Primary care-based", "Hospital-based", "Population-based".
