@@ -570,7 +570,6 @@ GENERAL:
 - data_resources_included:
   List explicit data sources (questionnaires, GP records, registries, clinical assessments) only if stated. Else [].
 """
-
 # ---------- PASS L: CDM & Funding ----------
 [task_cdm_funding]
 template_json = """
@@ -596,12 +595,13 @@ template_json = """
 
 instructions = """
 Extract Funding and Data Models. Do NOT infer.
+For all list fields: if nothing is mentioned, return [] (not null).
+
 
 - cdm_other:
   Use ONLY for CDM/mapping/data-model details. Do NOT describe study design, outcomes, or questionnaires.
   If no CDM/mapping is mentioned, return null.
 """
-
 
 # ---------- PASS M: Documentation ----------
 [task_docs_legislation_dates]
@@ -637,11 +637,13 @@ template_json = """
   "analysis_start_actual": "string",
   "metadata_issued": "string",
   "metadata_modified": "string"
-
+}
 """
 
 instructions = """
 Extract Dates and Legislation.
+"""
+
 """
 
 # ---------- PASS N: Content ----------
