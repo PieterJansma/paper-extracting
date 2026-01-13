@@ -642,6 +642,15 @@ template_json = """
 
 instructions = """
 Extract Dates and Legislation.
+
+  - applicable_legislation:
+  List ONLY laws or regulations. Do NOT include coding systems or codes of conduct.
+
+  - collection_start_planned / collection_start_actual:
+  Return a date ONLY if explicitly written in the text; do NOT infer or normalize.
+
+  - collection_start_planned:
+  Use only if the text explicitly says "planned" or "will start". Otherwise null (even if actual is known).
 """
 
 # ---------- PASS N: Content ----------
