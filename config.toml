@@ -149,7 +149,6 @@ Extract eligibility and study type.
 
   Do NOT leave empty if questionnaires, routine care data, registries, or medical records are explicitly described as data sources.
 
-
 - network_type:
   List formal networks or consortia ONLY if the text explicitly states that the study is part of, member of, or conducted within that network/consortium.
   Mere mention, collaboration, or contextual reference is NOT sufficient.
@@ -257,7 +256,6 @@ Extract population details.
   Only include exit events if they are explicitly described in the text with concrete wording (e.g., "withdrew", "withdrawal of consent", "lost to follow-up", "dropped out").
   If not explicitly stated -> [].
   Do NOT list generic attrition reasons.
-
 
 - population_disease:
   List ALL primary disease categories mentioned.

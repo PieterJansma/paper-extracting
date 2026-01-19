@@ -287,7 +287,7 @@ def extract_fields(
     )
 
     system_msg = (
-        "You are NuExtract. Extract structured data as JSON only. "
+        "You are `Qwen`. Extract structured data as JSON only. "
         "Do not output markdown fences or explanations."
     )
 
