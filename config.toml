@@ -1,5 +1,5 @@
   [llm]
-  base_url = "http://127.0.0.1:18080/v1"
+  base_url = "http://127.0.0.1:18000/v1"
   model    = "numind/NuExtract-2.0-8B"
   api_key  = "sk-local"
   use_grammar = false

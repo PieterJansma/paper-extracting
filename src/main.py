@@ -412,7 +412,7 @@ def cli():
     labels = args.paper_names if args.paper_names else [stem(p) for p in pdf_paths]
 
     client = OpenAICompatibleClient(
-        base_url=llm_cfg.get("base_url", "http://127.0.0.1:8080/v1"),
+        base_url=llm_cfg.get("base_url", "http://127.0.0.1:18000/v1"),
         api_key=llm_cfg.get("api_key", "sk-local"),
         model=llm_cfg.get("model", "numind/NuExtract-2.0-8B"),
         use_grammar=bool(llm_cfg.get("use_grammar", False)),
