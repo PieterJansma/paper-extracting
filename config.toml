@@ -142,9 +142,10 @@ Extract eligibility and study type.
 
   Always include "questionnaires" if the paper explicitly mentions questionnaires, surveys, or forms completed by participants or parents.
 
-  Diagnosis, recruitment, or referral by a GP alone does NOT imply use of GP records as a data source.
+  Diagnosis, recruitment, or referral by a GP alone does NOT explicitly use of GP records as a data source.
 
   Do NOT leave empty if questionnaires, routine care data, registries, or medical records are explicitly described as data sources.
+
 
 - network_type:
   List formal networks or consortia ONLY if the text explicitly states that the study is part of, member of, or conducted within that network/consortium.
