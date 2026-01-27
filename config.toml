@@ -53,8 +53,6 @@ Extract exact values only. Do not infer.
   Return ONLY if the text explicitly labels a name as the study/cohort name using wording like:
   "<name> study", "<name> trial", "<name> cohort", "<name> registry", or "We present/describe the <name> study".
   If the only available name is the article title or a descriptive sentence → null.
-  # CHANGED: blocks paper title leakage
-
 - local_name:
   Local / participant-facing name if explicitly mentioned.
 
@@ -78,7 +76,6 @@ Extract exact values only. Do not infer.
 - regions:
   Use most specific places mentioned (city/province).
   If none are explicitly mentioned → return [].
-  # CHANGED: enforce list consistency (no null)
 
 - population_age_group:
   Copy literal wording if present (e.g. "Age ≥18 years"), else null.
