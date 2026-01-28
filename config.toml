@@ -122,7 +122,8 @@ Extract eligibility and study type.
   If only "informed consent" is mentioned → return [].
 
 - exclusion_criteria:
-  Medical/demographic exclusions only (diseases, conditions, clinical status).
+  Medical/demographic exclusions ONLY (diseases/conditions/clinical status, pregnancy if excluded).
+  Do NOT include geography, moving away, non-response, follow-up availability.
 
 - other_exclusion_criteria:
   Administrative, geographic, logistical, or follow-up related exclusions (e.g. moving away, unreachable, consent not obtainable).
@@ -138,16 +139,11 @@ Extract eligibility and study type.
   If not explicit → use "Randomized Controlled Trial".
 
 - rwd_type:
-  List a source ONLY if the paper explicitly states that data are collected from
-  or extracted from that source.
-
-  Always include "questionnaires" ONLY if the paper explicitly mentions
-  questionnaires, surveys, or forms completed by participants or parents.
-
-  Diagnosis, recruitment, or referral by a GP does NOT imply use of GP records
-  or medical records and MUST NOT be listed as a data source.
-
-  If no data source is explicitly stated, return [].
+  Allowed labels only: "questionnaires", "GP medical records", "medical records", "registries", "routine care data", "health and administrative records".
+  Add a label ONLY if the paper explicitly states data are collected/extracted/linked from that source.
+  GP involvement (diagnosis/recruitment/referral) is NOT enough.
+  Use "GP medical records"/"medical records" ONLY if the paper explicitly says records were extracted/used for study data/analysis (e.g., outcomes/comorbidity).
+  If no explicit data source is stated -> [].
 
 
 - network_type:
@@ -767,4 +763,200 @@ Extract Content.
 
 - objectives:
   Primary aim.
+"""
+
+# ---------- PASS O: Consolidated Variables (from other passes) ----------
+[task_consolidated_vars]
+template_json = """
+{
+  "exclusion_criteria": ["string"],
+  "rwd_type": ["string"],
+  "data_collection_type": ["string"],
+  "data_collection_description": "string",
+  "number_of_participants_with_samples": "integer|null",
+  "age_min": "integer|null",
+  "access_rights": "string",
+  "data_access_conditions": ["string"],
+  "creator_resource": "string",
+  "diagnosis_medical_event_vocabulary": "string",
+  "biospecimen_access_conditions": "string",
+  "preservation_indefinite": "boolean",
+  "governance_details": "string",
+  "approval_for_publication": "boolean",
+  "biospecimen_collected": ["string"],
+  "languages": ["string"],
+  "linked_resource_names": ["string"],
+  "record_trigger": "string",
+  "collection_events_resource": ["string"],
+  "data_resources_included": ["string"],
+  "publications": [
+    {
+      "resource_title": "string",
+      "doi": "string"
+    }
+  ],
+  "funding_scheme": ["string"],
+  "applicable_legislation": ["string"],
+  "collection_start_planned": "string",
+  "collection_start_actual": "string",
+  "data_sources": ["string"],
+  "medical_conditions_studied": ["string"],
+  "analysis_plan": "string",
+  "results": "string"
+}
+"""
+
+instructions = """
+Extract exact values only. Do not infer, assume, or use placeholders such as "Not specified/Unknown/N/A".
+If not explicitly stated: return null (scalars/booleans) or [] (lists).
+
+--------------------------------------------------------------------------------
+Eligibility / RWD
+--------------------------------------------------------------------------------
+- exclusion_criteria:
+  Medical/demographic exclusions ONLY (diseases/conditions/clinical status, pregnancy if excluded).
+  Do NOT include geography, moving away, non-response, follow-up availability.
+
+- rwd_type:
+  Allowed labels only: "questionnaires", "GP medical records", "medical records", "registries", "routine care data", "health and administrative records".
+  Add a label ONLY if the paper explicitly states data are collected/extracted/linked from that source.
+  GP involvement (diagnosis/recruitment/referral) is NOT enough.
+  Use "GP medical records"/"medical records" ONLY if the paper explicitly says records were extracted/used for study data/analysis.
+  If no explicit data source is stated -> [].
+
+--------------------------------------------------------------------------------
+Data collection
+--------------------------------------------------------------------------------
+- data_collection_type:
+  Select ONLY from this list (use exact strings):
+  - "Web-based questionnaires"
+  - "Extraction from Electronic Patient Files"
+  - "Clinical assessments"
+  - "Record linkage"
+
+  Rules:
+  - "Clinical assessments" ONLY if the paper explicitly mentions assessment visits or examinations performed as part of the study protocol.
+    Do NOT use for routine clinical care, "clinical data", "clinical records", or "clinical characteristics".
+  - "Extraction from Electronic Patient Files" ONLY if the paper explicitly states extraction from EHR/EMR/GP dossier/hospital record system.
+  - "Record linkage" ONLY if the paper explicitly says linkage/linked to registries or administrative records.
+  If none apply → return [].
+
+- data_collection_description:
+  Copy ONE full sentence (verbatim or near-verbatim) from the paper that describes the METHOD or SOURCE of data collection.
+  The sentence MUST contain at least one of: questionnaire, questionnaires, REDCap, online, web-based, electronic, dossier, EHR, record, linkage. Otherwise return null.
+  Do NOT use sentences that only describe timing (baseline, follow-up weeks/months) or outcomes.
+  Do NOT create your own summary or list.
+  If no such sentence exists → return null.
+
+--------------------------------------------------------------------------------
+Population / Samples
+--------------------------------------------------------------------------------
+- number_of_participants_with_samples:
+  “Samples” = physical biospecimens (blood/saliva/DNA/urine/tissue), not cohort size.
+  Return a number ONLY if a specimen type is named AND the paper states how many individuals provided/collected/stored it; else null.
+  Do NOT infer or reuse n_included.
+
+- age_min:
+  Return ONLY if an explicit minimum age is stated (e.g. "≥16 years", "aged 7–17 years").
+  If not explicitly stated, return null. Do NOT infer.
+
+--------------------------------------------------------------------------------
+Access / Governance / Contributors
+--------------------------------------------------------------------------------
+- access_rights:
+  One of: "Open access", "Supported access", "Restricted".
+  If the paper does not describe a data access model -> null.
+  Open access article ≠ open access data.
+
+- data_access_conditions:
+  Steps/requirements to obtain access (e.g. proposal, committee approval, DUA) ONLY if explicitly described.
+
+- creator_resource:
+  The Organization.
+  Constraint: Do NOT return the study acronym.
+
+--------------------------------------------------------------------------------
+Vocabularies / Coding
+--------------------------------------------------------------------------------
+- diagnosis_medical_event_vocabulary:
+  Return only if a coding/terminology system is explicitly named.
+  Allowed outputs (use exact mention if possible):
+  ICPC, ICD-9, ICD-10, SNOMED CT, Read codes, ICPC-2.
+  If none -> null.
+
+--------------------------------------------------------------------------------
+Biobank logistics (gating)
+--------------------------------------------------------------------------------
+- biospecimen_access_conditions:
+  If the paper explicitly describes collected biological samples and storage, copy 1–2 sentences verbatim or near-verbatim.
+  If not stated -> null.
+
+- governance_details:
+  If access or governance is described, copy 1–2 sentences verbatim or near-verbatim.
+  If not stated -> null.
+
+- approval_for_publication:
+  true/false ONLY if explicitly stated. Otherwise null.
+
+- preservation_indefinite:
+  Return true if the paper explicitly mentions "long-term storage", "stored indefinitely", or equivalent. Else -> null.
+
+--------------------------------------------------------------------------------
+Linkage / Languages / Triggers
+--------------------------------------------------------------------------------
+- biospecimen_collected:
+  List ALL biological sample types explicitly mentioned.
+  Do NOT truncate. Do NOT assume.
+
+- languages:
+  Infer "nl" if study is in Netherlands, "en" if UK/USA.
+
+- linked_resource_names:
+  List ONLY proper names of registries or databases.
+  If the name is not a proper name, return [].
+
+- record_trigger:
+  The CLINICAL event that makes a patient eligible/entered (e.g. first consultation, diagnosis, presenting with symptoms).
+  If the text only describes recruitment/selection/invitation (e.g. "invited", "recruited", "selected by GP"), return null.
+
+- collection_events_resource:
+  Use short identifiers for the same events as in collection_events_name (e.g. "baseline_visit", "6m_followup").
+  Do NOT duplicate human-readable phrases.
+  Do not list more than 10 events. If more are present, summarize (e.g. "multiple follow-ups").
+
+- data_resources_included:
+  List explicit data sources (questionnaires, GP records, registries, clinical assessments) only if stated. Else [].
+
+--------------------------------------------------------------------------------
+Funding / Publications / Legislation / Dates
+--------------------------------------------------------------------------------
+- publications:
+  Extract title and DOI only if explicitly present. If none -> [].
+
+- funding_scheme:
+  If nothing is mentioned -> [].
+
+- applicable_legislation:
+  Include all explicitly mentioned laws/regulations.
+  Do NOT include ethics guidelines (e.g. Declaration of Helsinki) in this field.
+
+- collection_start_planned / collection_start_actual:
+  Return a date ONLY if explicitly written in the text; do NOT infer or normalize.
+  collection_start_planned: use only if the text explicitly says "planned" or "will start". Otherwise null.
+
+--------------------------------------------------------------------------------
+Content
+--------------------------------------------------------------------------------
+- data_sources:
+  List types of sources (e.g., questionnaires, GP records, registries, clinical assessments, biospecimens).
+  Do NOT return only the study/biobank name as a data source.
+
+- medical_conditions_studied:
+  List conditions explicitly studied. If none -> [].
+
+- analysis_plan:
+  Copy only the explicitly stated "statistical analysis" / "analysis plan" description. Else null.
+
+- results:
+  Extract results only if explicitly described in the paper text; otherwise null.
 """

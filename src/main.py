@@ -449,7 +449,9 @@ def cli():
         ("L", "Pass L (CDM & Funding)", "task_cdm_funding"),
         ("M", "Pass M (Docs & Dates)", "task_docs_legislation_dates"),
         ("N", "Pass N (Content)", "task_study_content"),
+        ("O", "Pass O (Consolidated Vars)", "task_consolidated_vars"),
     ]
+
 
     combined_results: Dict[str, Any] = {}
 
