@@ -819,11 +819,13 @@ Eligibility / RWD
   Do NOT include geography, moving away, non-response, follow-up availability.
 
 - rwd_type:
-  Allowed labels only: "questionnaires", "GP medical records", "medical records", "registries", "routine care data", "health and administrative records".
-  Add a label ONLY if the paper explicitly states data are collected/extracted/linked from that source.
-  GP involvement (diagnosis/recruitment/referral) is NOT enough.
-  Use "GP medical records"/"medical records" ONLY if the paper explicitly says records were extracted/used for study data/analysis.
-  If no explicit data source is stated -> [].
+  Add a label ONLY if the data source is used as a PRIMARY source
+  for study variables, outcomes, or analyses.
+
+  Do NOT add a label if records are used only for:
+  - eligibility screening
+  - background description
+  - contextual comparison
 
 --------------------------------------------------------------------------------
 Data collection
@@ -833,6 +835,8 @@ Data collection
   - "Web-based questionnaires"
   - "Extraction from Electronic Patient Files"
   - "Clinical assessments"
+    ONLY if the paper explicitly describes study-specific assessment visits
+    or examinations performed solely for the purpose of the study.
   - "Record linkage"
 
   Rules:
@@ -843,25 +847,22 @@ Data collection
   If none apply → return [].
 
 - data_collection_description:
-  Copy ONE full sentence (verbatim or near-verbatim) that describes
-  the METHOD or SOURCE of data collection.
+  The sentence MUST describe HOW data were obtained for the study
+  (e.g. questionnaires administered, records extracted, data linked).
 
-  The sentence MUST describe how data were collected or obtained
-  (e.g. questionnaires administered, records extracted, assessments performed,
-  data linked).
+  Do NOT use sentences that describe:
+  - routine clinical care
+  - data storage, databases, or software systems
 
-  Do NOT use sentences that only describe:
-  - data storage
-  - databases or IT systems
-  - data management or software platforms
 
 --------------------------------------------------------------------------------
 Population / Samples
 --------------------------------------------------------------------------------
 - number_of_participants_with_samples:
-  “Samples” = physical biospecimens (blood/saliva/DNA/urine/tissue), not cohort size.
-  Return a number ONLY if a specimen type is named AND the paper states how many individuals provided/collected/stored it; else null.
-  Do NOT infer or reuse n_included.
+  Return a number ONLY if the paper explicitly states
+  how many INDIVIDUALS provided biological samples.
+
+  If only cohort size or registry size is given → return null.
 
 - age_min:
   Return ONLY if an explicit minimum age is stated (e.g. "≥16 years", "aged 7–17 years").
@@ -903,11 +904,11 @@ Biobank logistics (gating)
   If not stated -> null.
 
 - approval_for_publication:
-  Return true ONLY if the paper explicitly states that data access,
-  release, or publication requires formal approval.
+  Return true ONLY if the paper explicitly states that
+  approval is required before data release or publication.
 
-  Ethics approval, trial registration, or IRB approval
-  does NOT count unless publication approval is explicitly mentioned.
+  Ethics approval, IRB approval, or trial registration
+  does NOT count.
 
 
 - preservation_indefinite:
@@ -926,15 +927,19 @@ Linkage / Languages / Triggers
 
 
 - linked_resource_names:
-  List ONLY proper names of registries or databases
-  IF AND ONLY IF the paper explicitly states that data are linked to,
-  or can be linked to, that resource.
+  List ONLY resources that the paper explicitly states
+  are linked to or can be linked to the study data.
 
-  Mere mention, comparison, or contextual reference is NOT sufficient.
+  Mentioning, comparing, or describing a registry
+  does NOT imply linkage.
+
 
 - record_trigger:
-  The CLINICAL event that makes a patient eligible/entered (e.g. first consultation, diagnosis, presenting with symptoms).
-  If the text only describes recruitment/selection/invitation (e.g. "invited", "recruited", "selected by GP"), return null.
+  Return the clinical event or condition that defines entry
+  into the study population (e.g. diagnosis, presentation with symptoms).
+
+  If a diagnosis or condition is explicitly described
+  as the basis for inclusion, it IS a record trigger.
 
 - collection_events_resource:
   Use short identifiers for the same events as in collection_events_name (e.g. "baseline_visit", "6m_followup").
@@ -962,8 +967,10 @@ Funding / Publications / Legislation / Dates
   collection_start_planned: use only if the text explicitly says "planned" or "will start". Otherwise null.
 
 - audit_possible:
-  If the text contains the substring "audit" (case-insensitive), return true.
-  If the text explicitly states auditing is not possible / not done / not available, return false.
+  Return true if the text contains the word "audit" OR
+  explicitly mentions auditing, monitoring, or audit trails.
+
+  Return false ONLY if explicitly stated auditing is not possible.
   Otherwise return null.
 
 --------------------------------------------------------------------------------
