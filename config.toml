@@ -775,6 +775,7 @@ template_json = """
   "data_collection_description": "string",
   "number_of_participants_with_samples": "integer|null",
   "age_min": "integer|null",
+  "audit_possible": "boolean"
   "access_rights": "string",
   "data_access_conditions": ["string"],
   "creator_resource": "string",
@@ -943,6 +944,11 @@ Funding / Publications / Legislation / Dates
 - collection_start_planned / collection_start_actual:
   Return a date ONLY if explicitly written in the text; do NOT infer or normalize.
   collection_start_planned: use only if the text explicitly says "planned" or "will start". Otherwise null.
+
+- audit_possible:
+  If the text contains the substring "audit" (case-insensitive), return true.
+  If the text explicitly states auditing is not possible / not done / not available, return false.
+  Otherwise return null.
 
 --------------------------------------------------------------------------------
 Content
