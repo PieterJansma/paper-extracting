@@ -843,11 +843,17 @@ Data collection
   If none apply → return [].
 
 - data_collection_description:
-  Copy ONE full sentence (verbatim or near-verbatim) from the paper that describes the METHOD or SOURCE of data collection.
-  The sentence MUST contain at least one of: questionnaire, questionnaires, REDCap, online, web-based, electronic, dossier, EHR, record, linkage. Otherwise return null.
-  Do NOT use sentences that only describe timing (baseline, follow-up weeks/months) or outcomes.
-  Do NOT create your own summary or list.
-  If no such sentence exists → return null.
+  Copy ONE full sentence (verbatim or near-verbatim) that describes
+  the METHOD or SOURCE of data collection.
+
+  The sentence MUST describe how data were collected or obtained
+  (e.g. questionnaires administered, records extracted, assessments performed,
+  data linked).
+
+  Do NOT use sentences that only describe:
+  - data storage
+  - databases or IT systems
+  - data management or software platforms
 
 --------------------------------------------------------------------------------
 Population / Samples
@@ -897,7 +903,12 @@ Biobank logistics (gating)
   If not stated -> null.
 
 - approval_for_publication:
-  true/false ONLY if explicitly stated. Otherwise null.
+  Return true ONLY if the paper explicitly states that data access,
+  release, or publication requires formal approval.
+
+  Ethics approval, trial registration, or IRB approval
+  does NOT count unless publication approval is explicitly mentioned.
+
 
 - preservation_indefinite:
   Return true if the paper explicitly mentions "long-term storage", "stored indefinitely", or equivalent. Else -> null.
@@ -910,11 +921,16 @@ Linkage / Languages / Triggers
   Do NOT truncate. Do NOT assume.
 
 - languages:
-  Infer "nl" if study is in Netherlands, "en" if UK/USA.
+  Return only if explicitly stated in the paper.
+  Do NOT infer language from country or setting.
+
 
 - linked_resource_names:
-  List ONLY proper names of registries or databases.
-  If the name is not a proper name, return [].
+  List ONLY proper names of registries or databases
+  IF AND ONLY IF the paper explicitly states that data are linked to,
+  or can be linked to, that resource.
+
+  Mere mention, comparison, or contextual reference is NOT sufficient.
 
 - record_trigger:
   The CLINICAL event that makes a patient eligible/entered (e.g. first consultation, diagnosis, presenting with symptoms).
