@@ -45,9 +45,32 @@ Extract exact values only. Do not infer.
   Do NOT use acronym as pid. If none → null.
 
 - resource_type:
-  Allowed only: cohort, registry, biobank, clinical trial, database.
-  Do NOT output study design terms such as "randomized controlled trial", "randomised controlled trial", "RCT".
-  If the paper describes an RCT, resource_type may be ["clinical trial"] ONLY if the text explicitly uses the phrase "clinical trial" or clearly labels it as a trial resource; otherwise return [].
+  Select ONE OR MORE values ONLY from the following list (use exact strings):
+  - "Biobank"
+  - "Catalogue"
+  - "Clinical trial"
+  - "Cohort study"
+  - "Common data model"
+  - "Databank"
+  - "Data source"
+  - "Disease specific"
+  - "Health records"
+  - "Network"
+  - "Rare disease"
+  - "Registry"
+  - "Other type"
+
+  Rules:
+  - Do NOT infer resource type.
+  - Do NOT output study design terms (e.g. "randomized controlled trial", "randomised controlled trial", "RCT").
+  - Output a value ONLY if the paper explicitly describes the resource as that type
+    (e.g. "cohort", "registry", "biobank", "clinical trial").
+  - For "Clinical trial":
+    - Return ONLY if the text explicitly uses the phrase "clinical trial"
+      OR clearly labels the resource itself as a trial.
+    - Mentions of randomization, control groups, protocols, or trial-like design
+      WITHOUT the phrase "clinical trial" → return [].
+  - If no allowed type is explicitly stated → return [].
 
 - study_name:
   Return ONLY if the text explicitly labels a name as the study/cohort name using wording like:
@@ -169,16 +192,13 @@ instructions = """
 Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
 
 - design:
-  Select from: ["Longitudinal", "Cross-sectional", "Cohort study", "Randomized Controlled Trial"].
-  (Note: Cluster RCT is a type of Randomized Controlled Trial).
+  Select from: ["Longitudinal", "Cross-sectional"].
 
 - data_collection_type:
   Select ONLY from this list (use exact strings):
-  - "Web-based questionnaires"
-  - "Extraction from Electronic Patient Files"
-  - "Clinical assessments"
-  - "Record linkage"
-
+  - "Retrospective"
+  - "Prospective"
+ 
   Rules:
   - "Clinical assessments" ONLY if the paper explicitly mentions assessment visits or examinations performed as part of the study protocol.
     Do NOT use for routine clinical care, "clinical data", "clinical records", or "clinical characteristics".
@@ -688,7 +708,6 @@ For all list fields: if nothing is mentioned, return [] (not null).
 
 
 # ---------- PASS M: Documentation ----------
-[task_docs_legislation_dates]
 template_json = """
 {
   "citation_requirements": "string",
@@ -702,14 +721,16 @@ template_json = """
   ],
   "internal_identifiers": [
     {
-      "resource": "string",
-      "identifier": "string"
+      "resource": "string|null",
+      "identifier": "string",
+      "other": "string|null"
     }
   ],
   "external_identifiers": [
     {
-      "resource": "string",
-      "identifier": "string"
+      "resource": "string|null",
+      "identifier": "string",
+      "other": "string|null"
     }
   ],
   "supplementary_information": "string",
@@ -724,8 +745,34 @@ template_json = """
 }
 """
 
+
 instructions = """
 Extract Dates and Legislation.
+
+- internal_identifiers:
+  Extract internal identifiers ONLY if the paper explicitly mentions an internal identifier or registration number.
+
+  Output format:
+  [
+    {
+      "resource": "UMCG register" | "Utopia UMCG PaNaMaID" | null,
+      "identifier": "string",
+      "other": "string|null"
+    }
+  ]
+
+  Rules:
+  - The identifier MUST be explicitly stated in the text. Do NOT invent or infer.
+  - Exactly ONE of the following must be filled:
+    - ("resource" AND "identifier")
+    - OR ("other" AND "identifier")
+  - NEVER fill both "resource" and "other".
+  - If the identifier source is:
+    - "UMCG register" → set resource = "UMCG register", other = null
+    - "Utopia UMCG PaNaMaID" → set resource = "Utopia UMCG PaNaMaID", other = null
+    - ANY other internal system name → set resource = null, other = "<exact system name from text>"
+  - If no internal identifier is explicitly mentioned → return [].
+
 
 - applicable_legislation:
   Include all explicitly mentioned laws/regulations.
@@ -737,6 +784,51 @@ Extract Dates and Legislation.
 - collection_start_planned:
   Use only if the text explicitly says "planned" or "will start".
   Otherwise null (even if actual is known).
+
+- external_identifiers:
+  Extract external identifiers ONLY if the paper explicitly mentions an external registration number or identifier.
+
+  Output format:
+  [
+    {
+      "resource": "EUPAS number" | "METc number" | "ClinicalTrials.gov NCT number" | "EUDRACT number" | null,
+      "identifier": "string",
+      "other": "string|null"
+    }
+  ]
+
+  Rules:
+  - The identifier MUST be explicitly stated in the text. Do NOT invent or infer.
+  - Exactly ONE of the following must be filled:
+    - ("resource" AND "identifier")
+    - OR ("other" AND "identifier")
+  - NEVER fill both "resource" and "other".
+  - If the identifier type is:
+    - EUPAS → resource = "EUPAS number"
+    - METc → resource = "METc number"
+    - ClinicalTrials.gov / NCT → resource = "ClinicalTrials.gov NCT number"
+    - EUDRACT → resource = "EUDRACT number"
+  - If the identifier source is an external identifier NOT in the list above:
+    → resource = null, other = "<exact name used in the text>"
+  - If no external identifier is explicitly mentioned → return [].
+
+- metadata_issued:
+  Return the date when the metadata of the resource was FIRST published.
+  Extract ONLY if an explicit issuance/publication date of the metadata is stated
+  (e.g. "metadata issued on …", "first published on …", "released on …").
+  Return the date exactly as written.
+  Do NOT infer from article publication date, study start date, or data collection dates.
+  If not explicitly stated → return null.
+
+- metadata_modified:
+  Return the date when the metadata of the resource was LAST modified.
+  Extract ONLY if an explicit metadata modification/update date is stated
+  (e.g. "metadata last modified on …", "updated on …", "last revision on …").
+  Return the date exactly as written.
+  Do NOT infer from version numbers, publication updates, or data changes.
+  If not explicitly stated → return null.
+
+
 """
 
 
@@ -996,4 +1088,68 @@ Content
 
 - results:
   Extract results only if explicitly described in the paper text; otherwise null.
+"""
+
+# ---------- PASS P: Subpopulations ----------
+[task_subpopulations]
+template_json = """
+{
+  "subpopulations": [
+    {
+      "pid": "string|null",
+      "description": "string",
+      "keywords": ["string"],
+      "number_of_participants": "integer|null",
+      "counts": [
+        {
+          "year": "integer|null",
+          "age_group": "string|null",
+          "gender": "string|null",
+          "n_unique_individuals": "integer|null"
+        }
+      ],
+      "inclusion_start": "integer|null",
+      "inclusion_end": "integer|null",
+      "age_groups": ["string"],
+      "age_min": "integer|null",
+      "age_max": "integer|null",
+      "main_medical_condition": ["string"],
+      "comorbidity": ["string"],
+      "countries": ["verbatim-string"],
+      "regions": ["verbatim-string"],
+      "inclusion_criteria": ["string"],
+      "other_inclusion_criteria": ["string"],
+      "exclusion_criteria": ["string"],
+      "other_exclusion_criteria": ["string"],
+      "issued": "string|null",
+      "modified": "string|null",
+      "theme": ["string"],
+      "access_rights": "string",
+      "applicable_legislation": ["string"]
+    }
+  ]
+}
+"""
+
+instructions = """
+Extract explicitly defined subpopulations only (arms/subcohorts/strata/case-control/derivation-validation). Do NOT infer.
+If none are explicitly defined -> {"subpopulations": []}.
+
+Rules:
+- pid: only if explicitly stated for the subpopulation; else null. Do NOT invent.
+- description (required): 1–3 sentences describing the subpopulation using paper wording; no inference.
+- keywords (required): 5–12 terms to improve findability; try NOT to reuse words from description; no generic filler.
+- number_of_participants: subgroup N only if explicitly stated; else null.
+- counts: return [] unless the paper explicitly provides unique individual counts by year AND age group AND gender (no partials).
+- inclusion_start/inclusion_end: explicit calendar years for this subpopulation only; ongoing -> inclusion_end null.
+- age_groups: only if explicitly listed; else [].
+- age_min/age_max: integers only if explicit; “≥X” -> age_min=X, age_max=null.
+- main_medical_condition/comorbidity: list explicit disease groups/codes or named comorbidities only; no code inference.
+- countries/regions: only if explicitly tied to this subpopulation; normalize "The Netherlands"->"Netherlands".
+- inclusion/exclusion criteria: only if explicitly applied to this subpopulation (or explicitly stated “same as study criteria”).
+- issued/modified: only if explicit publish/last modified dates for the subpopulation data; else null.
+- theme (required): must include "Health". Allowed: "Health","Agriculture","Environment","Energy","Government and public sector".
+- access_rights (required): "Open access" if explicitly public; "Restricted access" if explicitly controlled; else default "Non public".
+- applicable_legislation (required): must include "Data Governance Act" plus any explicitly named laws.
+No placeholders ("Unknown/N/A/Not specified"). Use null or [].
 """
