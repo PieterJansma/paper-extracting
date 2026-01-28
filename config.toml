@@ -166,6 +166,8 @@ template_json = """
 """
 
 instructions = """
+Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
+
 - design:
   Select from: ["Longitudinal", "Cross-sectional", "Cohort study", "Randomized Controlled Trial"].
   (Note: Cluster RCT is a type of Randomized Controlled Trial).
@@ -188,6 +190,9 @@ instructions = """
   Copy ONE full sentence (verbatim or near-verbatim) from the paper that describes the METHOD or SOURCE of data collection
   (e.g. questionnaires, electronic records, linkage, assessments).
   The sentence MUST contain at least one of: questionnaire, questionnaires, REDCap, online, web-based, electronic, dossier, EHR, record, linkage. Otherwise return null.
+
+  Copy EXACTLY ONE sentence and keep it under 250 characters.
+  If no suitable short sentence exists -> null.
 
   Do NOT use sentences that only describe timing (baseline, follow-up weeks/months) or outcomes.
   Do NOT create your own summary or list.
@@ -786,7 +791,7 @@ template_json = """
   "approval_for_publication": "boolean",
   "biospecimen_collected": ["string"],
   "languages": ["string"],
-  "linked_resource_names": ["string"],
+  "linked_resources_names": ["string"],
   "record_trigger": "string",
   "collection_events_resource": ["string"],
   "data_resources_included": ["string"],
@@ -926,7 +931,7 @@ Linkage / Languages / Triggers
   Do NOT infer language from country or setting.
 
 
-- linked_resource_names:
+- linked_resources_names:
   List ONLY resources that the paper explicitly states
   are linked to or can be linked to the study data.
 
