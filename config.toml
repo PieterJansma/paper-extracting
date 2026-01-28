@@ -3,7 +3,7 @@ base_url = "http://127.0.0.1:8080/v1"
 model    = "numind/NuExtract-2.0-8B"
 api_key  = "sk-local"
 use_grammar = false
-max_tokens = 4096
+max_tokens = 6000
 temperature = 0.0
 
 [pdf]
@@ -775,7 +775,7 @@ template_json = """
   "data_collection_description": "string",
   "number_of_participants_with_samples": "integer|null",
   "age_min": "integer|null",
-  "audit_possible": "boolean"
+  "audit_possible": "boolean",
   "access_rights": "string",
   "data_access_conditions": ["string"],
   "creator_resource": "string",
