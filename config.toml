@@ -708,6 +708,7 @@ For all list fields: if nothing is mentioned, return [] (not null).
 
 
 # ---------- PASS M: Documentation ----------
+[task_documentation]
 template_json = """
 {
   "citation_requirements": "string",
