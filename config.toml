@@ -852,8 +852,11 @@ Data collection
   If none apply → return [].
 
 - data_collection_description:
-  Copy ONE sentence only (verbatim or near-verbatim).
-  If needed, choose the single most informative sentence about how data were obtained.
+  Return EXACTLY ONE sentence (verbatim or near-verbatim) describing the method/source of data collection.
+  HARD LIMIT: max 180 characters.
+  If the best candidate sentence is longer than 180 characters -> return null.
+  Do NOT include parentheses-heavy or supplementary-table references.
+
 
 
 --------------------------------------------------------------------------------
