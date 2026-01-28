@@ -852,12 +852,8 @@ Data collection
   If none apply → return [].
 
 - data_collection_description:
-  The sentence MUST describe HOW data were obtained for the study
-  (e.g. questionnaires administered, records extracted, data linked).
-
-  Do NOT use sentences that describe:
-  - routine clinical care
-  - data storage, databases, or software systems
+  Copy ONE sentence only (verbatim or near-verbatim).
+  If needed, choose the single most informative sentence about how data were obtained.
 
 
 --------------------------------------------------------------------------------
@@ -870,8 +866,11 @@ Population / Samples
   If only cohort size or registry size is given → return null.
 
 - age_min:
-  Return ONLY if an explicit minimum age is stated (e.g. "≥16 years", "aged 7–17 years").
-  If not explicitly stated, return null. Do NOT infer.
+  Return ONE integer.
+  If multiple minimum ages are stated (e.g., by sex/subgroup), return the LOWEST stated minimum age as the single integer.
+  If not explicitly stated -> null.
+  Do NOT return text, ranges, or lists.
+
 
 --------------------------------------------------------------------------------
 Access / Governance / Contributors
@@ -909,8 +908,9 @@ Biobank logistics (gating)
   If not stated -> null.
 
 - approval_for_publication:
-  Return true ONLY if the paper explicitly states that
-  approval is required before data release or publication.
+  Return true ONLY if explicitly stated.
+  Return false ONLY if explicitly stated that no approval is required.
+  Otherwise null.
 
   Ethics approval, IRB approval, or trial registration
   does NOT count.
