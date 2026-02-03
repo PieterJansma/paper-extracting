@@ -866,3 +866,74 @@ RULES
 - Use verbatim terms/categories IF the paper lists them.
 - If the paper only gives general statements like “clinical data were collected” without a categorized list -> [].
 """
+
+# ---------- PASS Y: Linkage (Resources → linkage) ----------
+[task_linkage]
+template_json = """
+{
+  "prelinked": "boolean|null",
+  "linkage_options": "string|null",
+  "linkage_possibility": "boolean|null"
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Do NOT infer.
+
+SCOPE
+- Extract RESOURCE-LEVEL linkage information (HRICore → linkage tab).
+- This is NOT dataset-level and NOT subpopulation-level.
+- Use ONLY information explicitly stated in the PDF.
+
+GLOBAL RULES
+- No placeholders ("Unknown", "N/A", "Not specified").
+- If not explicitly stated -> null.
+- Do NOT assume linkage because registries/databases are mentioned.
+- Do NOT assume identifiers imply linkage.
+
+----------------------------------------
+prelinked
+----------------------------------------
+Question:
+- "Is the data from this data source linked to other data sources?"
+
+Rules:
+- true ONLY if the PDF explicitly states that the data ARE ALREADY LINKED
+  (e.g. “data were linked to registry X”, “pre-linked with hospital records”).
+- false ONLY if the PDF explicitly states data are NOT linked.
+- If linkage status is not explicitly stated -> null.
+
+----------------------------------------
+linkage_options
+----------------------------------------
+Definition:
+- Text field describing WHICH external data sources can be linked.
+
+Rules:
+- Fill ONLY if the PDF explicitly mentions linkable or linked external resources
+  (e.g. named registries, databases, administrative records).
+- Use short verbatim or near-verbatim wording.
+- Do NOT list variables or outcomes (e.g. mortality, survival).
+- If multiple sources are mentioned, combine into a single string separated by "; ".
+- If nothing explicit -> null.
+
+----------------------------------------
+linkage_possibility
+----------------------------------------
+Question:
+- "Can this data source be linked to other data sources?"
+
+Rules:
+- true ONLY if the PDF explicitly states that linkage IS POSSIBLE
+  (e.g. “can be linked”, “linkage is possible”, “allows linkage with…”).
+- false ONLY if the PDF explicitly states linkage is NOT possible.
+- If not explicitly stated -> null.
+
+----------------------------------------
+IMPORTANT DISTINCTIONS
+----------------------------------------
+- Mentioning a registry ≠ linkage.
+- Using external data for comparison ≠ linkage.
+- Shared governance/network membership ≠ linkage.
+- Presence of identifiers ≠ linkage unless explicitly stated.
+"""
