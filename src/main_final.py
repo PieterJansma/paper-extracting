@@ -86,6 +86,7 @@ def _build_resource_row(
     pdf_path: str,
     section_results: Dict[str, Dict[str, Any]],
     section_orders: Dict[str, List[str]],
+    section_keys_override: Dict[str, List[str]] | None = None,
 ) -> Tuple[Dict[str, Any], List[str]]:
     row: Dict[str, Any] = {
         "paper": label,
@@ -94,7 +95,10 @@ def _build_resource_row(
 
     columns = ["paper", "pdf_path"]
     for section, result in section_results.items():
-        ordered_keys = section_orders.get(section, [])
+        if section_keys_override and section in section_keys_override:
+            ordered_keys = section_keys_override[section]
+        else:
+            ordered_keys = section_orders.get(section, [])
         for key in ordered_keys:
             col = f"{section}.{key}"
             columns.append(col)
@@ -134,7 +138,7 @@ def cli() -> None:
         "-p", "--passes",
         nargs="+",
         default=["all"],
-        help="Specify passes: A, B, C, D, E, X1, X2, X3, Y or 'all'.",
+        help="Specify passes: A, B, C, D, E, F, G, H, X1, X2, X3, Y or 'all'.",
     )
     parser.add_argument(
         "--pdfs",
@@ -184,10 +188,13 @@ def cli() -> None:
         ("C", "PASS C: Subpopulations", "task_subpopulations"),
         ("D", "PASS D: Collection events", "task_collection_events"),
         ("E", "PASS E: Population", "task_population"),
+        ("F", "PASS F: Contributors", "task_contributors"),
         ("X1", "PASS X1: Datasets", "task_datasets"),
         ("X2", "PASS X2: Samplesets", "task_samplesets"),
         ("X3", "PASS X3: Areas of information", "task_areas_of_information"),
         ("Y", "PASS Y: Linkage", "task_linkage"),
+        ("G", "PASS G: Access conditions", "task_access_conditions"),
+        ("H", "PASS H: Information", "task_information"),
     ]
 
     # Preload template orders for stable column order
@@ -200,14 +207,36 @@ def cli() -> None:
         "task_overview",
         "task_design_structure",
         "task_population",
+        "task_contributors",
         "task_areas_of_information",
         "task_linkage",
+        "task_access_conditions",
+        "task_information",
     ]
     list_sections = {
         "task_subpopulations": "subpopulations",
         "task_collection_events": "collection_events",
         "task_datasets": "datasets",
         "task_samplesets": "samplesets",
+    }
+
+    resource_section_keys: Dict[str, List[str]] = {
+        "task_contributors": [
+            "publisher",
+            "creator",
+            "contact_point_first_name",
+            "contact_point_last_name",
+            "contact_point_email",
+        ],
+        "task_information": [
+            "funding_statement",
+            "citation_requirements",
+            "acknowledgements",
+            "provenance_statement",
+            "supplementary_information",
+            "theme",
+            "applicable_legislation",
+        ],
     }
 
     resource_rows: List[Dict[str, Any]] = []
@@ -217,6 +246,10 @@ def cli() -> None:
     ce_rows: List[Dict[str, Any]] = []
     dataset_rows: List[Dict[str, Any]] = []
     sampleset_rows: List[Dict[str, Any]] = []
+    organisation_rows: List[Dict[str, Any]] = []
+    people_rows: List[Dict[str, Any]] = []
+    publication_rows: List[Dict[str, Any]] = []
+    documentation_rows: List[Dict[str, Any]] = []
 
     for pdf_path, label in zip(pdf_paths, labels):
         paper_text = load_pdf_text(pdf_path, max_pages=pdf_cfg.get("max_pages"))
@@ -238,7 +271,13 @@ def cli() -> None:
             for section in resource_sections
             if section in per_section_results
         }
-        row, cols = _build_resource_row(label, pdf_path, resource_result, section_orders)
+        row, cols = _build_resource_row(
+            label,
+            pdf_path,
+            resource_result,
+            section_orders,
+            section_keys_override=resource_section_keys,
+        )
         resource_rows.append(row)
         if not resource_columns:
             resource_columns = cols
@@ -261,6 +300,60 @@ def cli() -> None:
             elif section_key == "task_samplesets":
                 rows, _ = _build_list_rows(label, items, "sampleset", ordered_keys)
                 sampleset_rows.extend(rows)
+
+        # Contributors tables
+        contributors_result = per_section_results.get("task_contributors", {})
+        if isinstance(contributors_result, dict):
+            organisations = contributors_result.get("organisations_involved", [])
+            people = contributors_result.get("people_involved", [])
+
+            org_keys = [
+                "id",
+                "type",
+                "name",
+                "organisation",
+                "other_organisation",
+                "department",
+                "website",
+                "email",
+                "logo",
+                "role",
+                "is_lead_organisation",
+            ]
+            rows, _ = _build_list_rows(label, organisations, "organisation", org_keys)
+            organisation_rows.extend(rows)
+
+            people_keys = [
+                "role",
+                "role_description",
+                "first_name",
+                "last_name",
+                "prefix",
+                "initials",
+                "title",
+                "organisation",
+                "email",
+                "orcid",
+                "homepage",
+                "photo",
+                "expertise",
+            ]
+            rows, _ = _build_list_rows(label, people, "person", people_keys)
+            people_rows.extend(rows)
+
+        # Information tables
+        info_result = per_section_results.get("task_information", {})
+        if isinstance(info_result, dict):
+            publications = info_result.get("publications", [])
+            documentation = info_result.get("documentation", [])
+
+            pub_keys = ["doi", "title", "is_design_publication", "reference"]
+            rows, _ = _build_list_rows(label, publications, "publication", pub_keys)
+            publication_rows.extend(rows)
+
+            doc_keys = ["name", "type", "description", "url", "file"]
+            rows, _ = _build_list_rows(label, documentation, "documentation", doc_keys)
+            documentation_rows.extend(rows)
 
     log.info("--- DONE EXTRACTING ---")
 
@@ -299,6 +392,67 @@ def cli() -> None:
         ]
         pd.DataFrame(sampleset_rows, columns=ss_cols).to_excel(
             writer, sheet_name="samplesets", index=False
+        )
+
+        # Organisations sheet
+        org_cols = ["paper", "organisation_index"] + [
+            "organisation.id",
+            "organisation.type",
+            "organisation.name",
+            "organisation.organisation",
+            "organisation.other_organisation",
+            "organisation.department",
+            "organisation.website",
+            "organisation.email",
+            "organisation.logo",
+            "organisation.role",
+            "organisation.is_lead_organisation",
+        ]
+        pd.DataFrame(organisation_rows, columns=org_cols).to_excel(
+            writer, sheet_name="organisations", index=False
+        )
+
+        # People involved sheet
+        people_cols = ["paper", "person_index"] + [
+            "person.role",
+            "person.role_description",
+            "person.first_name",
+            "person.last_name",
+            "person.prefix",
+            "person.initials",
+            "person.title",
+            "person.organisation",
+            "person.email",
+            "person.orcid",
+            "person.homepage",
+            "person.photo",
+            "person.expertise",
+        ]
+        pd.DataFrame(people_rows, columns=people_cols).to_excel(
+            writer, sheet_name="people", index=False
+        )
+
+        # Publications sheet
+        pub_cols = ["paper", "publication_index"] + [
+            "publication.doi",
+            "publication.title",
+            "publication.is_design_publication",
+            "publication.reference",
+        ]
+        pd.DataFrame(publication_rows, columns=pub_cols).to_excel(
+            writer, sheet_name="publications", index=False
+        )
+
+        # Documentation sheet
+        doc_cols = ["paper", "documentation_index"] + [
+            "documentation.name",
+            "documentation.type",
+            "documentation.description",
+            "documentation.url",
+            "documentation.file",
+        ]
+        pd.DataFrame(documentation_rows, columns=doc_cols).to_excel(
+            writer, sheet_name="documentation", index=False
         )
 
     log.info("Excel succesvol opgeslagen: %s", args.output)
