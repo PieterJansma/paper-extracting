@@ -18,6 +18,10 @@ NGL=999
 LOG_DIR="${PWD}/logs"
 mkdir -p "$LOG_DIR"
 
+# Local sync destination (set LOCAL_RSYNC_HOST if destination is remote)
+LOCAL_RSYNC_DEST="/Users/p.jansma/Documents/GitHub/paper-extracting/data/"
+LOCAL_RSYNC_HOST=""
+
 # ------------------------------------------------------------------------------
 # CLI passthrough:
 # - run without args => defaults to main_final.py -p all -o final_result.xlsx
@@ -32,6 +36,15 @@ if [[ $# -gt 0 ]]; then
 else
   RUN_ARGS=("${DEFAULT_ARGS[@]}")
 fi
+
+OUTPUT_FILE="final_result.xlsx"
+for ((i=0; i<${#RUN_ARGS[@]}; i++)); do
+  case "${RUN_ARGS[$i]}" in
+    -o|--output)
+      OUTPUT_FILE="${RUN_ARGS[$((i+1))]:-final_result.xlsx}"
+      ;;
+  esac
+done
 
 if command -v module >/dev/null 2>&1; then
   module purge || true
@@ -221,5 +234,13 @@ LB_PID=$!
 echo "[4/4] Starten main_final.py (PDF extractie → Excel)..."
 echo "  PDF_EXTRACT_CONFIG=$PDF_EXTRACT_CONFIG"
 python3 src/main_final.py "${RUN_ARGS[@]}"
+
+RSYNC_TARGET="$LOCAL_RSYNC_DEST"
+if [[ -n "$LOCAL_RSYNC_HOST" ]]; then
+  RSYNC_TARGET="${LOCAL_RSYNC_HOST}:${LOCAL_RSYNC_DEST}"
+fi
+
+echo "[4b/4] Sync output naar lokaal..."
+rsync -avhP "$OUTPUT_FILE" "$RSYNC_TARGET"
 
 echo "✅ Klaar."
