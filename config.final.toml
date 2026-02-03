@@ -193,62 +193,74 @@ Dates / contact
   Only if explicitly stated as resource metadata dates (NOT article publication date).
 """
 
-# ---------- PASS X: Design (Structure of the resource) ----------
+# ---------- PASS B: Design & structure (Resources) ----------
 [task_design_structure]
 template_json = """
 {
-  "design": ["string"],
-  "data_collection_type": ["string"]
+  "design": "string|null",
+  "design_description": "string|null",
+  "data_collection_type": "string|null"
 }
 """
 
 instructions = """
 Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
 
-Extract ONLY explicit values. Do NOT infer from context, timelines, or typical study practice.
+Extract ONLY explicit values from the PDF. Do NOT infer.
 
 SCOPE
-- Only the first "Structure of the resource" fields:
+- Resources → "design and structure":
   - design
+  - design_description
   - data_collection_type
-- Ignore: population, eligibility, samples, collection events, follow-up schedules.
+- Ignore EVERYTHING else (subpopulations, population, eligibility, samples, collection events, follow-up schedules).
+- Do NOT output "design schematic" (file upload field).
 
 GLOBAL RULES
 - No placeholders ("Unknown", "N/A", "Not specified").
-- If not explicitly stated -> return [].
+- If not explicitly stated -> null.
 - Use ONLY the allowed dropdown values exactly as written below.
 
 --------------------------------------------------
-design (STRICT dropdown)
+design (STRICT dropdown; single select)
 --------------------------------------------------
 Allowed values (exact strings only):
 - "Longitudinal"
 - "Cross-sectional"
 
 Rules:
-- Output ONLY if the paper explicitly uses the term "longitudinal" or "cross-sectional"
-  to describe the study/resource.
-- Do NOT infer "Longitudinal" from follow-up visits, repeated measures, baseline + follow-up, or prospective wording.
-- Do NOT infer "Cross-sectional" from "baseline analysis" or "at inclusion" unless explicitly labeled cross-sectional.
-- If not explicit -> [].
+- Fill ONLY if the paper explicitly uses "longitudinal" or "cross-sectional".
+- Do NOT infer from follow-up visits, repeated measures, baseline + follow-up, or prospective wording.
+- Do NOT infer cross-sectional from "baseline" unless explicitly called cross-sectional.
+- If not explicit -> null.
 
 --------------------------------------------------
-data_collection_type (STRICT dropdown, multi-select)
+design_description (free text)
+--------------------------------------------------
+- Fill ONLY if the paper explicitly provides a short description of the study design in words.
+- Prefer verbatim or near-verbatim wording (max 250 characters).
+- Do NOT write your own summary.
+- If not explicit -> null.
+
+--------------------------------------------------
+data_collection_type (STRICT dropdown; single select)
 --------------------------------------------------
 Allowed values (exact strings only):
 - "Retrospective"
 - "Prospective"
 
 Rules:
-- Add a value ONLY if explicitly stated as retrospective and/or prospective data collection.
-- If both are explicitly stated (e.g., retrospective extraction + prospective follow-up) -> return ["Retrospective","Prospective"].
+- Fill ONLY if explicitly stated as retrospective OR prospective.
+- If the paper explicitly says BOTH apply:
+  -> set data_collection_type = null (do NOT guess which is primary).
 - Do NOT infer "Prospective" from "cohort" or "longitudinal".
 - Do NOT infer "Retrospective" from use of existing records unless explicitly stated.
-- If not explicit -> [].
+- If not explicit -> null.
 """
 
 
-# ---------- PASS B: Subpopulations ----------
+
+# ---------- PASS C: Subpopulations ----------
 [task_subpopulations]
 template_json = """
 {
@@ -310,4 +322,381 @@ Rules:
 - access_rights (required): "Open access" if explicitly public; "Restricted access" if explicitly controlled; else default "Non public".
 - applicable_legislation (required): must include "Data Governance Act" plus any explicitly named laws.
 No placeholders ("Unknown/N/A/Not specified"). Use null or [].
+"""
+
+# ---------- PASS D: Collection events (CollectionEvents) ----------
+[task_collection_events]
+template_json = """
+{
+  "collection_events": [
+    {
+      "name": "string",
+      "pid": "string|null",
+      "description": "string",
+      "subpopulations": ["string"],
+      "keywords": ["string"],
+      "start_date": "string|null",
+      "end_date": "string|null",
+      "age_groups": ["string"],
+      "number_of_participants": "integer|null",
+      "areas_of_information": ["string"],
+      "sample_categories": ["string"],
+      "data_categories": ["string"],
+      "data_categories_other": "string|null",
+      "standardized_tools": ["string"],
+      "standardized_tools_other": "string|null",
+      "core_variables": ["string"],
+      "issued": "string|null",
+      "modified": "string|null",
+      "theme": ["string"],
+      "access_rights": "string",
+      "applicable_legislation": ["string"]
+    }
+  ]
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
+
+Extract Collection Events (HRICore CollectionEvents). Do NOT infer.
+
+SCOPE
+- A "collection event" is a distinct data-collection moment/wave/round/visit (e.g., baseline, follow-up, questionnaire wave).
+- Extract ONLY events explicitly described in the paper.
+- If no explicit events are described -> {"collection_events": []}.
+
+GLOBAL RULES
+- No placeholders ("Unknown", "N/A", "Not specified"). Use null or [].
+- Do NOT invent events.
+- Use paper wording as much as possible (verbatim or near-verbatim).
+
+--------------------------------------------------
+name (REQUIRED)
+--------------------------------------------------
+- Use explicit event labels from the paper (e.g., "baseline", "6-month follow-up", "T0", "visit 1").
+- If an event is clearly described but unnamed, you MAY create a minimal label using ONLY explicit timing wording (e.g., "Baseline", "Follow-up at 6 months").
+- If you cannot produce a label from explicit wording -> do not output that event.
+
+--------------------------------------------------
+pid
+--------------------------------------------------
+- Only if an explicit persistent identifier for the event is stated; else null.
+
+--------------------------------------------------
+description (REQUIRED)
+--------------------------------------------------
+- 1–3 sentences describing what is collected/done in this event, using paper wording.
+- No inference.
+
+--------------------------------------------------
+subpopulations
+--------------------------------------------------
+- List subpopulations targeted by THIS collection event ONLY if explicitly stated.
+- Do NOT infer.
+- If not explicit -> [].
+
+--------------------------------------------------
+keywords (REQUIRED)
+--------------------------------------------------
+- 5–12 terms to improve findability of THIS collection event.
+- Must be verbatim terms from the paper (no invented synonyms).
+- No generic filler.
+
+--------------------------------------------------
+start_date / end_date
+--------------------------------------------------
+- Fill ONLY if explicitly stated for this event (as written).
+- Ongoing -> end_date null.
+- Do NOT infer from recruitment periods or publication dates.
+
+--------------------------------------------------
+age_groups
+--------------------------------------------------
+- Only fill if the paper explicitly names age group categories or clearly restricts the event to such groups.
+- Do NOT infer from mean/median age.
+- If not explicit -> [].
+
+--------------------------------------------------
+number_of_participants
+--------------------------------------------------
+- Only if the paper explicitly gives the N for THIS event/wave.
+- Do NOT reuse total cohort size.
+- Else null.
+
+--------------------------------------------------
+areas_of_information (STRICT UI top-level categories)
+--------------------------------------------------
+Allowed values (exact strings only; top-level categories):
+- "Socio-demographic and economic characteristics"
+- "Lifestyle and behaviours"
+- "Birth, pregnancy and reproductive health history"
+- "Perception of health, quality of life, development and functional limitations"
+- "Symptoms and signs"
+- "Medication and supplements"
+- "Non-pharmacological interventions"
+- "Health and community care services utilization"
+- "Death"
+- "Physical measures and assessments"
+- "Laboratory measures"
+- "Cognition, personality and psychological measures and assessments"
+- "Life events, life plans, beliefs and values"
+- "Preschool, school and work life"
+- "Social environment and relationships"
+- "Physical environment"
+- "Administrative information"
+
+Rules:
+- Add a category ONLY if the paper explicitly states that this type of information was collected in THIS event
+  OR explicitly lists measures/variables that clearly fall under one of these categories.
+- Prefer top-level categories only; do NOT output subcategory labels.
+- Do NOT infer categories from general cohort descriptions.
+- If not explicit -> [].
+
+--------------------------------------------------
+sample_categories
+--------------------------------------------------
+- List biological sample types/categories for THIS event ONLY if explicitly stated.
+- If not explicitly stated -> [].
+
+--------------------------------------------------
+data_categories
+--------------------------------------------------
+Use ONLY these exact strings if explicitly supported by the paper:
+- "Biological samples"
+- "Survey data"
+- "Imaging data"
+- "Medical records"
+- "National registries"
+- "Genealogical records"
+- "Physiological/Biochemical measurements"
+- "Genomics"
+- "Transcriptomics"
+- "Proteomics"
+- "Metabolomics"
+- "Other"
+
+Rules:
+- Add items ONLY if explicitly stated for this event.
+- If "Other" is included -> fill data_categories_other with exact wording from the paper.
+- Otherwise data_categories_other = null.
+- If not explicit -> [].
+
+--------------------------------------------------
+standardized_tools / standardized_tools_other
+--------------------------------------------------
+- standardized_tools: list explicit questionnaire/instrument/tool names used in THIS event.
+- Do NOT invent.
+- standardized_tools_other must be null unless standardized_tools includes "Other".
+- If no explicit tools -> [] and standardized_tools_other = null.
+
+--------------------------------------------------
+core_variables
+--------------------------------------------------
+- List 10–20 variable names ONLY if the paper explicitly lists them for this event.
+- If not explicitly enumerated -> [] (do NOT guess).
+
+--------------------------------------------------
+issued / modified
+--------------------------------------------------
+- Only if explicitly stated for this collection event's data; else null.
+- Do NOT infer from article publication date.
+
+--------------------------------------------------
+theme
+--------------------------------------------------
+Allowed values:
+- "Health"
+- "Agriculture"
+- "Environment"
+- "Energy"
+- "Government and public sector"
+
+Rules:
+- Must include "Health" for health events. If nothing else explicit -> ["Health"].
+
+--------------------------------------------------
+access_rights
+--------------------------------------------------
+Allowed values:
+- "Open access"
+- "Restricted access"
+- "Non public"
+
+Rules:
+- "Open access" ONLY if data are explicitly publicly available.
+- "Restricted access" ONLY if explicitly stated controlled/restricted.
+- Otherwise default "Non public".
+
+--------------------------------------------------
+applicable_legislation
+--------------------------------------------------
+- Must always include "Data Governance Act".
+- Add other laws ONLY if explicitly named (e.g., GDPR/AVG).
+- Do NOT include ethics guidelines.
+"""
+
+
+# ---------- PASS E: Population (Resource-level) ----------
+[task_population]
+template_json = """
+{
+  "number_of_participants": "integer|null",
+  "number_of_participants_with_samples": "integer|null",
+  "countries": ["verbatim-string"],
+  "regions": ["verbatim-string"],
+  "population_age_groups": ["string"],
+  "age_min": "integer|null",
+  "age_max": "integer|null",
+  "inclusion_criteria": ["string"],
+  "other_inclusion_criteria": ["string"],
+  "exclusion_criteria": ["string"],
+  "other_exclusion_criteria": ["string"],
+  "population_disease": ["string"],
+  "population_oncology_topology": ["string"],
+  "population_oncology_morphology": ["string"]
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
+
+Extract ONLY RESOURCE-LEVEL population information (the overall cohort/registry population).
+Do NOT extract subpopulations/arms/strata here (those belong to PASS C).
+Do NOT extract collection waves/visits (those belong to PASS D).
+
+GLOBAL RULES
+- No placeholders ("Unknown", "N/A", "Not specified").
+- If not explicitly stated -> null or [].
+- Do NOT infer from typical cohort practice, tables of baseline characteristics, or assumptions.
+- Do NOT copy values from other passes unless explicitly stated in the PDF.
+- Empty strings are NOT allowed.
+
+--------------------------------------------------
+number_of_participants
+--------------------------------------------------
+Definition: total number of individuals for which data is collected (resource-level).
+Rules:
+- Use ONLY if the paper explicitly states a total cohort/registry N (e.g., "N=...", "included ... participants").
+- Do NOT reuse event-level N (baseline visit N, follow-up N).
+- If multiple totals exist (e.g., different timepoints), pick ONLY the one explicitly described as the overall cohort size;
+  otherwise return null.
+
+--------------------------------------------------
+number_of_participants_with_samples
+--------------------------------------------------
+Definition: number of individuals for which biological samples were collected (resource-level).
+Rules:
+- Only fill if BOTH:
+  (1) at least one biospecimen type is explicitly mentioned (e.g., blood, saliva, urine, tissue, DNA),
+  AND (2) the paper explicitly states how many individuals provided/had samples collected/stored.
+- Do NOT infer from "biobank" wording or from total N.
+- If not explicit -> null.
+
+--------------------------------------------------
+countries / regions
+--------------------------------------------------
+- countries:
+  Include ONLY countries explicitly stated as origin of data/samples for this resource.
+  Normalize "The Netherlands" -> "Netherlands".
+- regions:
+  Include ONLY explicitly stated geographical regions/provinces/cities relevant to where data/samples originate.
+  Use verbatim wording (no harmonization beyond obvious Netherlands normalization above).
+- If none explicit -> [].
+
+--------------------------------------------------
+population_age_groups (STRICT dropdown labels)
+--------------------------------------------------
+Allowed values (exact strings only):
+- "Prenatal"
+- "All ages"
+- "Infant (0-23 months)"
+- "Newborn (0-1 months)"
+- "Infants and toddlers (2-23 months)"
+- "Child (2-12 years)"
+- "Adolescent (13-17 years)"
+- "Adult (18+ years)"
+- "Young adult (18-24 years)"
+- "Adult (25-44 years)"
+- "Middle-aged (45-64 years)"
+- "Aged (65+ years)"
+- "Aged (65-79 years)"
+- "Aged (80+ years)"
+
+Rules:
+- Add a value ONLY if the paper explicitly indicates the population includes that age group category
+  (either by naming the category or by explicitly stating an age range that maps unambiguously to one of these labels).
+- Do NOT infer "Adult (18+ years)" just because mean age > 18 unless explicitly restricted.
+- If not explicit -> [].
+
+--------------------------------------------------
+age_min / age_max
+--------------------------------------------------
+- age_min:
+  Integer ONLY if explicitly stated as minimum age (e.g. "≥18 years", "aged 0–5", "older than 16").
+  For "≥X" -> age_min=X.
+- age_max:
+  Integer ONLY if explicitly stated as maximum age (e.g. "≤80 years", "aged 0–5", "under 18").
+  For "≤Y" -> age_max=Y.
+- If only "≥X" is given -> age_max=null.
+- If only "≤Y" is given -> age_min=null.
+- Do NOT infer from mean/median age or SD.
+- If not explicit -> null.
+
+--------------------------------------------------
+inclusion_criteria / exclusion_criteria (STRICT dropdown values)
+--------------------------------------------------
+These fields are UI checkbox categories, NOT free-text criteria.
+Only output items that are explicitly stated in the paper.
+
+Allowed values (exact strings only) for BOTH inclusion_criteria and exclusion_criteria:
+- "Clinically relevant lifestyle inclusion criterion"
+- "Family status inclusion criterion"
+- "Gravidity inclusion criterion"
+- "Use of medication inclusion criterion"
+- "Age group inclusion criterion"
+- "Health status inclusion criterion"
+- "Age of majority inclusion criterion"
+- "BMI range inclusion criterion"
+- "Country of residence inclusion criteria"
+- "Clinically relevant exposure inclusion criterion"
+- "Defined population inclusion criterion"
+- "Ethnicity inclusion criterion"
+- "Hospital patient inclusion criterion"
+- "Sex inclusion criterion"
+
+Rules:
+- Add a label ONLY if the paper explicitly states that kind of criterion is used.
+  Examples:
+  - age threshold -> "Age group inclusion criterion"
+  - only females/males -> "Sex inclusion criterion"
+  - pregnancy/gravidity required -> "Gravidity inclusion criterion"
+  - must live in country/region -> "Country of residence inclusion criteria"
+  - must be hospital patients -> "Hospital patient inclusion criterion"
+- Do NOT infer from demographic descriptions.
+- If not explicit -> [].
+
+--------------------------------------------------
+other_inclusion_criteria / other_exclusion_criteria
+--------------------------------------------------
+Free-text lists (paper wording), only if explicit.
+Rules:
+- Include verbatim or near-verbatim short phrases/sentences from the paper that specify criteria
+  that are NOT captured by the checkbox labels above.
+- Do NOT invent or summarize.
+- If nothing explicit -> [].
+
+--------------------------------------------------
+population_disease
+--------------------------------------------------
+- List diseases/conditions explicitly stated as the target/defined study population (resource-level).
+- Use exact wording (include codes if provided).
+- If not explicit -> [].
+
+--------------------------------------------------
+population_oncology_topology / population_oncology_morphology
+--------------------------------------------------
+- Only fill if the paper explicitly mentions oncology topology/morphology classifications/codes (e.g., ICD-O terms/codes).
+- Do NOT infer oncology just because cancer is mentioned.
+- If not explicit -> [].
 """
