@@ -700,3 +700,169 @@ population_oncology_topology / population_oncology_morphology
 - Do NOT infer oncology just because cancer is mentioned.
 - If not explicit -> [].
 """
+# ---------- PASS X: Available data & samples (Datasets + Samplesets subtables) ----------
+# NOTE: These are SUBTABLES. There can be MULTIPLE entries.
+# Output arrays; do NOT assume there is only one dataset/sampleset.
+
+# ---------- PASS X1: Datasets (Datasets table) ----------
+[task_datasets]
+template_json = """
+{
+  "datasets": [
+    {
+      "name": "string",
+      "label": "string|null",
+      "dataset_type": ["string"],
+      "unit_of_observation": "string|null",
+      "keywords": ["string"],
+      "description": "string|null",
+      "number_of_rows": "integer|null",
+      "since_version": "string|null",
+      "until_version": "string|null"
+    }
+  ]
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Do NOT infer.
+
+SCOPE
+- Extract entries for the HRICore Datasets subtable (Available data & samples).
+- There may be multiple datasets -> return one object per dataset.
+- If no dataset is explicitly described -> {"datasets": []}.
+
+GLOBAL RULES
+- No placeholders ("Unknown", "N/A", "Not specified").
+- If not explicitly stated -> null or [].
+- Do NOT invent dataset names, types, versions, counts, or units.
+- Do NOT copy values from other passes unless explicitly stated in the PDF.
+
+----------------------------------------
+name (REQUIRED)
+----------------------------------------
+- Use an explicit dataset/table name ONLY if the PDF explicitly names it (e.g., “baseline dataset”, “harmonised dataset X”, “questionnaire dataset”).
+- If the PDF does not explicitly name datasets -> return {"datasets": []}.
+  (Do NOT create names like "Dataset 1".)
+
+----------------------------------------
+label
+----------------------------------------
+- Short human readable description ONLY if explicitly provided (e.g., a caption-like label).
+- Otherwise null. Do NOT write your own summary.
+
+----------------------------------------
+dataset_type (STRICT dropdown; multi-select)
+----------------------------------------
+Allowed values (exact strings only):
+- "Collected dataset"
+- "Harmonised dataset"
+- "Harmonisation schema"
+
+Rules:
+- Add a value ONLY if the PDF explicitly uses wording that maps directly to one of these.
+- If nothing explicit -> [].
+
+----------------------------------------
+unit_of_observation (single select)
+----------------------------------------
+- Fill ONLY if the PDF explicitly states the unit (e.g., patient, person, sample, prescription/event/observation).
+- Otherwise null.
+- Do NOT guess from context.
+
+----------------------------------------
+keywords
+----------------------------------------
+- Only if explicitly listed for the dataset OR explicitly stated as tags/topics.
+- Must be verbatim terms from the PDF.
+- Otherwise [].
+
+----------------------------------------
+description
+----------------------------------------
+- Only if explicitly described as the role/function of this dataset/table (verbatim or near-verbatim).
+- Otherwise null.
+
+----------------------------------------
+number_of_rows
+----------------------------------------
+- Only if the PDF explicitly gives the record count for THIS dataset/table.
+- Otherwise null.
+- Do NOT reuse cohort size as row count.
+
+----------------------------------------
+mapped_to / mapped_from
+----------------------------------------
+- IGNORE these: they are UI fields only fillable after save; do NOT output.
+
+----------------------------------------
+since_version / until_version
+----------------------------------------
+- Only if explicitly stated (as written) for THIS dataset.
+- Otherwise null.
+- Do NOT infer from paper publication year, software versions, or dates.
+"""
+
+
+# ---------- PASS X2: Samplesets (Samplesets table) ----------
+[task_samplesets]
+template_json = """
+{
+  "samplesets": [
+    {
+      "name": "string",
+      "sample_types": ["string"]
+    }
+  ]
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Do NOT infer.
+
+SCOPE
+- Extract entries for the HRICore Samplesets subtable (Available data & samples).
+- There may be multiple sample sets -> return one object per sampleset.
+- If no sample sets are explicitly described -> {"samplesets": []}.
+
+GLOBAL RULES
+- No placeholders ("Unknown", "N/A", "Not specified").
+- If not explicitly stated -> [].
+- Do NOT invent sample set names or sample types.
+
+----------------------------------------
+name (REQUIRED)
+----------------------------------------
+- Use an explicit sample set name ONLY if the PDF explicitly names it (e.g., “Blood samples”, “Biobank sampleset”, “DNA collection”).
+- If no explicit sampleset name exists -> return {"samplesets": []}.
+  (Do NOT create “Sampleset 1”.)
+
+----------------------------------------
+sample_types
+----------------------------------------
+- List biological sample types explicitly mentioned as being part of THIS sampleset (e.g., Blood, Serum, Plasma, Saliva, Urine, Tissue, DNA).
+- Use the exact wording from the PDF where possible.
+- If the PDF does not list sample types for the named sampleset -> [].
+"""
+
+
+# ---------- PASS X3: Areas of information (Resources field; optional helper) ----------
+# (This is the Resources -> "areas of information" multi-select you showed under Available data)
+[task_areas_of_information]
+template_json = """
+{
+  "areas_of_information": ["string"]
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Do NOT infer.
+
+SCOPE
+- Extract ONLY the high-level 'areas of information that were collected' if the PDF explicitly states them.
+- If not explicitly stated -> {"areas_of_information": []}.
+
+RULES
+- Use verbatim terms/categories IF the paper lists them.
+- If the paper only gives general statements like “clinical data were collected” without a categorized list -> [].
+"""
