@@ -13,3 +13,301 @@ max_pages = 40
 # =============================================================================
 # OPTIMIZED CONFIGURATION 
 # =============================================================================
+
+# ---------- PASS A: Overview ----------
+[task_overview]
+template_json = """
+{
+  "pid": "string|null",
+  "name": "string|null",
+  "local_name": "string|null",
+  "acronym": "string|null",
+  "type": ["string"],
+  "type_other": "string|null",
+  "cohort_type": "string|null",
+  "website": "string|null",
+  "description": "string|null",
+  "keywords": ["string"],
+  "internal_identifiers": [
+    {
+      "identifier": "string",
+      "type": "string|null",
+      "type_other": "string|null"
+    }
+  ],
+  "external_identifiers": [
+    {
+      "identifier": "string",
+      "type": "string|null",
+      "type_other": "string|null"
+    }
+  ],
+  "start_year": "integer|null",
+  "end_year": "integer|null",
+  "contact_email": "string|null",
+  "issued": "string|null",
+  "modified": "string|null"
+}
+"""
+
+instructions = """
+Extract exact resource-level values only (HRICore "General information"). Do NOT infer.
+
+SCOPE
+- Describe the RESOURCE as a whole (cohort/registry/biobank).
+- Do NOT extract subpopulations here.
+- Use ONLY information explicitly stated in the PDF.
+
+GLOBAL RULES
+- No placeholders ("Unknown", "N/A", "Not specified").
+- If not explicitly stated → null or [].
+- Empty strings are NOT allowed.
+- Do NOT reuse values across fields unless explicitly stated.
+
+--------------------------------------------------
+pid / name / local_name / acronym
+--------------------------------------------------
+- pid:
+  Only if an explicit persistent identifier is stated (e.g. registry ID, trial ID, DOI).
+  Do NOT use acronym as pid.
+
+- name:
+  Only if the text explicitly labels a resource name (e.g. "<name> study/cohort/registry").
+  Article title alone ≠ resource name.
+
+- local_name:
+  Only if explicitly stated as a local or participant-facing name.
+
+- acronym:
+  Only if explicitly marked as acronym OR a single-token abbreviation (no spaces).
+
+--------------------------------------------------
+type (STRICT dropdown)
+--------------------------------------------------
+Allowed values for type (exact strings only):
+- "Biobank"
+- "Catalogue"
+- "Clinical trial"
+- "Cohort study"
+- "Databank"
+- "Network"
+- "Rare disease"
+- "Common data model"
+- "Data source"
+- "Disease specific"
+- "Health records"
+- "Registry"
+- "Other type"
+
+Rules:
+- Add a value ONLY if the paper explicitly uses that label.
+- Do NOT infer from study design.
+- If no allowed value is explicitly stated → [].
+- If the resource type does not match any allowed value:
+  → type = ["Other type"]
+  → fill type_other with the exact wording from the text.
+
+--------------------------------------------------
+type_other
+--------------------------------------------------
+- Fill ONLY if type includes "Other type".
+- Must contain verbatim wording from the paper describing the resource type.
+- If type does NOT include "Other type" → type_other = null.
+
+--------------------------------------------------
+cohort_type (ONLY if type includes "Cohort study")
+--------------------------------------------------
+Allowed values (exact strings only):
+- "Clinical cohort"
+- "Population cohort"
+- "Case-control"
+- "Case only"
+- "Birth cohort"
+- "Other type"
+
+Rules:
+- Fill ONLY if "Cohort study" ∈ type[].
+- Only choose a value if explicitly stated.
+- Do NOT map or guess.
+- If cohort_type = "Other type":
+  → append exact wording to description (verbatim).
+
+--------------------------------------------------
+website / description / keywords
+--------------------------------------------------
+- website:
+  Only if an explicit URL is present.
+
+- description:
+  Only if the paper explicitly describes the resource.
+  Do NOT summarize or paraphrase.
+
+- keywords:
+  Only if explicitly listed as keywords or resource keywords.
+  Must appear verbatim in the text.
+  If none → [].
+
+--------------------------------------------------
+Identifiers (STRICT lists)
+--------------------------------------------------
+GENERAL:
+- Do NOT invent identifiers.
+- Return [] if no identifier value is explicitly present.
+
+EXTERNAL IDENTIFIERS
+Allowed values for external_identifiers.type:
+- "EUPAS number"
+- "METc number"
+- "ClinicalTrials.gov"
+- "NCT number"
+- "EUDRACT number"
+
+Rules:
+- If identifier type matches one of the above → set type.
+- Otherwise:
+  → type = null
+  → type_other = exact wording from the text.
+
+INTERNAL IDENTIFIERS
+Allowed values for internal_identifiers.type:
+- "UMCG register Utopia"
+- "UMCG PaNaMaID"
+
+Rules:
+- Same logic as external identifiers.
+- Do NOT guess based on formatting.
+
+--------------------------------------------------
+Dates / contact
+--------------------------------------------------
+- start_year:
+  Integer year ONLY if explicitly tied to start wording ("started in YYYY", "established in YYYY").
+
+- end_year:
+  Integer year ONLY if explicitly tied to end wording ("ended in YYYY", "from YYYY to YYYY").
+
+- contact_email:
+  Only if explicitly shown.
+
+- issued / modified:
+  Only if explicitly stated as resource metadata dates (NOT article publication date).
+"""
+
+# ---------- PASS X: Design (Structure of the resource) ----------
+[task_design_structure]
+template_json = """
+{
+  "design": ["string"],
+  "data_collection_type": ["string"]
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
+
+Extract ONLY explicit values. Do NOT infer from context, timelines, or typical study practice.
+
+SCOPE
+- Only the first "Structure of the resource" fields:
+  - design
+  - data_collection_type
+- Ignore: population, eligibility, samples, collection events, follow-up schedules.
+
+GLOBAL RULES
+- No placeholders ("Unknown", "N/A", "Not specified").
+- If not explicitly stated -> return [].
+- Use ONLY the allowed dropdown values exactly as written below.
+
+--------------------------------------------------
+design (STRICT dropdown)
+--------------------------------------------------
+Allowed values (exact strings only):
+- "Longitudinal"
+- "Cross-sectional"
+
+Rules:
+- Output ONLY if the paper explicitly uses the term "longitudinal" or "cross-sectional"
+  to describe the study/resource.
+- Do NOT infer "Longitudinal" from follow-up visits, repeated measures, baseline + follow-up, or prospective wording.
+- Do NOT infer "Cross-sectional" from "baseline analysis" or "at inclusion" unless explicitly labeled cross-sectional.
+- If not explicit -> [].
+
+--------------------------------------------------
+data_collection_type (STRICT dropdown, multi-select)
+--------------------------------------------------
+Allowed values (exact strings only):
+- "Retrospective"
+- "Prospective"
+
+Rules:
+- Add a value ONLY if explicitly stated as retrospective and/or prospective data collection.
+- If both are explicitly stated (e.g., retrospective extraction + prospective follow-up) -> return ["Retrospective","Prospective"].
+- Do NOT infer "Prospective" from "cohort" or "longitudinal".
+- Do NOT infer "Retrospective" from use of existing records unless explicitly stated.
+- If not explicit -> [].
+"""
+
+
+# ---------- PASS B: Subpopulations ----------
+[task_subpopulations]
+template_json = """
+{
+  "subpopulations": [
+    {
+      "pid": "string|null",
+      "description": "string",
+      "keywords": ["string"],
+      "number_of_participants": "integer|null",
+      "counts": [
+        {
+          "year": "integer|null",
+          "age_group": "string|null",
+          "gender": "string|null",
+          "n_unique_individuals": "integer|null"
+        }
+      ],
+      "inclusion_start": "integer|null",
+      "inclusion_end": "integer|null",
+      "age_groups": ["string"],
+      "age_min": "integer|null",
+      "age_max": "integer|null",
+      "main_medical_condition": ["string"],
+      "comorbidity": ["string"],
+      "countries": ["verbatim-string"],
+      "regions": ["verbatim-string"],
+      "inclusion_criteria": ["string"],
+      "other_inclusion_criteria": ["string"],
+      "exclusion_criteria": ["string"],
+      "other_exclusion_criteria": ["string"],
+      "issued": "string|null",
+      "modified": "string|null",
+      "theme": ["string"],
+      "access_rights": "string",
+      "applicable_legislation": ["string"]
+    }
+  ]
+}
+"""
+
+instructions = """
+Extract explicitly defined subpopulations only (arms/subcohorts/strata/case-control/derivation-validation). Do NOT infer.
+If none are explicitly defined -> {"subpopulations": []}.
+
+Rules:
+- pid: only if explicitly stated for the subpopulation; else null. Do NOT invent.
+- description (required): 1–3 sentences describing the subpopulation using paper wording; no inference.
+- keywords (required): 5–12 terms to improve findability; try NOT to reuse words from description; no generic filler.
+- number_of_participants: subgroup N only if explicitly stated; else null.
+- counts: return [] unless the paper explicitly provides unique individual counts by year AND age group AND gender (no partials).
+- inclusion_start/inclusion_end: explicit calendar years for this subpopulation only; ongoing -> inclusion_end null.
+- age_groups: only if explicitly listed; else [].
+- age_min/age_max: integers only if explicit; “≥X” -> age_min=X, age_max=null.
+- main_medical_condition/comorbidity: list explicit disease groups/codes or named comorbidities only; no code inference.
+- countries/regions: only if explicitly tied to this subpopulation; normalize "The Netherlands"->"Netherlands".
+- inclusion/exclusion criteria: only if explicitly applied to this subpopulation (or explicitly stated “same as study criteria”).
+- issued/modified: only if explicit publish/last modified dates for the subpopulation data; else null.
+- theme (required): must include "Health". Allowed: "Health","Agriculture","Environment","Energy","Government and public sector".
+- access_rights (required): "Open access" if explicitly public; "Restricted access" if explicitly controlled; else default "Non public".
+- applicable_legislation (required): must include "Data Governance Act" plus any explicitly named laws.
+No placeholders ("Unknown/N/A/Not specified"). Use null or [].
+"""
