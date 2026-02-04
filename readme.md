@@ -1,103 +1,151 @@
-# PDF → LLM Extract
+# Paper Extracting (Final Pipeline)
 
-Simple pipeline that reads a research paper (PDF) and extracts structured data (JSON) using a local **OpenAI-compatible LLM server** such as `llama.cpp` running a NuMind **NuExtract** model.
+This repo extracts structured fields from PDFs using a local OpenAI-compatible LLM server.
+The *final* workflow is centered around these three files:
 
----
-
-## 🧠 How It Works
-
-1. The PDF is read with `pypdf` (limited by `pdf.max_pages`).
-2. A NuExtract-style prompt is built:
-
-   * `# Template:` → your JSON schema
-   * `# Instructions:` → short English rules
-   * `# Context:` → the PDF text
-3. The model is called once (or over multiple chunks if needed).
-4. All partial JSON results are merged automatically.
-
-The model returns **only JSON**, e.g.:
-
-```json
-{"n_included": 15247, "countries": ["United Kingdom"]}
-```
+- `config.final.toml` (all extraction rules + templates)
+- `src/main_final.py` (runs the multi-pass extractor and writes Excel)
+- `src/run_cluster_final.sh` (cluster launcher + load balancer + extraction)
 
 ---
 
-## ⚙️ Configuration
+## 1) `config.final.toml` (the source of truth)
 
-Everything lives in `config.toml`:
+`config.final.toml` defines **all prompts, schemas, and rules** for the final pipeline. It is divided into passes, each one extracting a specific section.
 
-### `[llm]`
+### LLM + PDF settings
 
-* `base_url` → your local server (e.g. `http://127.0.0.1:8080/v1`)
-* `model` → model name (e.g. `numind/NuExtract-2.0-4B-GGUF`)
-* `temperature` (default 0.0)
-* `max_tokens` (default 256)
-* `use_grammar` (usually `false`)
+```
+[llm]
+base_url = "http://127.0.0.1:8080/v1"
+model    = "numind/NuExtract-2.0-8B"
+api_key  = "sk-local"
+use_grammar = false
+max_tokens = 6000
+temperature = 0.0
 
-### `[pdf]`
+[pdf]
+path = "data/concrete.pdf"
+max_pages = 40
+```
 
-* `path` → path to your PDF
-* `max_pages` → how many pages to read
+### Passes (what gets extracted)
 
-### `[task]`
+The final config uses these passes (names must match in `main_final.py`):
 
-* `template_json` → JSON schema of fields to extract
-* `instructions` → clear extraction rules
+- **A: Overview** -> `[task_overview]`
+- **B: Design & structure** -> `[task_design_structure]`
+- **C: Subpopulations** -> `[task_subpopulations]`
+- **D: Collection events** -> `[task_collection_events]`
+- **E: Population** -> `[task_population]`
+- **F: Contributors** -> `[task_contributors]`
+- **G: Access conditions** -> `[task_access_conditions]`
+- **H: Information** -> `[task_information]`
+- **X1: Datasets** -> `[task_datasets]`
+- **X2: Samplesets** -> `[task_samplesets]`
+- **X3: Areas of information** -> `[task_areas_of_information]`
+- **Y: Linkage** -> `[task_linkage]`
 
-Example:
+Each pass has:
 
-```toml
-[task]
-template_json = '{"n_included":"integer","countries":["verbatim-string"]}'
-instructions  = '''
-Extract the number of INCLUDED participants and the countries they came from.
-Include only final included participants. Exclude screened, excluded, or author locations.
-Return each country verbatim. Deduplicate.
-'''
+- `template_json` (strict JSON schema)
+- `instructions` (exact extraction rules)
+
+If you want to change what is extracted or how strict the rules are, **edit only this file**.
+
+---
+
+## 2) `src/main_final.py` (the extractor)
+
+This script:
+
+1. Loads `config.final.toml` (or `PDF_EXTRACT_CONFIG`).
+2. Runs the selected passes against the PDF text.
+3. Writes a multi-sheet Excel file with consistent columns.
+
+### Key behavior
+
+- Uses `extract_pipeline.extract_fields()` for each pass.
+- Outputs **one Excel file** with sheets:
+  - `resources`
+  - `subpopulations`
+  - `collection_events`
+  - `datasets`
+  - `samplesets`
+  - `organisations`
+  - `people`
+  - `publications`
+  - `documentation`
+
+### Run locally
+
+```
+python3 src/main_final.py -p all -o final_result.xlsx
+```
+
+### Run specific passes
+
+```
+python3 src/main_final.py -p A B E -o out.xlsx
+```
+
+### Run multiple PDFs
+
+```
+python3 src/main_final.py -p all \
+  --pdfs data/a.pdf data/b.pdf \
+  --paper-names paper_a paper_b \
+  -o out.xlsx
 ```
 
 ---
 
-## 🚀 Running
+## 3) `src/run_cluster_final.sh` (cluster workflow)
 
-Start the LLM server:
+This script is the **production cluster runner**. It:
+
+1. Starts two `llama-server` instances (GPU 0 and GPU 1).
+2. Waits for `/health` to be OK.
+3. Runs a TCP load balancer on port 18000.
+4. Creates `config.runtime.toml` with `base_url` pointing to the load balancer.
+5. Runs `src/main_final.py` with your args.
+6. Copies the Excel output to your local destination (rsync).
+
+### Default usage
 
 ```
-llama-server -hf numind/NuExtract-2.0-4B-GGUF -fa on -ngl 999 --port 8080 --ctx-size 20000
+bash src/run_cluster_final.sh
 ```
 
-> `--ctx-size` defines max context length. Increase for longer papers (slower, more VRAM/CPU).
-
-Then run the extractor:
+### Custom usage (passes, output, PDFs)
 
 ```
-pip install -e .
-python -m src.main
+bash src/run_cluster_final.sh -p A -o out.xlsx --pdfs data/concrete.pdf data/oncolifes.pdf
 ```
 
-Output appears as JSON in the console.
+### Important settings inside the script
+
+- `LLAMA_BIN` -> path to `llama-server`
+- `MODEL_PATH` -> GGUF model
+- `PORT_LB` / `PORT_GPU0` / `PORT_GPU1`
+- `CTX`, `SLOTS`, `NGL`
+- `LOCAL_RSYNC_DEST` (where results are synced)
+
+If you move models or change servers, update these variables at the top of the script.
 
 ---
 
-## 🧩 Adding New Fields
+## Typical workflow
 
-No code changes required:
-
-1. Add new fields to `template_json`.
-2. Describe them in `instructions`.
-3. Re-run `python -m src.main`.
-
-Example new field:
-
-```toml
-template_json = '{"n_included":"integer","countries":["string"],"age_mean":"float"}'
-```
+1. Edit extraction rules in `config.final.toml`.
+2. Run locally for quick tests: `python3 src/main_final.py -p A -o out.xlsx`.
+3. Run on cluster for full output: `bash src/run_cluster_final.sh -p all -o final_result.xlsx`.
 
 ---
 
-## ⚡ Tips
+## Troubleshooting
 
-* **Speed up:** lower `pdf.max_pages`, use 4B quantized model, smaller `--ctx-size`.
-* **Improve accuracy:** raise `max_pages`, `max_tokens`, or context size.
-* **Evidence extraction:** add an extra field like `"evidence": ["string"]` and update the instructions accordingly.
+- **No output / empty fields**: check `instructions` in `config.final.toml` for overly strict rules.
+- **Wrong model / server**: update `[llm]` in `config.final.toml` or use `PDF_EXTRACT_CONFIG`.
+- **Cluster failure**: check `logs/gpu0.log`, `logs/gpu1.log`, `logs/lb.log`.
+- **PDF not found**: update `[pdf].path` or pass `--pdfs` to `main_final.py`.
