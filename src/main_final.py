@@ -15,7 +15,7 @@ except ModuleNotFoundError:
     import tomli as toml
 
 from llm_client import OpenAICompatibleClient
-from extract_pipeline import load_pdf_text, extract_fields
+from extract_pipeline import load_pdf_text, extract_fields, build_context_prefix_messages
 
 # ==============================================================================
 # Helpers
@@ -119,6 +119,7 @@ def _collect_pass_result(
     llm_cfg: Dict[str, Any],
     log: logging.Logger,
     name: str,
+    prefix_messages: List[Dict[str, str]] | None = None,
 ) -> Dict[str, Any]:
     if not task_cfg:
         log.warning("Sectie is leeg of ontbreekt: %s", name)
@@ -133,6 +134,9 @@ def _collect_pass_result(
         use_grammar=bool(llm_cfg.get("use_grammar", False)),
         temperature=float(llm_cfg.get("temperature", 0.0)),
         max_tokens=int(llm_cfg.get("max_tokens", 2048)),
+        prefix_messages=prefix_messages,
+        cache_prompt=bool(llm_cfg.get("prompt_cache", False)),
+        timeout=int(llm_cfg.get("timeout", 600)),
     )
 
 
@@ -255,6 +259,7 @@ def cli() -> None:
         api_key=llm_cfg.get("api_key", "sk-local"),
         model=llm_cfg.get("model", "numind/NuExtract-2.0-8B"),
         use_grammar=bool(llm_cfg.get("use_grammar", False)),
+        use_session=bool(llm_cfg.get("sticky_session", False)),
     )
 
     pass_defs = [
@@ -340,12 +345,28 @@ def cli() -> None:
         paper_text = load_pdf_text(pdf_path, max_pages=pdf_cfg.get("max_pages"))
         log.info("PDF '%s' loaded (%d chars)", pdf_path, len(paper_text))
 
+        prefix_messages: List[Dict[str, str]] | None = None
+        if bool(llm_cfg.get("prompt_cache", False)):
+            prefix_messages = build_context_prefix_messages(paper_text)
+            log.info(
+                "Prompt cache enabled: using reusable paper prefix (%d chars).",
+                len(paper_text),
+            )
+
         per_section_results: Dict[str, Dict[str, Any]] = {}
 
         for code, name, section_key in pass_defs:
             if "ALL" in selected_passes or code in selected_passes:
                 task_cfg = cfg.get(section_key, {})
-                result = _collect_pass_result(client, paper_text, task_cfg, llm_cfg, log, name)
+                result = _collect_pass_result(
+                    client,
+                    paper_text,
+                    task_cfg,
+                    llm_cfg,
+                    log,
+                    name,
+                    prefix_messages=prefix_messages,
+                )
                 per_section_results[section_key] = result
             else:
                 log.info("Skipping %s (not selected)", name)

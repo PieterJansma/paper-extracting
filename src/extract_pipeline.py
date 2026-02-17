@@ -16,6 +16,11 @@ except Exception:
 
 log = logging.getLogger(__name__)
 
+SYSTEM_EXTRACT_MSG = (
+    "You are `Qwen`. Extract structured data as JSON only. "
+    "Do not output markdown fences or explanations."
+)
+
 
 # ==============================================================================
 # PDF Handling
@@ -113,6 +118,16 @@ def _build_nuextract_prompt(
         blocks += ["# Context:", paper_text]
 
     return "\n".join(blocks)
+
+
+def build_context_prefix_messages(paper_text: str) -> List[Dict[str, str]]:
+    """
+    Prefix messages that can be reused across passes to benefit from prompt caching.
+    """
+    return [
+        {"role": "system", "content": SYSTEM_EXTRACT_MSG},
+        {"role": "user", "content": f"# Context:\n{paper_text}"},
+    ]
 
 
 # ==============================================================================
@@ -293,29 +308,37 @@ def extract_fields(
     use_grammar: bool = False,
     temperature: float = 0.0,
     max_tokens: int = 1024,
+    prefix_messages: Optional[List[Dict[str, str]]] = None,
+    cache_prompt: bool = False,
+    timeout: int = 600,
 ) -> Dict[str, Any]:
     """Execute a single extraction pass using the LLM."""
     if not paper_text:
         return {}
 
-    prompt = _build_nuextract_prompt(template_json or "", instructions, paper_text)
+    # If prefix_messages are provided, paper context is already in the prefix and
+    # this per-pass prompt should only contain template + instructions.
+    prompt = _build_nuextract_prompt(
+        template_json or "",
+        instructions,
+        "" if prefix_messages else paper_text,
+    )
 
     log.info(
-        "Prompt size: %d chars (max_tokens=%d, temp=%.2f)",
+        "Prompt size: %d chars (max_tokens=%d, temp=%.2f, cache_prompt=%s)",
         len(prompt),
         int(max_tokens),
         float(temperature),
+        bool(cache_prompt),
     )
 
-    system_msg = (
-        "You are `Qwen`. Extract structured data as JSON only. "
-        "Do not output markdown fences or explanations."
-    )
-
-    messages = [
-        {"role": "system", "content": system_msg},
-        {"role": "user", "content": prompt},
-    ]
+    if prefix_messages:
+        messages = list(prefix_messages) + [{"role": "user", "content": prompt}]
+    else:
+        messages = [
+            {"role": "system", "content": SYSTEM_EXTRACT_MSG},
+            {"role": "user", "content": prompt},
+        ]
 
     try:
         raw_response = client.chat(
@@ -323,6 +346,8 @@ def extract_fields(
             temperature=float(temperature),
             max_tokens=int(max_tokens),
             grammar=(GRAMMAR_JSON_INT_OR_NULL if use_grammar else None),
+            extra_body={"cache_prompt": True} if cache_prompt else None,
+            timeout=int(timeout),
         )
     except Exception as e:
         log.error("LLM Call failed: %s", e)

@@ -3,7 +3,10 @@ base_url = "http://127.0.0.1:8080/v1"
 model    = "numind/NuExtract-2.0-8B"
 api_key  = "sk-local"
 use_grammar = false
+prompt_cache = true
+sticky_session = true
 max_tokens = 6000
+timeout = 900
 temperature = 0.0
 
 [pdf]

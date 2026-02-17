@@ -26,19 +26,30 @@ class OpenAICompatibleClient:
     - Keeps the same interface for main.py
     """
 
-    def __init__(self, base_url: str, api_key: str, model: str, use_grammar: bool = False):
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        model: str,
+        use_grammar: bool = False,
+        use_session: bool = False,
+    ):
         self.base_url = _with_v1(base_url)
         self.api_key = api_key
         self.model = model
         self.use_grammar = use_grammar
+        self.use_session = use_session
+        self._session: Optional[requests.Session] = requests.Session() if use_session else None
 
         # Static headers (no Session, but we still centralize headers)
         self.headers: Dict[str, str] = {
             "Content-Type": "application/json",
             "Accept": "application/json",
-            # Critical: with a TCP load balancer, keep-alive makes the connection "sticky".
-            "Connection": "close",
         }
+        # With TCP load balancer:
+        # - close: spread requests across backends (default)
+        # - keep-alive + Session: stick to one backend (needed for prompt cache reuse)
+        self.headers["Connection"] = "keep-alive" if use_session else "close"
         if api_key:
             self.headers["Authorization"] = f"Bearer {api_key}"
 
@@ -80,7 +91,8 @@ class OpenAICompatibleClient:
 
         for attempt in range(max_retries):
             try:
-                resp = requests.post(url, headers=self.headers, json=payload, timeout=timeout)
+                http = self._session if self._session is not None else requests
+                resp = http.post(url, headers=self.headers, json=payload, timeout=timeout)
 
                 # Common llama-server transient state
                 if resp.status_code == 503:
@@ -99,7 +111,7 @@ class OpenAICompatibleClient:
                     stripped = dict(payload)
                     stripped.pop("response_format", None)
                     stripped.pop("grammar", None)
-                    resp = requests.post(url, headers=self.headers, json=stripped, timeout=timeout)
+                    resp = http.post(url, headers=self.headers, json=stripped, timeout=timeout)
 
                 if resp.status_code >= 400:
                     try:
