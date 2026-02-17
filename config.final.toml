@@ -146,9 +146,11 @@ website / description / keywords
   Do NOT summarize or paraphrase.
 
 - keywords:
-  Only if explicitly listed as keywords or resource keywords.
-  Must appear verbatim in the text.
-  If none → [].
+  Return up to 8 keywords that best capture the paper/resource for retrieval and matching to related work.
+  Prioritize distinctive, descriptive terms that are central to this paper (methods, population, condition, intervention, setting).
+  Prefer terms present in the paper wording; avoid overly generic tags (e.g., "study", "data", "health") unless specifically needed.
+  Balance specificity and discoverability: choose terms another researcher would realistically search for.
+  If no meaningful terms can be extracted -> [].
 
 --------------------------------------------------
 Identifiers (STRICT lists)
