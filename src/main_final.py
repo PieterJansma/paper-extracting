@@ -57,6 +57,53 @@ def _ordered_keys_from_template(template_json: str | None) -> List[str]:
     return list(tpl.keys())
 
 
+def _ordered_item_keys_from_template(template_json: str | None, list_key: str) -> List[str]:
+    """
+    For templates like {"subpopulations": [{...}]}, return the nested item keys.
+    """
+    if not template_json:
+        return []
+    template_json = (
+        template_json
+        .replace("\ufeff", "")
+        .replace("\u00a0", " ")
+        .replace("\ufffd", " ")
+        .strip()
+    )
+    try:
+        tpl = json.loads(template_json)
+    except Exception:
+        return []
+
+    if not isinstance(tpl, dict):
+        return []
+
+    arr = tpl.get(list_key)
+    if not isinstance(arr, list) or not arr:
+        return []
+
+    item0 = arr[0]
+    if not isinstance(item0, dict):
+        return []
+
+    return list(item0.keys())
+
+
+def _validate_list_template_keys(section_key: str, list_name: str, keys: List[str]) -> None:
+    """
+    Fail fast on malformed list templates to prevent silently wrong Excel columns like
+    `subpopulation.subpopulations` or `collection_event.collection_events`.
+    """
+    if not keys:
+        raise SystemExit(
+            f"Template for {section_key} is invalid or unreadable: no item keys found for '{list_name}'."
+        )
+    if len(keys) == 1 and keys[0] == list_name:
+        raise SystemExit(
+            f"Template for {section_key} appears nested incorrectly: item key equals container '{list_name}'."
+        )
+
+
 def _serialize_value(val: Any) -> str:
     if val is None:
         return ""
@@ -228,6 +275,16 @@ def cli() -> None:
         "task_samplesets": "samplesets",
     }
 
+    list_section_orders: Dict[str, List[str]] = {}
+    for section_key, list_name in list_sections.items():
+        task_cfg = cfg.get(section_key, {})
+        keys = _ordered_item_keys_from_template(
+            task_cfg.get("template_json"),
+            list_name,
+        )
+        _validate_list_template_keys(section_key, list_name, keys)
+        list_section_orders[section_key] = keys
+
     resource_section_keys: Dict[str, List[str]] = {
         "task_contributors": [
             "publisher",
@@ -294,7 +351,7 @@ def cli() -> None:
         for section_key, list_name in list_sections.items():
             section_result = per_section_results.get(section_key, {})
             items = section_result.get(list_name, []) if isinstance(section_result, dict) else []
-            ordered_keys = section_orders.get(section_key, [])
+            ordered_keys = list_section_orders.get(section_key, [])
 
             if section_key == "task_subpopulations":
                 rows, _ = _build_list_rows(label, items, "subpopulation", ordered_keys)
@@ -384,7 +441,7 @@ def cli() -> None:
 
         # Subpopulations sheet
         sub_cols = ["paper", "subpopulation_index"] + [
-            f"subpopulation.{k}" for k in section_orders.get("task_subpopulations", [])
+            f"subpopulation.{k}" for k in list_section_orders.get("task_subpopulations", [])
         ]
         pd.DataFrame(subpop_rows, columns=sub_cols).to_excel(
             writer, sheet_name="subpopulations", index=False
@@ -392,7 +449,7 @@ def cli() -> None:
 
         # Collection events sheet
         ce_cols = ["paper", "collection_event_index"] + [
-            f"collection_event.{k}" for k in section_orders.get("task_collection_events", [])
+            f"collection_event.{k}" for k in list_section_orders.get("task_collection_events", [])
         ]
         pd.DataFrame(ce_rows, columns=ce_cols).to_excel(
             writer, sheet_name="collection_events", index=False
@@ -400,7 +457,7 @@ def cli() -> None:
 
         # Datasets sheet
         ds_cols = ["paper", "dataset_index"] + [
-            f"dataset.{k}" for k in section_orders.get("task_datasets", [])
+            f"dataset.{k}" for k in list_section_orders.get("task_datasets", [])
         ]
         pd.DataFrame(dataset_rows, columns=ds_cols).to_excel(
             writer, sheet_name="datasets", index=False
@@ -408,7 +465,7 @@ def cli() -> None:
 
         # Samplesets sheet
         ss_cols = ["paper", "sampleset_index"] + [
-            f"sampleset.{k}" for k in section_orders.get("task_samplesets", [])
+            f"sampleset.{k}" for k in list_section_orders.get("task_samplesets", [])
         ]
         pd.DataFrame(sampleset_rows, columns=ss_cols).to_excel(
             writer, sheet_name="samplesets", index=False

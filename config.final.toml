@@ -160,10 +160,12 @@ Allowed values for external_identifiers.type:
 - "METc number"
 - "ClinicalTrials.gov"
 - "NCT number"
+- "NTR number"
 - "EUDRACT number"
 
 Rules:
 - If identifier type matches one of the above → set type.
+- Do NOT map one registry type to another (e.g., NTR is NOT NCT).
 - Otherwise:
   → type = null
   → type_other = exact wording from the text.
