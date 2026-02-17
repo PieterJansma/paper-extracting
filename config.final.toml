@@ -311,6 +311,9 @@ Extract explicitly defined subpopulations only (arms/subcohorts/strata/case-cont
 If none are explicitly defined -> {"subpopulations": []}.
 
 Rules:
+- Evidence threshold: only output a subpopulation when the paper explicitly frames a distinct subgroup
+  (e.g., "subpopulation", "arm", "group", "stratum", "intervention arm", "control arm", "derivation/validation cohort").
+- Do NOT create subpopulations from generic site lists, acknowledgements, or overall trial logistics.
 - pid: only if explicitly stated for the subpopulation; else null. Do NOT invent.
 - description (required): 1–3 sentences describing the subpopulation using paper wording; no inference.
 - keywords (required): 5–12 terms to improve findability; try NOT to reuse words from description; no generic filler.
@@ -325,7 +328,9 @@ Rules:
 - issued/modified: only if explicit publish/last modified dates for the subpopulation data; else null.
 - theme (required): must include "Health". Allowed: "Health","Agriculture","Environment","Energy","Government and public sector".
 - access_rights (required): "Open access" if explicitly public; "Restricted access" if explicitly controlled; else default "Non public".
-- applicable_legislation (required): must include "Data Governance Act" plus any explicitly named laws.
+  IMPORTANT: article license text (e.g., "Open access article", CC-BY) is NOT evidence for dataset access_rights.
+- applicable_legislation (required): include only explicitly named applicable laws/regulations for this subpopulation.
+  Do NOT auto-add "Data Governance Act" unless explicitly stated.
 No placeholders ("Unknown/N/A/Not specified"). Use null or [].
 """
 
@@ -375,6 +380,7 @@ GLOBAL RULES
 - No placeholders ("Unknown", "N/A", "Not specified"). Use null or [].
 - Do NOT invent events.
 - Use paper wording as much as possible (verbatim or near-verbatim).
+- Do NOT convert generic trial timelines into collection events unless those timepoints are explicitly data-collection events.
 
 --------------------------------------------------
 name (REQUIRED)
@@ -532,11 +538,13 @@ Rules:
 - "Open access" ONLY if data are explicitly publicly available.
 - "Restricted access" ONLY if explicitly stated controlled/restricted.
 - Otherwise default "Non public".
+- IMPORTANT: article-level "Open access" publication status is NOT evidence that event-level data are open.
 
 --------------------------------------------------
 applicable_legislation
 --------------------------------------------------
-- Must always include "Data Governance Act".
+- Include ONLY explicitly named laws/regulations applicable to data access/use for this event.
+- Do NOT auto-add "Data Governance Act".
 - Add other laws ONLY if explicitly named (e.g., GDPR/AVG).
 - Do NOT include ethics guidelines.
 """
@@ -998,6 +1006,8 @@ GLOBAL RULES
 - Empty strings are NOT allowed.
 - Do NOT invent DOIs, titles, URLs, file names, or references.
 - Do NOT create publication entries from citations unless the DOI (or equivalent persistent identifier) is explicitly provided.
+- Resource metadata only: do NOT treat journal front-matter defaults as resource metadata
+  (e.g., "Open access article", generic publisher copyright text, article submission dates).
 
 --------------------------------------------------
 publications (table; Publications)
@@ -1028,6 +1038,8 @@ funding_statement / citation_requirements / acknowledgements / provenance_statem
 - Fill ONLY if explicitly stated.
 - Prefer verbatim or near-verbatim text.
 - Do NOT summarise or paraphrase.
+- citation_requirements: fill ONLY when the paper explicitly states requirements for citing/acknowledging RESOURCE DATA reuse.
+  Do NOT use generic "To cite this article" text as data citation requirements.
 
 --------------------------------------------------
 documentation (table; Documentation)
@@ -1039,6 +1051,8 @@ Fields:
 - name (REQUIRED):
     Use explicit document name/title ONLY if stated.
     If a document is referenced generically (e.g., “study protocol”) without a name -> do NOT output a row.
+    Do NOT create pseudo-document names from generic phrases ("information brochure", "informed consent form")
+    unless the PDF explicitly presents them as named documents.
 
 - type (string|null):
     Only if the PDF explicitly labels the documentation type (e.g., “Harmonisation protocol”, “Informed consent”).
@@ -1143,6 +1157,8 @@ Rules:
 - "Non public" ONLY if explicitly stated as not publicly accessible or closed.
 - If not explicitly stated -> null.
 NOTE: The UI may default to non-public, but extraction must not default; only extract explicit statements.
+- IMPORTANT: publication status text (e.g., "Open access article", CC-BY license for the paper) is NOT evidence
+  for resource data access_rights.
 
 --------------------------------------------------
 data_access_conditions (STRICT dropdown; multi-select)
@@ -1449,6 +1465,8 @@ RULES
 - No placeholders; use null or [] when missing.
 - Do NOT extract people/contact fields in this pass.
 - Exclude acknowledgement-only collaborator lists unless explicitly tied to contributor roles.
+- Do NOT treat author affiliation lists as organisations_involved unless the text explicitly links
+  those organisations to resource governance/management/sponsorship/coordination.
 
 organisations_involved
 - Output one row per explicitly named contributing organisation/agent.
@@ -1510,12 +1528,16 @@ RULES
 - No placeholders; use null or [] when missing.
 - Do NOT extract organisations/publisher/creator in this pass.
 - Do NOT treat full author lists as people_involved unless explicitly linked to contributor/contact roles.
+- Do NOT use article-level CRediT/contributorship role lists as people_involved for the RESOURCE
+  unless the person is explicitly identified as a resource contact/coordinator/PI for this resource.
 
 people_involved
 - Output one row per explicitly named person with a contributor/contact role.
 - first_name and last_name are required to include a row.
 - role only when explicit; else [].
 - email/orcid/homepage only if explicitly shown.
+- Prefer role evidence from resource-specific wording ("principal investigator", "study coordinator", "contact")
+  over generic publication authorship statements.
 
 contact point
 - Fill only when the PDF explicitly marks a primary contact/corresponding person.
