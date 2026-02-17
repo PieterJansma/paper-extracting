@@ -1408,3 +1408,117 @@ contact point (single select from people_involved)
 - Values must match a person in people_involved (same first_name + last_name; email if available).
 - If not explicit -> set all contact_point_* fields to null.
 """
+
+
+# ---------- PASS F1: Contributors (Organisations + publisher/creator) ----------
+[task_contributors_org]
+template_json = """
+{
+    "organisations_involved": [
+        {
+            "id": "string",
+            "type": "string",
+            "name": "string|null",
+            "organisation": "string|null",
+            "other_organisation": "string|null",
+            "department": "string|null",
+            "website": "string|null",
+            "email": "string|null",
+            "logo": "string|null",
+            "role": ["string"],
+            "is_lead_organisation": "boolean|null"
+        }
+    ],
+    "publisher": "string|null",
+    "creator": ["string"]
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
+
+Extract ONLY resource-level contributor organisations. Do NOT infer.
+
+SCOPE
+- organisations_involved
+- publisher
+- creator
+
+RULES
+- Use only explicit statements from the PDF.
+- No placeholders; use null or [] when missing.
+- Do NOT extract people/contact fields in this pass.
+- Exclude acknowledgement-only collaborator lists unless explicitly tied to contributor roles.
+
+organisations_involved
+- Output one row per explicitly named contributing organisation/agent.
+- id is required and must come from explicit wording (acronym/short name/clear identifier).
+- type must be exactly "Organisation" or "Individual".
+- role only when explicitly stated; otherwise [].
+- is_lead_organisation: true/false only if explicit; otherwise null.
+
+publisher
+- Only if explicitly stated.
+- Must equal an organisations_involved.id.
+
+creator
+- Only organisations explicitly stated as creator/developer/maintainer.
+- Each item must equal an organisations_involved.id.
+"""
+
+
+# ---------- PASS F2: Contributors (People + contact point) ----------
+[task_contributors_people]
+template_json = """
+{
+    "people_involved": [
+        {
+            "role": ["string"],
+            "role_description": "string|null",
+            "first_name": "string",
+            "last_name": "string",
+            "prefix": "string|null",
+            "initials": "string|null",
+            "title": "string|null",
+            "organisation": "string|null",
+            "email": "string|null",
+            "orcid": "string|null",
+            "homepage": "string|null",
+            "photo": "string|null",
+            "expertise": "string|null"
+        }
+    ],
+    "contact_point_first_name": "string|null",
+    "contact_point_last_name": "string|null",
+    "contact_point_email": "string|null"
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
+
+Extract ONLY resource-level people and contact point information. Do NOT infer.
+
+SCOPE
+- people_involved
+- contact_point_first_name
+- contact_point_last_name
+- contact_point_email
+
+RULES
+- Use only explicit statements from the PDF.
+- No placeholders; use null or [] when missing.
+- Do NOT extract organisations/publisher/creator in this pass.
+- Do NOT treat full author lists as people_involved unless explicitly linked to contributor/contact roles.
+
+people_involved
+- Output one row per explicitly named person with a contributor/contact role.
+- first_name and last_name are required to include a row.
+- role only when explicit; else [].
+- email/orcid/homepage only if explicitly shown.
+
+contact point
+- Fill only when the PDF explicitly marks a primary contact/corresponding person.
+- Values must match a person in people_involved.
+- Otherwise set all contact_point_* fields to null.
+"""

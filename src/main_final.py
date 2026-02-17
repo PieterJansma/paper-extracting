@@ -207,6 +207,23 @@ def _build_list_rows(
     return rows, columns
 
 
+def _combine_contributor_results(
+    org_result: Dict[str, Any] | None,
+    people_result: Dict[str, Any] | None,
+) -> Dict[str, Any]:
+    org = org_result or {}
+    ppl = people_result or {}
+    return {
+        "organisations_involved": org.get("organisations_involved", []),
+        "publisher": org.get("publisher"),
+        "creator": org.get("creator", []),
+        "people_involved": ppl.get("people_involved", []),
+        "contact_point_first_name": ppl.get("contact_point_first_name"),
+        "contact_point_last_name": ppl.get("contact_point_last_name"),
+        "contact_point_email": ppl.get("contact_point_email"),
+    }
+
+
 # ==============================================================================
 # CLI
 # ==============================================================================
@@ -217,7 +234,7 @@ def cli() -> None:
         "-p", "--passes",
         nargs="+",
         default=["all"],
-        help="Specify passes: A, B, C, D, E, F, G, H, X1, X2, X3, Y or 'all'.",
+        help="Specify passes: A, B, C, D, E, F/F1/F2, G, H, X1, X2, X3, Y or 'all'.",
     )
     parser.add_argument(
         "--pdfs",
@@ -238,6 +255,8 @@ def cli() -> None:
     )
     args = parser.parse_args()
     selected_passes = [p.upper() for p in args.passes]
+    if "F" in selected_passes:
+        selected_passes.extend(["F1", "F2"])
 
     cfg_path = os.environ.get("PDF_EXTRACT_CONFIG", "config.final.toml")
     cfg = load_config(cfg_path)
@@ -262,13 +281,14 @@ def cli() -> None:
         use_session=bool(llm_cfg.get("sticky_session", False)),
     )
 
+    has_split_contributors = "task_contributors_org" in cfg and "task_contributors_people" in cfg
+
     pass_defs = [
         ("A", "PASS A: Overview", "task_overview"),
         ("B", "PASS B: Design & structure", "task_design_structure"),
         ("C", "PASS C: Subpopulations", "task_subpopulations"),
         ("D", "PASS D: Collection events", "task_collection_events"),
         ("E", "PASS E: Population", "task_population"),
-        ("F", "PASS F: Contributors", "task_contributors"),
         ("X1", "PASS X1: Datasets", "task_datasets"),
         ("X2", "PASS X2: Samplesets", "task_samplesets"),
         ("X3", "PASS X3: Areas of information", "task_areas_of_information"),
@@ -276,6 +296,11 @@ def cli() -> None:
         ("G", "PASS G: Access conditions", "task_access_conditions"),
         ("H", "PASS H: Information", "task_information"),
     ]
+    if has_split_contributors:
+        pass_defs.insert(5, ("F1", "PASS F1: Contributors (organisations)", "task_contributors_org"))
+        pass_defs.insert(6, ("F2", "PASS F2: Contributors (people/contact)", "task_contributors_people"))
+    else:
+        pass_defs.insert(5, ("F", "PASS F: Contributors", "task_contributors"))
 
     # Preload template orders for stable column order
     section_orders: Dict[str, List[str]] = {}
@@ -372,11 +397,27 @@ def cli() -> None:
                 log.info("Skipping %s (not selected)", name)
 
         # Resource-level combined row
+        if has_split_contributors:
+            contributors_result = _combine_contributor_results(
+                per_section_results.get("task_contributors_org", {}),
+                per_section_results.get("task_contributors_people", {}),
+            )
+        else:
+            contributors_result = per_section_results.get("task_contributors", {})
+
         resource_result = {
             section: per_section_results.get(section, {})
             for section in resource_sections
             if section in per_section_results
         }
+        if (
+            ("ALL" in selected_passes)
+            or ("F" in selected_passes)
+            or ("F1" in selected_passes)
+            or ("F2" in selected_passes)
+        ):
+            resource_result["task_contributors"] = contributors_result
+
         row, cols = _build_resource_row(
             label,
             pdf_path,
@@ -408,7 +449,7 @@ def cli() -> None:
                 sampleset_rows.extend(rows)
 
         # Contributors tables
-        contributors_result = per_section_results.get("task_contributors", {})
+        # Contributors tables
         if isinstance(contributors_result, dict):
             organisations = contributors_result.get("organisations_involved", [])
             people = contributors_result.get("people_involved", [])
