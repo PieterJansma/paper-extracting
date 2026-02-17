@@ -354,6 +354,36 @@ def extract_fields(
         return {}
 
     parsed = _json_load_stripping_fences(raw_response)
+
+    # If model returned invalid JSON, retry once with stricter JSON-object enforcement.
+    if not parsed:
+        log.warning("Invalid JSON output; retrying this pass once with stricter JSON mode.")
+        try:
+            retry_messages = messages + [
+                {
+                    "role": "user",
+                    "content": (
+                        "Your previous answer was not valid JSON. "
+                        "Return ONLY one valid JSON object that matches the template."
+                    ),
+                }
+            ]
+            retry_raw = client.chat(
+                retry_messages,
+                temperature=float(temperature),
+                max_tokens=int(max_tokens),
+                response_format={"type": "json_object"},
+                grammar=(GRAMMAR_JSON_INT_OR_NULL if use_grammar else None),
+                extra_body={"cache_prompt": True} if cache_prompt else None,
+                timeout=int(timeout),
+                max_retries=4,
+            )
+            retry_parsed = _json_load_stripping_fences(retry_raw)
+            if retry_parsed:
+                parsed = retry_parsed
+        except Exception as e:
+            log.warning("Retry after invalid JSON failed: %s", e)
+
     parsed = _normalize_values(parsed)
 
     # ✅ Fill missing keys based on template schema so RAW JSON is never "sparse"
