@@ -5,7 +5,7 @@ api_key  = "sk-local"
 use_grammar = false
 prompt_cache = true
 sticky_session = true
-max_tokens = 6000
+max_tokens = 8000
 timeout = 900
 temperature = 0.0
 
