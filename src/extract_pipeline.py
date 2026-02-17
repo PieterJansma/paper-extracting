@@ -345,6 +345,7 @@ def extract_fields(
             messages,
             temperature=float(temperature),
             max_tokens=int(max_tokens),
+            response_format={"type": "json_object"},
             grammar=(GRAMMAR_JSON_INT_OR_NULL if use_grammar else None),
             extra_body={"cache_prompt": True} if cache_prompt else None,
             timeout=int(timeout),
