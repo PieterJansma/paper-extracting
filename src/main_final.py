@@ -171,14 +171,34 @@ def _build_list_rows(
     rows: List[Dict[str, Any]] = []
     columns = ["paper", f"{prefix}_index"] + [f"{prefix}.{k}" for k in ordered_keys]
 
-    for idx, item in enumerate(items, start=1):
+    out_idx = 1
+    for item in items:
+        # Skip structurally empty items (all fields null/empty), which can appear
+        # when model output partially matches schema but contains no actual values.
+        has_payload = False
+        for key in ordered_keys:
+            val = item.get(key)
+            if val is None:
+                continue
+            if isinstance(val, str) and val.strip() == "":
+                continue
+            if isinstance(val, list) and len(val) == 0:
+                continue
+            if isinstance(val, dict) and len(val) == 0:
+                continue
+            has_payload = True
+            break
+        if not has_payload:
+            continue
+
         row: Dict[str, Any] = {
             "paper": label,
-            f"{prefix}_index": idx,
+            f"{prefix}_index": out_idx,
         }
         for key in ordered_keys:
             row[f"{prefix}.{key}"] = _serialize_value(item.get(key))
         rows.append(row)
+        out_idx += 1
 
     return rows, columns
 
