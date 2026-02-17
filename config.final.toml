@@ -236,9 +236,14 @@ Allowed values (exact strings only):
 - "Cross-sectional"
 
 Rules:
-- Fill ONLY if the paper explicitly uses "longitudinal" or "cross-sectional".
-- Do NOT infer from follow-up visits, repeated measures, baseline + follow-up, or prospective wording.
-- Do NOT infer cross-sectional from "baseline" unless explicitly called cross-sectional.
+- Fill if either:
+  (A) the paper explicitly uses "longitudinal" or "cross-sectional", OR
+  (B) explicit structural evidence supports one label:
+      - Longitudinal: repeated measurements/events over time are explicitly described
+        (e.g., baseline plus follow-up timepoints such as 6/12/24 months; repeated questionnaires/visits).
+      - Cross-sectional: one-time measurement/snapshot is explicitly described with no planned follow-up.
+- Prefer explicit wording over inferred structure when both are present.
+- Do NOT map to Cross-sectional when explicit follow-up events are present.
 - If not explicit -> null.
 
 --------------------------------------------------
@@ -257,11 +262,16 @@ Allowed values (exact strings only):
 - "Prospective"
 
 Rules:
-- Fill ONLY if explicitly stated as retrospective OR prospective.
+- Fill if either:
+  (A) explicitly stated as retrospective/prospective, OR
+  (B) explicit procedural evidence supports one label:
+      - Prospective: participants are enrolled and then followed forward in time
+        with planned future measurements/events.
+      - Retrospective: existing historical records are analyzed for past periods
+        without prospective follow-up design.
 - If the paper explicitly says BOTH apply:
   -> set data_collection_type = null (do NOT guess which is primary).
-- Do NOT infer "Prospective" from "cohort" or "longitudinal".
-- Do NOT infer "Retrospective" from use of existing records unless explicitly stated.
+- If evidence for both is mixed/ambiguous -> null.
 - If not explicit -> null.
 """
 
