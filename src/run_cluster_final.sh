@@ -18,7 +18,9 @@ NGL=999
 LOG_DIR="${PWD}/logs"
 mkdir -p "$LOG_DIR"
 
-# Local sync destination (set LOCAL_RSYNC_HOST if destination is remote)
+# Sync destination:
+# - If LOCAL_RSYNC_HOST is empty, destination is interpreted on the cluster node.
+# - If LOCAL_RSYNC_HOST is set, destination is interpreted on that remote host.
 LOCAL_RSYNC_DEST="/Users/p.jansma/Documents/cluster_data/"
 LOCAL_RSYNC_HOST=""
 
@@ -247,9 +249,16 @@ if [[ -n "$LOCAL_RSYNC_HOST" ]]; then
     --rsync-path="mkdir -p \"$LOCAL_RSYNC_DEST\" && rsync" \
     "$OUTPUT_FILE" "$RSYNC_TARGET"
 else
-  # Ensure destination directory exists for local receiver.
-  mkdir -p "$LOCAL_RSYNC_DEST"
-  rsync -avhP "$OUTPUT_FILE" "$RSYNC_TARGET"
+  # Guard: on cluster nodes, macOS paths like /Users/... are not local paths.
+  if [[ "$LOCAL_RSYNC_DEST" == /Users/* ]]; then
+    echo "⚠️  Skip sync: '$LOCAL_RSYNC_DEST' is een macOS pad en bestaat niet op de cluster node."
+    echo "   Haal het bestand op vanaf je Mac met:"
+    echo "   rsync -avhP tunnel+nibbler:${PWD}/$OUTPUT_FILE \"$LOCAL_RSYNC_DEST\""
+  else
+    # Ensure destination directory exists for local receiver.
+    mkdir -p "$LOCAL_RSYNC_DEST"
+    rsync -avhP "$OUTPUT_FILE" "$RSYNC_TARGET"
+  fi
 fi
 
 echo "✅ Klaar."
