@@ -698,9 +698,18 @@ Rules:
   Examples:
   - age threshold -> "Age group inclusion criterion"
   - only females/males -> "Sex inclusion criterion"
-  - pregnancy/gravidity required -> "Gravidity inclusion criterion"
+  - pregnancy-related requirement OR pregnancy-based exclusion -> "Gravidity inclusion criterion"
+  - prior diagnosis / prior procedure / prior disease history exclusion -> "Health status inclusion criterion"
+  - explicit disease/symptom target population (e.g., CAD suspected patients, atypical angina, chest pain complaints)
+    -> "Defined population inclusion criterion"
+  - explicit requirement to be free of/with a specific condition at baseline
+    -> "Health status inclusion criterion"
   - must live in country/region -> "Country of residence inclusion criteria"
   - must be hospital patients -> "Hospital patient inclusion criterion"
+- Apply the same mapping logic to BOTH inclusion_criteria and exclusion_criteria.
+- Important: although labels include the word "inclusion", they are category names used for exclusion_criteria as well.
+- If an explicit exclusion is present and maps to one of these categories, include the mapped category in exclusion_criteria.
+- If multiple criterion types are explicitly present, include all matching labels (do not keep only one).
 - Do NOT infer from demographic descriptions.
 - If not explicit -> [].
 
@@ -711,6 +720,10 @@ Free-text lists (paper wording), only if explicit.
 Rules:
 - Include verbatim or near-verbatim short phrases/sentences from the paper that specify criteria
   that are NOT captured by the checkbox labels above.
+- For explicit inclusion criteria, always include the concrete wording in other_inclusion_criteria,
+  even when a checkbox category is also mapped in inclusion_criteria.
+- For explicit exclusions, always copy the concrete wording into other_exclusion_criteria,
+  even when a checkbox category is also mapped in exclusion_criteria.
 - Do NOT invent or summarize.
 - If nothing explicit -> [].
 
