@@ -4,6 +4,7 @@ import os
 import json
 import argparse
 import logging
+import importlib.util
 from typing import Any, Dict, List, Iterable, Tuple
 
 import pandas as pd
@@ -364,7 +365,19 @@ def cli() -> None:
 
     log.info("--- DONE EXTRACTING ---")
 
-    with pd.ExcelWriter(args.output, engine="xlsxwriter") as writer:
+    if importlib.util.find_spec("xlsxwriter") is not None:
+        excel_engine = "xlsxwriter"
+    elif importlib.util.find_spec("openpyxl") is not None:
+        excel_engine = "openpyxl"
+    else:
+        raise SystemExit(
+            "No Excel writer engine found. Install one in the active venv, e.g.:\n"
+            "  .venv/bin/python -m pip install xlsxwriter"
+        )
+
+    log.info("Writing Excel with engine=%s", excel_engine)
+
+    with pd.ExcelWriter(args.output, engine=excel_engine) as writer:
         # Resources sheet
         res_df = pd.DataFrame(resource_rows, columns=resource_columns)
         res_df.to_excel(writer, sheet_name="resources", index=False)

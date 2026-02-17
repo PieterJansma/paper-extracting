@@ -19,7 +19,7 @@ LOG_DIR="${PWD}/logs"
 mkdir -p "$LOG_DIR"
 
 # Local sync destination (set LOCAL_RSYNC_HOST if destination is remote)
-LOCAL_RSYNC_DEST="/Users/p.jansma/Documents/GitHub/paper-extracting/data/"
+LOCAL_RSYNC_DEST="/Users/p.jansma/Documents/cluster_data/"
 LOCAL_RSYNC_HOST=""
 
 # ------------------------------------------------------------------------------
@@ -241,6 +241,15 @@ if [[ -n "$LOCAL_RSYNC_HOST" ]]; then
 fi
 
 echo "[4b/4] Sync output naar lokaal..."
-rsync -avhP "$OUTPUT_FILE" "$RSYNC_TARGET"
+if [[ -n "$LOCAL_RSYNC_HOST" ]]; then
+  # Ensure destination directory exists on remote receiver before syncing.
+  rsync -avhP \
+    --rsync-path="mkdir -p \"$LOCAL_RSYNC_DEST\" && rsync" \
+    "$OUTPUT_FILE" "$RSYNC_TARGET"
+else
+  # Ensure destination directory exists for local receiver.
+  mkdir -p "$LOCAL_RSYNC_DEST"
+  rsync -avhP "$OUTPUT_FILE" "$RSYNC_TARGET"
+fi
 
 echo "✅ Klaar."
