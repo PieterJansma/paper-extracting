@@ -40,6 +40,13 @@ def stem(path: str) -> str:
 def _ordered_keys_from_template(template_json: str | None) -> List[str]:
     if not template_json:
         return []
+    template_json = (
+        template_json
+        .replace("\ufeff", "")
+        .replace("\u00a0", " ")
+        .replace("\ufffd", " ")
+        .strip()
+    )
     try:
         tpl = json.loads(template_json)
     except Exception:

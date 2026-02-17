@@ -78,6 +78,13 @@ def _json_load_stripping_fences(s: str) -> Dict[str, Any]:
 
     try:
         return json.loads(t)
+    except json.JSONDecodeError:
+        pass
+
+    # Common LLM issue: trailing commas before } or ]
+    t_no_trailing_commas = re.sub(r",\s*([}\]])", r"\1", t)
+    try:
+        return json.loads(t_no_trailing_commas)
     except json.JSONDecodeError as e:
         # Dit is belangrijk om te zien waarom passes "leeg" lijken.
         log.warning("JSON decode failed (%s). Raw head: %r", e, t[:400])
@@ -94,7 +101,7 @@ def _build_nuextract_prompt(
     paper_text: str,
 ) -> str:
     """Construct the prompt strictly following NuExtract format."""
-    template_json = (template_json or "").strip()
+    template_json = _sanitize_template_json(template_json)
     instr = (instructions or "").strip()
 
     blocks: List[str] = []
@@ -116,6 +123,19 @@ SchemaSpec = Dict[str, Tuple[str, Any]]
 # where Tuple is (kind, prototype) where kind in {"scalar","list","dict"}
 
 
+def _sanitize_template_json(template_json: Optional[str]) -> str:
+    """Normalize hidden characters that frequently break JSON parsing in TOML multi-line strings."""
+    if not template_json:
+        return ""
+    return (
+        template_json
+        .replace("\ufeff", "")   # BOM
+        .replace("\u00a0", " ")  # non-breaking space
+        .replace("\ufffd", " ")  # replacement char (from broken encodings)
+        .strip()
+    )
+
+
 def _parse_template_schema(template_json: Optional[str]) -> SchemaSpec:
     """
     Parse the template JSON into a shallow schema:
@@ -124,6 +144,7 @@ def _parse_template_schema(template_json: Optional[str]) -> SchemaSpec:
     - dict   -> default {}
     We only enforce top-level keys (matches your use-case).
     """
+    template_json = _sanitize_template_json(template_json)
     if not template_json:
         return {}
 

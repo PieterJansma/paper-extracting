@@ -943,30 +943,30 @@ IMPORTANT DISTINCTIONS
 [task_information]
 template_json = """
 {
-  "publications": [
-    {
-      "doi": "string",
-      "title": "string",
-      "is_design_publication": "boolean|null",
-      "reference": "string|null"
-    }
-  ],
-  "funding_statement": "string|null",
-  "citation_requirements": "string|null",
-  "acknowledgements": "string|null",
-  "provenance_statement": "string|null",
-  "documentation": [
-    {
-      "name": "string",
-      "type": "string|null",
-      "description": "string|null",
-      "url": "string|null",
-      "file": "string|null"
-    }
-  ],
-  "supplementary_information": "string|null",
-  "theme": ["string"],
-  "applicable_legislation": ["string"]
+    "publications": [
+        {
+            "doi": "string",
+            "title": "string",
+            "is_design_publication": "boolean|null",
+            "reference": "string|null"
+        }
+    ],
+    "funding_statement": "string|null",
+    "citation_requirements": "string|null",
+    "acknowledgements": "string|null",
+    "provenance_statement": "string|null",
+    "documentation": [
+        {
+            "name": "string",
+            "type": "string|null",
+            "description": "string|null",
+            "url": "string|null",
+            "file": "string|null"
+        }
+    ],
+    "supplementary_information": "string|null",
+    "theme": ["string"],
+    "applicable_legislation": ["string"]
 }
 """
 
@@ -1002,20 +1002,20 @@ publications (table; Publications)
 
 Fields:
 - doi (REQUIRED):
-  Only if explicitly provided (DOI string or DOI URL).
-  If only a citation without DOI is provided -> do NOT output a publication row.
+    Only if explicitly provided (DOI string or DOI URL).
+    If only a citation without DOI is provided -> do NOT output a publication row.
 
 - title (REQUIRED):
-  Only if explicitly provided as a publication title.
+    Only if explicitly provided as a publication title.
 
 - is_design_publication (boolean|null):
-  true ONLY if explicitly stated as design/marker/design paper/publication describing design of the cohort.
-  false ONLY if explicitly stated as NOT design publication.
-  If not explicit -> null.
+    true ONLY if explicitly stated as design/marker/design paper/publication describing design of the cohort.
+    false ONLY if explicitly stated as NOT design publication.
+    If not explicit -> null.
 
 - reference (string|null):
-  Only if an explicit formatted reference string is provided in the PDF.
-  Otherwise null. Do NOT generate references.
+    Only if an explicit formatted reference string is provided in the PDF.
+    Otherwise null. Do NOT generate references.
 
 --------------------------------------------------
 funding_statement / citation_requirements / acknowledgements / provenance_statement (free text)
@@ -1032,22 +1032,22 @@ documentation (table; Documentation)
 
 Fields:
 - name (REQUIRED):
-  Use explicit document name/title ONLY if stated.
-  If a document is referenced generically (e.g., “study protocol”) without a name -> do NOT output a row.
+    Use explicit document name/title ONLY if stated.
+    If a document is referenced generically (e.g., “study protocol”) without a name -> do NOT output a row.
 
 - type (string|null):
-  Only if the PDF explicitly labels the documentation type (e.g., “Harmonisation protocol”, “Informed consent”).
-  Otherwise null.
+    Only if the PDF explicitly labels the documentation type (e.g., “Harmonisation protocol”, “Informed consent”).
+    Otherwise null.
 
 - description (string|null):
-  Only if explicitly described, otherwise null.
+    Only if explicitly described, otherwise null.
 
 - url (string|null):
-  Only if explicitly provided, otherwise null.
+    Only if explicitly provided, otherwise null.
 
 - file (string|null):
-  Only if the PDF explicitly provides a file name/attachment label, otherwise null.
-  Do NOT invent local file names.
+    Only if the PDF explicitly provides a file name/attachment label, otherwise null.
+    Do NOT invent local file names.
 
 --------------------------------------------------
 supplementary_information (free text)
@@ -1086,14 +1086,14 @@ NOTE: The UI may default this value, but extraction must not default.
 [task_access_conditions]
 template_json = """
 {
-  "informed_consent_type": "string|null",
-  "access_rights": "string|null",
-  "data_access_conditions": ["string"],
-  "data_use_conditions": ["string"],
-  "data_access_conditions_description": "string|null",
-  "data_access_fee": "boolean|null",
-  "release_type": "string|null",
-  "release_description": "string|null"
+    "informed_consent_type": "string|null",
+    "access_rights": "string|null",
+    "data_access_conditions": ["string"],
+    "data_use_conditions": ["string"],
+    "data_access_conditions_description": "string|null",
+    "data_access_fee": "boolean|null",
+    "release_type": "string|null",
+    "release_description": "string|null"
 }
 """
 
@@ -1177,7 +1177,7 @@ Rules:
 - Add an item ONLY if explicitly stated in the PDF as a condition/requirement/limitation.
 - If none are explicitly stated -> [].
 - Do NOT infer "ethics approval required" just because ethics approval is mentioned for running the study.
-  It must be explicitly stated as a requirement for DATA ACCESS or DATA USE by external users.
+    It must be explicitly stated as a requirement for DATA ACCESS or DATA USE by external users.
 
 --------------------------------------------------
 data_access_conditions_description (free text)
@@ -1213,7 +1213,7 @@ Rules:
 - Set ONLY if the PDF explicitly states the release cycle of the resource or dataset updates.
 - Do NOT infer release type from recruitment period or follow-up schedule.
 - If the release cycle is explicitly stated but does not match allowed values:
-  -> set "Other release type" and describe the exact wording in release_description.
+    -> set "Other release type" and describe the exact wording in release_description.
 
 --------------------------------------------------
 release_description (free text)
@@ -1227,43 +1227,43 @@ release_description (free text)
 [task_contributors]
 template_json = """
 {
-  "organisations_involved": [
-    {
-      "id": "string",
-      "type": "string",
-      "name": "string|null",
-      "organisation": "string|null",
-      "other_organisation": "string|null",
-      "department": "string|null",
-      "website": "string|null",
-      "email": "string|null",
-      "logo": "string|null",
-      "role": ["string"],
-      "is_lead_organisation": "boolean|null"
-    }
-  ],
-  "publisher": "string|null",
-  "creator": ["string"],
-  "people_involved": [
-    {
-      "role": ["string"],
-      "role_description": "string|null",
-      "first_name": "string",
-      "last_name": "string",
-      "prefix": "string|null",
-      "initials": "string|null",
-      "title": "string|null",
-      "organisation": "string|null",
-      "email": "string|null",
-      "orcid": "string|null",
-      "homepage": "string|null",
-      "photo": "string|null",
-      "expertise": "string|null"
-    }
-  ],
-  "contact_point_first_name": "string|null",
-  "contact_point_last_name": "string|null",
-  "contact_point_email": "string|null"
+    "organisations_involved": [
+        {
+            "id": "string",
+            "type": "string",
+            "name": "string|null",
+            "organisation": "string|null",
+            "other_organisation": "string|null",
+            "department": "string|null",
+            "website": "string|null",
+            "email": "string|null",
+            "logo": "string|null",
+            "role": ["string"],
+            "is_lead_organisation": "boolean|null"
+        }
+    ],
+    "publisher": "string|null",
+    "creator": ["string"],
+    "people_involved": [
+        {
+            "role": ["string"],
+            "role_description": "string|null",
+            "first_name": "string",
+            "last_name": "string",
+            "prefix": "string|null",
+            "initials": "string|null",
+            "title": "string|null",
+            "organisation": "string|null",
+            "email": "string|null",
+            "orcid": "string|null",
+            "homepage": "string|null",
+            "photo": "string|null",
+            "expertise": "string|null"
+        }
+    ],
+    "contact_point_first_name": "string|null",
+    "contact_point_last_name": "string|null",
+    "contact_point_email": "string|null"
 }
 """
 
@@ -1291,50 +1291,50 @@ GLOBAL RULES
 organisations_involved (table; Organisations)
 --------------------------------------------------
 - Output one row per organisation/agent explicitly named as being involved in the resource
-  (e.g., coordinating centre, sponsor, institute, hospital, university, consortium partner).
+    (e.g., coordinating centre, sponsor, institute, hospital, university, consortium partner).
 - If the PDF does not explicitly name any organisations -> [].
 
 Fields:
 - id (REQUIRED):
-  Use an explicit acronym/short identifier ONLY if stated in the PDF (e.g., "UMCG").
-  If no explicit acronym/identifier is present, you MAY use the organisation's explicit short name as id.
-  If you cannot produce an id from explicit wording -> do NOT output that row.
+    Use an explicit acronym/short identifier ONLY if stated in the PDF (e.g., "UMCG").
+    If no explicit acronym/identifier is present, you MAY use the organisation's explicit short name as id.
+    If you cannot produce an id from explicit wording -> do NOT output that row.
 
 - type (REQUIRED; STRICT dropdown):
-  Allowed values (exact strings only):
-  - "Individual"
-  - "Organisation"
-  Rules:
-  - Use "Organisation" for institutions/universities/hospitals/companies/consortia.
-  - Use "Individual" ONLY if the PDF explicitly lists an individual as an "agent"/contributor in the organisations list context.
-  - If unclear -> do NOT output that row.
+    Allowed values (exact strings only):
+    - "Individual"
+    - "Organisation"
+    Rules:
+    - Use "Organisation" for institutions/universities/hospitals/companies/consortia.
+    - Use "Individual" ONLY if the PDF explicitly lists an individual as an "agent"/contributor in the organisations list context.
+    - If unclear -> do NOT output that row.
 
 - name:
-  ONLY for type="Individual": full person name if explicitly stated, else null.
-  For type="Organisation": set name=null.
+    ONLY for type="Individual": full person name if explicitly stated, else null.
+    For type="Organisation": set name=null.
 
 - organisation / other_organisation / department:
-  ONLY for type="Organisation":
-  - organisation: organisation name if explicitly stated in the PDF (verbatim or near-verbatim).
-  - other_organisation: ONLY if the PDF explicitly indicates an alternative spelling/name/identifier for the organisation.
-  - department: ONLY if explicitly stated (e.g., "Department of ...").
-  If not explicit -> null.
+    ONLY for type="Organisation":
+    - organisation: organisation name if explicitly stated in the PDF (verbatim or near-verbatim).
+    - other_organisation: ONLY if the PDF explicitly indicates an alternative spelling/name/identifier for the organisation.
+    - department: ONLY if explicitly stated (e.g., "Department of ...").
+    If not explicit -> null.
 
 - website / email:
-  Only if explicitly shown in the PDF (URL/email). Otherwise null.
+    Only if explicitly shown in the PDF (URL/email). Otherwise null.
 
 - logo:
-  Only if explicitly provided in the PDF as a logo reference/file name (rare). Otherwise null.
+    Only if explicitly provided in the PDF as a logo reference/file name (rare). Otherwise null.
 
 - role:
-  List contributor role(s) ONLY if explicitly stated (e.g., "sponsor", "coordinating centre", "data provider").
-  Use verbatim role terms from the PDF.
-  If no explicit role terms -> [].
+    List contributor role(s) ONLY if explicitly stated (e.g., "sponsor", "coordinating centre", "data provider").
+    Use verbatim role terms from the PDF.
+    If no explicit role terms -> [].
 
 - is_lead_organisation (boolean|null):
-  true ONLY if explicitly stated as lead/coordinating/primary organisation.
-  false ONLY if explicitly stated as NOT lead.
-  Otherwise null.
+    true ONLY if explicitly stated as lead/coordinating/primary organisation.
+    false ONLY if explicitly stated as NOT lead.
+    Otherwise null.
 
 --------------------------------------------------
 publisher (single select from organisations_involved)
@@ -1342,7 +1342,7 @@ publisher (single select from organisations_involved)
 - Set publisher ONLY if the PDF explicitly states the publishing organisation of the resource.
 - Value must be the EXACT "id" of one of the organisations_involved rows.
 - If the publisher organisation is explicitly stated but missing from organisations_involved:
-  add it to organisations_involved AND set publisher to its id.
+    add it to organisations_involved AND set publisher to its id.
 - If not explicit -> null.
 
 --------------------------------------------------
@@ -1352,54 +1352,54 @@ creator (multi select from organisations_involved)
 - Each item must exactly match an organisations_involved.id.
 - If not explicit -> [].
 - If a creator organisation is explicitly stated but missing from organisations_involved:
-  add it to organisations_involved AND include its id in creator[].
+    add it to organisations_involved AND include its id in creator[].
 
 --------------------------------------------------
 people_involved (table; Contacts)
 --------------------------------------------------
 - Output one row per explicitly named person contributing to the resource
-  (e.g., principal investigator, coordinator, corresponding author, contact person).
+    (e.g., principal investigator, coordinator, corresponding author, contact person).
 - Do NOT infer authorship lists as "people involved" unless the PDF explicitly ties them to the resource.
 
 Fields:
 - first_name / last_name (REQUIRED):
-  Only output a person if both are explicitly stated.
+    Only output a person if both are explicitly stated.
 
 - role:
-  List explicit role(s) (e.g., "Principal Investigator", "Primary contact").
-  Use verbatim wording where possible.
-  If no role explicitly tied to the person -> [].
+    List explicit role(s) (e.g., "Principal Investigator", "Primary contact").
+    Use verbatim wording where possible.
+    If no role explicitly tied to the person -> [].
 
 - role_description:
-  Only if explicitly described in the PDF, else null.
+    Only if explicitly described in the PDF, else null.
 
 - prefix / initials / title:
-  Only if explicitly stated, else null.
+    Only if explicitly stated, else null.
 
 - organisation:
-  Affiliated organisation ONLY if explicitly stated next to the person, else null.
+    Affiliated organisation ONLY if explicitly stated next to the person, else null.
 
 - email:
-  Only if explicitly shown, else null.
+    Only if explicitly shown, else null.
 
 - orcid:
-  Only if explicitly shown, else null.
+    Only if explicitly shown, else null.
 
 - homepage:
-  Only if explicitly shown (URL), else null.
+    Only if explicitly shown (URL), else null.
 
 - photo:
-  Only if explicitly provided (rare), else null.
+    Only if explicitly provided (rare), else null.
 
 - expertise:
-  Only if explicitly described, else null.
+    Only if explicitly described, else null.
 
 --------------------------------------------------
 contact point (single select from people_involved)
 --------------------------------------------------
 - This is the primary contact point for the resource.
 - Fill contact_point_* ONLY if the PDF explicitly identifies a main contact person
-  (e.g., "contact:", "corresponding author:", "for information contact", "primary contact").
+    (e.g., "contact:", "corresponding author:", "for information contact", "primary contact").
 - Values must match a person in people_involved (same first_name + last_name; email if available).
 - If not explicit -> set all contact_point_* fields to null.
 """
