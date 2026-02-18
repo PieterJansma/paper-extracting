@@ -344,8 +344,10 @@ Rules:
 - theme (required): must include "Health". Allowed: "Health","Agriculture","Environment","Energy","Government and public sector".
 - access_rights (required): "Open access" if explicitly public; "Restricted access" if explicitly controlled; else default "Non public".
   IMPORTANT: article license text (e.g., "Open access article", CC-BY) is NOT evidence for dataset access_rights.
-- applicable_legislation (required): include only explicitly named applicable laws/regulations for this subpopulation.
-  Do NOT auto-add "Data Governance Act" unless explicitly stated.
+- applicable_legislation (required):
+  - For health subpopulations, always include "Data Governance Act".
+  - Add other laws/regulations only if explicitly named.
+  - If the subpopulation is not health-related and no law is explicitly named -> [].
 No placeholders ("Unknown/N/A/Not specified"). Use null or [].
 """
 
@@ -558,9 +560,9 @@ Rules:
 --------------------------------------------------
 applicable_legislation
 --------------------------------------------------
-- Include ONLY explicitly named laws/regulations applicable to data access/use for this event.
-- Do NOT auto-add "Data Governance Act".
-- Add other laws ONLY if explicitly named (e.g., GDPR/AVG).
+- For health collection events, always include "Data Governance Act".
+- Add other laws/regulations ONLY if explicitly named (e.g., GDPR/AVG).
+- If the event is not health-related and no law is explicitly named -> [].
 - Do NOT include ethics guidelines.
 """
 
@@ -904,8 +906,33 @@ SCOPE
 - If not explicitly stated -> {"areas_of_information": []}.
 
 RULES
-- Use verbatim terms/categories IF the paper lists them.
-- If the paper only gives general statements like “clinical data were collected” without a categorized list -> [].
+- Use ONLY these top-level values (exact strings):
+  - "Socio-demographic and economic characteristics"
+  - "Lifestyle and behaviours"
+  - "Birth, pregnancy and reproductive health history"
+  - "Perception of health, quality of life, development and functional limitations"
+  - "Symptoms and signs"
+  - "Medication and supplements"
+  - "Non-pharmacological interventions"
+  - "Health and community care services utilization"
+  - "Death"
+  - "Physical measures and assessments"
+  - "Laboratory measures"
+  - "Cognition, personality and psychological measures and assessments"
+  - "Life events, life plans, beliefs and values"
+  - "Preschool, school and work life"
+  - "Social environment and relationships"
+  - "Physical environment"
+  - "Administrative information"
+- If the paper explicitly lists categories, map them directly to the allowed values above.
+- If categories are not listed but explicit variables/measures are listed, map those explicit items to the matching top-level categories.
+  Examples:
+  - chest pain/symptoms -> "Symptoms and signs"
+  - quality of life (e.g., EQ-5D, HeartQoL) -> "Perception of health, quality of life, development and functional limitations"
+  - healthcare utilization / referrals / downstream testing -> "Health and community care services utilization"
+  - cardiovascular risk factors / blood pressure / clinical assessments -> "Physical measures and assessments"
+- Do NOT add categories from vague statements alone (e.g., "clinical data were collected") without explicit measures/items.
+- Return unique values only; no duplicates.
 """
 
 # ---------- PASS Y: Linkage (Resources → linkage) ----------
@@ -1068,6 +1095,30 @@ funding_statement / citation_requirements / acknowledgements / provenance_statem
 - Do NOT summarise or paraphrase.
 - citation_requirements: fill ONLY when the paper explicitly states requirements for citing/acknowledging RESOURCE DATA reuse.
   Do NOT use generic "To cite this article" text as data citation requirements.
+  Do NOT use sponsor/funder role statements as citation requirements.
+  Valid evidence examples:
+  - "Users must acknowledge the cohort/resource in publications"
+  - "Please cite dataset DOI ... when using these data"
+  - "Data users are required to include the following acknowledgment ..."
+  Invalid evidence examples (keep out of citation_requirements):
+  - "The sponsor has no role ..."
+  - generic trial/article citation blocks
+  - funding declarations without user citation obligations
+  If no explicit data/resource citation obligation is stated -> null.
+- provenance_statement: use this official meaning:
+  "A statement of any changes in ownership and custody of a resource since its creation
+  that are significant for its authenticity, integrity, and interpretation."
+  Fill ONLY when the paper explicitly states such ownership/custody changes (or explicitly states none).
+  Valid examples:
+  - transfer of custodianship between institutions
+  - ownership/hosting change over time
+  - explicit custody chain statements relevant to authenticity/integrity/interpretation
+  Do NOT use journal/editorial metadata as provenance.
+  Invalid examples:
+  - "Not commissioned; externally peer reviewed"
+  - generic publication process notes
+  - funding statements without custody/ownership information
+  If no explicit ownership/custody provenance statement is provided -> null.
 
 --------------------------------------------------
 documentation (table; Documentation)
@@ -1124,9 +1175,10 @@ Allowed values:
 - "Data Governance Act"
 
 Rules:
-- Add "Data Governance Act" ONLY if explicitly stated in the PDF as applicable/mandating legislation.
-- Otherwise -> [].
-NOTE: The UI may default this value, but extraction must not default.
+- For health resources, always include "Data Governance Act" (default baseline requirement).
+- Add other legislations only when explicitly stated in the PDF (URIs/identifiers may be included if present).
+- If the resource is not health-related and no legislation is explicitly stated -> [].
+NOTE: Apply the domain default above for health resources; do not invent additional legislation beyond explicit evidence.
 """
 
 # ---------- PASS G: Access conditions (Resources chapter) ----------
@@ -1167,8 +1219,18 @@ Allowed values (exact strings only):
 - "No consent"
 
 Rules:
-- Set ONLY if the PDF explicitly states the type of consent for the data resource.
-- If consent language is present but does not match one of the allowed values exactly -> null.
+- Set to one of the 4 allowed values when explicit consent evidence is present.
+- Allowed values are fixed:
+  - "Study specific consent"
+  - "Broad consent"
+  - "Passive/tacit consent"
+  - "No consent"
+- Evidence-based mapping (when wording is explicit):
+  - study-specific consent form / signed informed consent for this study -> "Study specific consent"
+  - broad consent explicitly stated -> "Broad consent"
+  - opt-out / tacit / passive consent explicitly stated -> "Passive/tacit consent"
+  - no consent required explicitly stated -> "No consent"
+- If evidence is absent or ambiguous -> null.
 - Do NOT infer "Broad consent" from general biobank language unless explicitly stated.
 
 --------------------------------------------------
@@ -1201,6 +1263,12 @@ Rules:
 - Add an item ONLY if explicitly stated.
 - If none are explicitly stated -> [].
 - Do NOT infer from the topic area of the cohort.
+- Evidence-based mapping (only when explicitly about access/reuse scope):
+  - "available without restrictions" / "unrestricted access" -> "no restriction"
+  - "for research purposes" / "for scientific research" (non-domain-specific) -> "general research use"
+  - "for medical/health/biomedical research" -> "health or medical or biomedical research"
+  - "restricted to [disease area]" -> "disease specific research"
+- If wording is ambiguous (e.g., only states study topic, not access scope), do not map.
 
 --------------------------------------------------
 data_use_conditions (STRICT dropdown; multi-select)
@@ -1227,12 +1295,25 @@ Rules:
 - If none are explicitly stated -> [].
 - Do NOT infer "ethics approval required" just because ethics approval is mentioned for running the study.
     It must be explicitly stated as a requirement for DATA ACCESS or DATA USE by external users.
+- Evidence-based mapping (when explicitly about data/samples reuse or access governance):
+  - requires ethics committee/IRB approval for secondary use/access -> "ethics approval required"
+  - use limited to a specific approved research question/protocol -> "research specific restrictions"
+  - use restricted to named disease domain -> "disease specific research" (put in data_access_conditions) and/or
+    "research specific restrictions" when phrased as project scope.
+  - collaboration with the resource team required for use -> "collaboration required"
+  - explicit publication obligations for users -> "publication required"
+  - non-commercial / not-for-profit limitation -> "not for profit, non commercial use only"
+  - institution-only or user-group-only restriction -> "institution specific restriction" / "user specific restriction"
+  - project-by-project approval language -> "project specific restriction"
+- IMPORTANT: do not map participation criteria (e.g., patient informed consent at enrollment) to data_use_conditions
+  unless the text explicitly frames them as conditions for external data reuse/access.
 
 --------------------------------------------------
 data_access_conditions_description (free text)
 --------------------------------------------------
 - Fill ONLY if the PDF explicitly describes access terms/conditions in text (e.g., “available upon request”, “via data access committee”, “requires MTA/DTA”).
 - Use short verbatim or near-verbatim wording (max ~400 characters).
+- If data_access_conditions is [] but explicit access workflow text exists, still fill this field.
 - If not explicit -> null.
 
 --------------------------------------------------
