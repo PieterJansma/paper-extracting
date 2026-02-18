@@ -325,12 +325,7 @@ If none are explicitly defined -> {"subpopulations": []}.
 Rules:
 - Evidence threshold: only output a subpopulation when the paper explicitly frames a distinct subgroup
   (e.g., "subpopulation", "arm", "group", "stratum", "intervention arm", "control arm", "derivation/validation cohort").
-- Subpopulation must be participant-level (people/patients/participants), not site-level units.
 - Do NOT create subpopulations from generic site lists, acknowledgements, or overall trial logistics.
-- Do NOT treat GP practices, hospitals, centers, or recruiting sites as subpopulations unless participants are explicitly grouped by those units.
-- Do NOT create subpopulations from care-pathway strategy descriptions unless participant-level grouping is explicit.
-- In cluster-randomized studies, do NOT output practice/site strategy arms as subpopulations unless participant-level subgroup characteristics or participant counts per arm are explicitly reported.
-- If the paper describes one cohort/resource population without explicit participant-level subgrouping -> {"subpopulations": []}.
 - pid: only if explicitly stated for the subpopulation; else null. Do NOT invent.
 - description (required): 1–3 sentences describing the subpopulation using paper wording; no inference.
 - keywords (required): 5–12 terms to improve findability; try NOT to reuse words from description; no generic filler.
@@ -349,10 +344,8 @@ Rules:
 - theme (required): must include "Health". Allowed: "Health","Agriculture","Environment","Energy","Government and public sector".
 - access_rights (required): "Open access" if explicitly public; "Restricted access" if explicitly controlled; else default "Non public".
   IMPORTANT: article license text (e.g., "Open access article", CC-BY) is NOT evidence for dataset access_rights.
-- applicable_legislation (required):
-  - For health subpopulations, always include "Data Governance Act".
-  - Add other laws/regulations only if explicitly named.
-  - If the subpopulation is not health-related and no law is explicitly named -> [].
+- applicable_legislation (required): include only explicitly named applicable laws/regulations for this subpopulation.
+  Do NOT auto-add "Data Governance Act" unless explicitly stated.
 No placeholders ("Unknown/N/A/Not specified"). Use null or [].
 """
 
@@ -397,22 +390,18 @@ SCOPE
 - A "collection event" is a distinct data-collection moment/wave/round/visit (e.g., baseline, follow-up, questionnaire wave).
 - Extract ONLY events explicitly described in the paper.
 - If no explicit events are described -> {"collection_events": []}.
-- Return at most 10 collection events (prefer the most explicitly described/core events if more are mentioned).
 
 GLOBAL RULES
 - No placeholders ("Unknown", "N/A", "Not specified"). Use null or [].
 - Do NOT invent events.
 - Use paper wording as much as possible (verbatim or near-verbatim).
-- Event evidence threshold:
-  - If a schedule/table/figure explicitly lists timepoints with measurements/questionnaires/assessments, treat each explicit timepoint as a collection event.
-  - If only generic follow-up duration is stated without explicit measurement moments, do NOT create events.
+- Do NOT convert generic trial timelines into collection events unless those timepoints are explicitly data-collection events.
 
 --------------------------------------------------
 name (REQUIRED)
 --------------------------------------------------
 - Use explicit event labels from the paper (e.g., "baseline", "6-month follow-up", "T0", "visit 1").
 - If an event is clearly described but unnamed, you MAY create a minimal label using ONLY explicit timing wording (e.g., "Baseline", "Follow-up at 6 months").
-- For schedule tables (e.g., columns like baseline / 6 / 12 / 24 months), use those explicit column/timepoint labels as event names.
 - If you cannot produce a label from explicit wording -> do not output that event.
 
 --------------------------------------------------
@@ -423,9 +412,8 @@ pid
 --------------------------------------------------
 description (REQUIRED)
 --------------------------------------------------
-- Max 1 concise sentence describing what is collected/done in this event, using paper wording.
+- 1–3 sentences describing what is collected/done in this event, using paper wording.
 - No inference.
-- If a table/schedule is the source, summarize only explicitly marked measurements for that timepoint.
 
 --------------------------------------------------
 subpopulations
@@ -437,7 +425,7 @@ subpopulations
 --------------------------------------------------
 keywords (REQUIRED)
 --------------------------------------------------
-- 3–5 terms to improve findability of THIS collection event.
+- 5–12 terms to improve findability of THIS collection event.
 - Must be verbatim terms from the paper (no invented synonyms).
 - No generic filler.
 
@@ -461,7 +449,6 @@ number_of_participants
 - Only if the paper explicitly gives the N for THIS event/wave.
 - Do NOT reuse total cohort size.
 - Else null.
-- If the same participant set is implied but event-specific N is not explicitly provided -> null.
 
 --------------------------------------------------
 areas_of_information (STRICT UI top-level categories)
@@ -517,10 +504,6 @@ Use ONLY these exact strings if explicitly supported by the paper:
 
 Rules:
 - Add items ONLY if explicitly stated for this event.
-- For schedule-based evidence:
-  - questionnaires/PROs -> "Survey data"
-  - EHR/clinical record extraction -> "Medical records"
-  - biospecimen collection explicitly listed -> "Biological samples"
 - If "Other" is included -> fill data_categories_other with exact wording from the paper.
 - Otherwise data_categories_other = null.
 - If not explicit -> [].
@@ -528,7 +511,7 @@ Rules:
 --------------------------------------------------
 standardized_tools / standardized_tools_other
 --------------------------------------------------
-- standardized_tools: list explicit questionnaire/instrument/tool names used in THIS event (max 5).
+- standardized_tools: list explicit questionnaire/instrument/tool names used in THIS event.
 - Do NOT invent.
 - standardized_tools_other must be null unless standardized_tools includes "Other".
 - If no explicit tools -> [] and standardized_tools_other = null.
@@ -536,7 +519,7 @@ standardized_tools / standardized_tools_other
 --------------------------------------------------
 core_variables
 --------------------------------------------------
-- List up to 8 variable names ONLY if the paper explicitly lists them for this event.
+- List 10–20 variable names ONLY if the paper explicitly lists them for this event.
 - If not explicitly enumerated -> [] (do NOT guess).
 
 --------------------------------------------------
@@ -575,177 +558,10 @@ Rules:
 --------------------------------------------------
 applicable_legislation
 --------------------------------------------------
-- For health collection events, always include "Data Governance Act".
-- Add other laws/regulations ONLY if explicitly named (e.g., GDPR/AVG).
-- If the event is not health-related and no law is explicitly named -> [].
+- Include ONLY explicitly named laws/regulations applicable to data access/use for this event.
+- Do NOT auto-add "Data Governance Act".
+- Add other laws ONLY if explicitly named (e.g., GDPR/AVG).
 - Do NOT include ethics guidelines.
-"""
-
-[task_collection_events_core]
-template_json = """
-{
-  "collection_events": [
-    {
-      "name": "string",
-      "pid": "string|null",
-      "description": "string",
-      "subpopulations": ["string"],
-      "keywords": ["string"],
-      "start_date": "string|null",
-      "end_date": "string|null",
-      "age_groups": ["string"],
-      "number_of_participants": "integer|null"
-    }
-  ]
-}
-"""
-
-instructions = """
-Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
-
-Extract core Collection Events only. Keep it compact and factual.
-
-SCOPE
-- A collection event is an explicit wave/visit/timepoint where data was collected.
-- Extract ONLY explicitly described events.
-- If no explicit events are described -> {"collection_events": []}.
-- Return at most 8 events (prefer the most explicitly described/core events).
-
-RULES
-- No placeholders ("Unknown", "N/A", "Not specified"). Use null or [].
-- Do NOT invent events.
-- Use paper wording as much as possible.
-- Keep description to max 1 short sentence per event.
-
-FIELDS
-- name (required): explicit label (e.g., baseline, follow-up, T1). If unnamed but explicit timing exists, use minimal timing label.
-- pid: only if explicit identifier exists, else null.
-- description (required): what is collected/done at this event, explicit only.
-- subpopulations: explicit only, else [].
-- keywords (required): 3-5 findability terms for this event, preferably verbatim from paper.
-- start_date/end_date: explicit only, else null.
-- age_groups: explicit only, else [].
-- number_of_participants: event-specific N only if explicit; approximate values such as "around 800" may be converted to integer when clearly stated for this event; else null.
-"""
-
-[task_collection_events_enrichment]
-template_json = """
-{
-  "collection_events": [
-    {
-      "name": "string",
-      "areas_of_information": ["string"],
-      "sample_categories": ["string"],
-      "data_categories": ["string"],
-      "data_categories_other": "string|null",
-      "standardized_tools": ["string"],
-      "standardized_tools_other": "string|null",
-      "core_variables": ["string"],
-      "issued": "string|null",
-      "modified": "string|null",
-      "theme": ["string"],
-      "access_rights": "string",
-      "applicable_legislation": ["string"]
-    }
-  ]
-}
-"""
-
-instructions = """
-Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
-
-Extract enrichment fields for collection events. Use the same event names as in D1 when possible.
-
-SCOPE
-- Output events only when at least one enrichment field has explicit evidence.
-- Prefer matching names from core events; do not create speculative new events.
-- If no enrichment evidence exists -> {"collection_events": []}.
-- Use short canonical event names so they can match D1 names (e.g., "Baseline", "6-month follow-up", "Year 1").
-
-GLOBAL RULES
-- No placeholders ("Unknown", "N/A", "Not specified"). Use null or [].
-- Do NOT infer from general cohort context if event-level evidence is absent.
-- Keep lists concise and evidence-based.
-
-areas_of_information (exact strings only)
-- "Socio-demographic and economic characteristics"
-- "Lifestyle and behaviours"
-- "Birth, pregnancy and reproductive health history"
-- "Perception of health, quality of life, development and functional limitations"
-- "Symptoms and signs"
-- "Medication and supplements"
-- "Non-pharmacological interventions"
-- "Health and community care services utilization"
-- "Death"
-- "Physical measures and assessments"
-- "Laboratory measures"
-- "Cognition, personality and psychological measures and assessments"
-- "Life events, life plans, beliefs and values"
-- "Preschool, school and work life"
-- "Social environment and relationships"
-- "Physical environment"
-- "Administrative information"
-
-Rules:
-- Add only if explicit for THIS event.
-- Do not output subcategory labels.
-- If not explicit -> [].
-- If the paper states a measure is collected repeatedly across all follow-up waves/events, you may repeat the mapped category for each explicitly described event.
-
-data_categories (exact strings only)
-- "Biological samples"
-- "Survey data"
-- "Imaging data"
-- "Medical records"
-- "National registries"
-- "Genealogical records"
-- "Physiological/Biochemical measurements"
-- "Genomics"
-- "Transcriptomics"
-- "Proteomics"
-- "Metabolomics"
-- "Other"
-
-Rules:
-- Event-level explicit evidence only.
-- If "Other" is used, set data_categories_other with exact paper wording; otherwise null.
-- If the paper explicitly states one data source type applies to all measurements/events (e.g., all via questionnaires), you may apply it across all explicitly described events.
-
-standardized_tools / standardized_tools_other
-- standardized_tools: explicit tool names only (max 5), else [].
-- standardized_tools_other: null unless "Other" is in standardized_tools.
-
-core_variables
-- Up to 8 explicitly listed variables for this event; else [].
-
-issued / modified
-- Only if explicit for event data; else null.
-
-theme (exact values)
-- "Health"
-- "Agriculture"
-- "Environment"
-- "Energy"
-- "Government and public sector"
-
-Rules:
-- For health events include "Health".
-- If nothing explicit beyond that, ["Health"] is allowed.
-
-access_rights (exact value)
-- "Open access"
-- "Restricted access"
-- "Non public"
-
-Rules:
-- "Open access" only for explicit public event-level data access.
-- "Restricted access" only if explicit controlled access.
-- Else default "Non public".
-
-applicable_legislation
-- For health events include "Data Governance Act".
-- Add explicitly named laws (e.g., GDPR/AVG).
-- Else [] for non-health events.
 """
 
 
@@ -790,8 +606,6 @@ number_of_participants
 Definition: total number of individuals for which data is collected (resource-level).
 Rules:
 - Use ONLY if the paper explicitly states a total cohort/registry N (e.g., "N=...", "included ... participants").
-- If explicitly approximate wording is used for total N (e.g., "around", "approximately", "about", "circa", "~"),
-  convert to nearest integer and use it.
 - Do NOT reuse event-level N (baseline visit N, follow-up N).
 - If multiple totals exist (e.g., different timepoints), pick ONLY the one explicitly described as the overall cohort size;
   otherwise return null.
@@ -864,20 +678,7 @@ These fields are UI checkbox categories, NOT free-text criteria.
 Only output items that are explicitly stated in the paper.
 
 Allowed values (exact strings only) for BOTH inclusion_criteria and exclusion_criteria:
-- "Clinically relevant lifestyle inclusion criterion"
-- "Family status inclusion criterion"
-- "Gravidity inclusion criterion"
-- "Use of medication inclusion criterion"
-- "Age group inclusion criterion"
-- "Health status inclusion criterion"
-- "Age of majority inclusion criterion"
-- "BMI range inclusion criterion"
-- "Country of residence inclusion criteria"
-- "Clinically relevant exposure inclusion criterion"
-- "Defined population inclusion criterion"
-- "Ethnicity inclusion criterion"
-- "Hospital patient inclusion criterion"
-- "Sex inclusion criterion"
+
 
 Rules:
 - Add a label ONLY if the paper explicitly states that kind of criterion is used.
@@ -895,7 +696,6 @@ Rules:
 - Apply the same mapping logic to BOTH inclusion_criteria and exclusion_criteria.
 - Important: although labels include the word "inclusion", they are category names used for exclusion_criteria as well.
 - If an explicit exclusion is present and maps to one of these categories, include the mapped category in exclusion_criteria.
-- Explicit safeguard: if exclusion text contains pregnancy/pregnant (e.g., "pregnancy" as exclusion), include "Gravidity inclusion criterion" in exclusion_criteria.
 - If multiple criterion types are explicitly present, include all matching labels (do not keep only one).
 - Do NOT infer from demographic descriptions.
 - If not explicit -> [].
@@ -970,10 +770,8 @@ GLOBAL RULES
 name (REQUIRED)
 ----------------------------------------
 - Use an explicit dataset/table name ONLY if the PDF explicitly names it (e.g., “baseline dataset”, “harmonised dataset X”, “questionnaire dataset”).
-- If no explicit "dataset" name is used, you may use an explicit data module/source label as dataset name
-  (e.g., "Quality of life questionnaires", "Clinical records", "Biobank samples", "Registry linkage data"),
-  but only when the label is clearly present in the paper text.
-- Do NOT create synthetic names like "Dataset 1".
+- If the PDF does not explicitly name datasets -> return {"datasets": []}.
+  (Do NOT create names like "Dataset 1".)
 
 ----------------------------------------
 label
@@ -992,10 +790,6 @@ Allowed values (exact strings only):
 Rules:
 - Add a value ONLY if the PDF explicitly uses wording that maps directly to one of these.
 - If nothing explicit -> [].
-- Practical mapping:
-  - newly collected study/cohort data -> "Collected dataset"
-  - merged/combined/cross-source harmonized data -> "Harmonised dataset"
-  - explicit schema/model/standard for harmonization -> "Harmonisation schema"
 
 ----------------------------------------
 unit_of_observation (single select)
@@ -1007,8 +801,8 @@ unit_of_observation (single select)
 ----------------------------------------
 keywords
 ----------------------------------------
-- If not explicitly listed, extract up to 6 concise descriptive terms from explicit dataset/module wording in the paper.
-- Prefer specific terms over generic words.
+- Only if explicitly listed for the dataset OR explicitly stated as tags/topics.
+- Must be verbatim terms from the PDF.
 - Otherwise [].
 
 ----------------------------------------
@@ -1068,20 +862,15 @@ GLOBAL RULES
 name (REQUIRED)
 ----------------------------------------
 - Use an explicit sample set name ONLY if the PDF explicitly names it (e.g., “Blood samples”, “Biobank sampleset”, “DNA collection”).
-- If no formal sampleset title is present, you may use an explicit resource/module label that clearly denotes the sample collection
-  (e.g., "biobank", "biospecimen collection"), but only when that wording is explicit in the PDF.
-- If neither a sampleset name nor an explicit biobank/sample-collection label exists -> return {"samplesets": []}.
-- Do NOT create synthetic names like “Sampleset 1”.
+- If no explicit sampleset name exists -> return {"samplesets": []}.
+  (Do NOT create “Sampleset 1”.)
 
 ----------------------------------------
 sample_types
 ----------------------------------------
 - List biological sample types explicitly mentioned as being part of THIS sampleset (e.g., Blood, Serum, Plasma, Saliva, Urine, Tissue, DNA).
 - Use the exact wording from the PDF where possible.
-- Treat explicit wording like "DNA samples ... collected" as a sample type and include "DNA" in sample_types.
-- When the sampleset is an explicit biobank/biospecimen collection, aggregate all explicitly listed biospecimen types for that biobank section.
 - If the PDF does not list sample types for the named sampleset -> [].
-- If a biobank/sample collection is explicitly described and explicit sample types are listed, output it as a sampleset row.
 """
 
 
@@ -1102,33 +891,8 @@ SCOPE
 - If not explicitly stated -> {"areas_of_information": []}.
 
 RULES
-- Use ONLY these top-level values (exact strings):
-  - "Socio-demographic and economic characteristics"
-  - "Lifestyle and behaviours"
-  - "Birth, pregnancy and reproductive health history"
-  - "Perception of health, quality of life, development and functional limitations"
-  - "Symptoms and signs"
-  - "Medication and supplements"
-  - "Non-pharmacological interventions"
-  - "Health and community care services utilization"
-  - "Death"
-  - "Physical measures and assessments"
-  - "Laboratory measures"
-  - "Cognition, personality and psychological measures and assessments"
-  - "Life events, life plans, beliefs and values"
-  - "Preschool, school and work life"
-  - "Social environment and relationships"
-  - "Physical environment"
-  - "Administrative information"
-- If the paper explicitly lists categories, map them directly to the allowed values above.
-- If categories are not listed but explicit variables/measures are listed, map those explicit items to the matching top-level categories.
-  Examples:
-  - chest pain/symptoms -> "Symptoms and signs"
-  - quality of life (e.g., EQ-5D, HeartQoL) -> "Perception of health, quality of life, development and functional limitations"
-  - healthcare utilization / referrals / downstream testing -> "Health and community care services utilization"
-  - cardiovascular risk factors / blood pressure / clinical assessments -> "Physical measures and assessments"
-- Do NOT add categories from vague statements alone (e.g., "clinical data were collected") without explicit measures/items.
-- Return unique values only; no duplicates.
+- Use verbatim terms/categories IF the paper lists them.
+- If the paper only gives general statements like “clinical data were collected” without a categorized list -> [].
 """
 
 # ---------- PASS Y: Linkage (Resources → linkage) ----------
@@ -1164,8 +928,6 @@ Question:
 Rules:
 - true ONLY if the PDF explicitly states that the data ARE ALREADY LINKED
   (e.g. “data were linked to registry X”, “pre-linked with hospital records”).
-- Also set true for explicit present-tense operational linkage statements
-  (e.g., "is evaluated monthly by linkage to ...", "data are linked to ...").
 - false ONLY if the PDF explicitly states data are NOT linked.
 - If linkage status is not explicitly stated -> null.
 
@@ -1179,9 +941,7 @@ Rules:
 - Fill ONLY if the PDF explicitly mentions linkable or linked external resources
   (e.g. named registries, databases, administrative records).
 - Use short verbatim or near-verbatim wording.
-- Include ONLY source-system names/types (e.g., municipal registry, pharmacy database, national registry).
-- Do NOT list variables, endpoints, outcomes, or derived measures
-  (e.g., mortality, survival, quality of life, risk factors).
+- Do NOT list variables or outcomes (e.g. mortality, survival).
 - If multiple sources are mentioned, combine into a single string separated by "; ".
 - If nothing explicit -> null.
 
@@ -1194,7 +954,6 @@ Question:
 Rules:
 - true ONLY if the PDF explicitly states that linkage IS POSSIBLE
   (e.g. “can be linked”, “linkage is possible”, “allows linkage with…”).
-- Statements like "can also be linked to other sources of data" map to true.
 - false ONLY if the PDF explicitly states linkage is NOT possible.
 - If not explicitly stated -> null.
 
@@ -1268,14 +1027,8 @@ GLOBAL RULES
 --------------------------------------------------
 publications (table; Publications)
 --------------------------------------------------
-- Output one row per publication ABOUT this resource when supported by explicit bibliographic evidence.
-- If no publication evidence is present -> [].
-
-Evidence policy (important):
-- The current paper itself MAY be included as a publication row if:
-  - it is clearly about the resource/cohort/biobank (title/abstract/scope), AND
-  - DOI and title are explicitly present.
-- Do not require a separate "publications list" section when the paper itself is an explicit resource/design/protocol publication.
+- Output one row per publication ABOUT this resource only if explicitly indicated.
+- If no explicit publications are provided -> [].
 
 Fields:
 - doi (REQUIRED):
@@ -1286,8 +1039,7 @@ Fields:
     Only if explicitly provided as a publication title.
 
 - is_design_publication (boolean|null):
-    true if the publication is explicitly a protocol/design/marker paper for the resource
-    (e.g., title includes "protocol", "design", "cohort profile", or equivalent explicit wording).
+    true ONLY if explicitly stated as design/marker/design paper/publication describing design of the cohort.
     false ONLY if explicitly stated as NOT design publication.
     If not explicit -> null.
 
@@ -1303,30 +1055,6 @@ funding_statement / citation_requirements / acknowledgements / provenance_statem
 - Do NOT summarise or paraphrase.
 - citation_requirements: fill ONLY when the paper explicitly states requirements for citing/acknowledging RESOURCE DATA reuse.
   Do NOT use generic "To cite this article" text as data citation requirements.
-  Do NOT use sponsor/funder role statements as citation requirements.
-  Valid evidence examples:
-  - "Users must acknowledge the cohort/resource in publications"
-  - "Please cite dataset DOI ... when using these data"
-  - "Data users are required to include the following acknowledgment ..."
-  Invalid evidence examples (keep out of citation_requirements):
-  - "The sponsor has no role ..."
-  - generic trial/article citation blocks
-  - funding declarations without user citation obligations
-  If no explicit data/resource citation obligation is stated -> null.
-- provenance_statement: use this official meaning:
-  "A statement of any changes in ownership and custody of a resource since its creation
-  that are significant for its authenticity, integrity, and interpretation."
-  Fill ONLY when the paper explicitly states such ownership/custody changes (or explicitly states none).
-  Valid examples:
-  - transfer of custodianship between institutions
-  - ownership/hosting change over time
-  - explicit custody chain statements relevant to authenticity/integrity/interpretation
-  Do NOT use journal/editorial metadata as provenance.
-  Invalid examples:
-  - "Not commissioned; externally peer reviewed"
-  - generic publication process notes
-  - funding statements without custody/ownership information
-  If no explicit ownership/custody provenance statement is provided -> null.
 
 --------------------------------------------------
 documentation (table; Documentation)
@@ -1340,7 +1068,6 @@ Fields:
     If a document is referenced generically (e.g., “study protocol”) without a name -> do NOT output a row.
     Do NOT create pseudo-document names from generic phrases ("information brochure", "informed consent form")
     unless the PDF explicitly presents them as named documents.
-    If text only says participants "receive" or "sign" a brochure/consent form, treat this as process evidence, NOT a named document row.
 
 - type (string|null):
     Only if the PDF explicitly labels the documentation type (e.g., “Harmonisation protocol”, “Informed consent”).
@@ -1375,8 +1102,6 @@ Allowed values (exact strings only):
 Rules:
 - Add values ONLY if explicitly stated as themes/categories.
 - Do NOT infer "Health" unless explicitly stated in the PDF.
-- Being a medical/clinical/biobank/cancer study is NOT sufficient evidence for theme.
-- If no explicit theme/category label appears, return [] (even when all content is health-related).
 NOTE: The UI sets a default, but extraction must not default. If not explicit -> [].
 
 --------------------------------------------------
@@ -1386,10 +1111,9 @@ Allowed values:
 - "Data Governance Act"
 
 Rules:
-- For health resources, always include "Data Governance Act" (default baseline requirement).
-- Add other legislations only when explicitly stated in the PDF (URIs/identifiers may be included if present).
-- If the resource is not health-related and no legislation is explicitly stated -> [].
-NOTE: Apply the domain default above for health resources; do not invent additional legislation beyond explicit evidence.
+- Add "Data Governance Act" ONLY if explicitly stated in the PDF as applicable/mandating legislation.
+- Otherwise -> [].
+NOTE: The UI may default this value, but extraction must not default.
 """
 
 # ---------- PASS G: Access conditions (Resources chapter) ----------
@@ -1430,18 +1154,8 @@ Allowed values (exact strings only):
 - "No consent"
 
 Rules:
-- Set to one of the 4 allowed values when explicit consent evidence is present.
-- Allowed values are fixed:
-  - "Study specific consent"
-  - "Broad consent"
-  - "Passive/tacit consent"
-  - "No consent"
-- Evidence-based mapping (when wording is explicit):
-  - study-specific consent form / signed informed consent for this study -> "Study specific consent"
-  - broad consent explicitly stated -> "Broad consent"
-  - opt-out / tacit / passive consent explicitly stated -> "Passive/tacit consent"
-  - no consent required explicitly stated -> "No consent"
-- If evidence is absent or ambiguous -> null.
+- Set ONLY if the PDF explicitly states the type of consent for the data resource.
+- If consent language is present but does not match one of the allowed values exactly -> null.
 - Do NOT infer "Broad consent" from general biobank language unless explicitly stated.
 
 --------------------------------------------------
@@ -1474,14 +1188,6 @@ Rules:
 - Add an item ONLY if explicitly stated.
 - If none are explicitly stated -> [].
 - Do NOT infer from the topic area of the cohort.
-- Evidence-based mapping (only when explicitly about access/reuse scope):
-  - "available without restrictions" / "unrestricted access" -> "no restriction"
-  - "for research purposes" / "for scientific research" (non-domain-specific) -> "general research use"
-  - "for medical/health/biomedical research" -> "health or medical or biomedical research"
-  - "restricted to [disease area]" -> "disease specific research"
-- If access requires proposal review and approval by a scientific/data-access board for defined study aims,
-  map to "health or medical or biomedical research" when domain is medical/biomedical.
-- If wording is ambiguous (e.g., only states study topic, not access scope), do not map.
 
 --------------------------------------------------
 data_use_conditions (STRICT dropdown; multi-select)
@@ -1508,26 +1214,12 @@ Rules:
 - If none are explicitly stated -> [].
 - Do NOT infer "ethics approval required" just because ethics approval is mentioned for running the study.
     It must be explicitly stated as a requirement for DATA ACCESS or DATA USE by external users.
-- Evidence-based mapping (when explicitly about data/samples reuse or access governance):
-  - requires ethics committee/IRB approval for secondary use/access -> "ethics approval required"
-  - use limited to a specific approved research question/protocol -> "research specific restrictions"
-  - use restricted to named disease domain -> "disease specific research" (put in data_access_conditions) and/or
-    "research specific restrictions" when phrased as project scope.
-  - collaboration with the resource team required for use -> "collaboration required"
-  - explicit publication obligations for users -> "publication required"
-  - non-commercial / not-for-profit limitation -> "not for profit, non commercial use only"
-  - institution-only or user-group-only restriction -> "institution specific restriction" / "user specific restriction"
-  - project-by-project approval language -> "project specific restriction"
-- If text states requests/proposals are reviewed and approved case-by-case, map "project specific restriction".
-- IMPORTANT: do not map participation criteria (e.g., patient informed consent at enrollment) to data_use_conditions
-  unless the text explicitly frames them as conditions for external data reuse/access.
 
 --------------------------------------------------
 data_access_conditions_description (free text)
 --------------------------------------------------
 - Fill ONLY if the PDF explicitly describes access terms/conditions in text (e.g., “available upon request”, “via data access committee”, “requires MTA/DTA”).
 - Use short verbatim or near-verbatim wording (max ~400 characters).
-- If data_access_conditions is [] but explicit access workflow text exists, still fill this field.
 - If not explicit -> null.
 
 --------------------------------------------------
@@ -1541,8 +1233,6 @@ Allowed values:
 Rules:
 - true ONLY if the PDF explicitly states a fee/cost/charge is required for access.
 - false ONLY if explicitly states no fee / free of charge.
-- Treat wording like "external parties will be asked to cover expenses/running costs" as true.
-- Treat wording like "a cost will need to be charged" as true.
 - If not explicit -> null.
 
 --------------------------------------------------
@@ -1558,9 +1248,6 @@ Allowed values (exact strings only):
 Rules:
 - Set ONLY if the PDF explicitly states the release cycle of the resource or dataset updates.
 - Do NOT infer release type from recruitment period or follow-up schedule.
-- Do NOT infer release type from ongoing data collection, hospital embedding, governance setup, or long-term project duration.
-- "Continuous" requires explicit wording equivalent to continuous/real-time/ongoing release or update cadence.
-- "Periodically"/"Annually" require explicit cadence wording.
 - If the release cycle is explicitly stated but does not match allowed values:
     -> set "Other release type" and describe the exact wording in release_description.
 
