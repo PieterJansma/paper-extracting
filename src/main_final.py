@@ -224,6 +224,60 @@ def _combine_contributor_results(
     }
 
 
+def _is_empty_value(v: Any) -> bool:
+    if v is None:
+        return True
+    if isinstance(v, str):
+        return v.strip() == ""
+    if isinstance(v, list) or isinstance(v, dict):
+        return len(v) == 0
+    return False
+
+
+def _combine_collection_event_results(
+    core_result: Dict[str, Any] | None,
+    enrich_result: Dict[str, Any] | None,
+) -> Dict[str, Any]:
+    core_items = (core_result or {}).get("collection_events", []) or []
+    enrich_items = (enrich_result or {}).get("collection_events", []) or []
+
+    merged: List[Dict[str, Any]] = []
+    by_name: Dict[str, Dict[str, Any]] = {}
+
+    def _norm_name(item: Dict[str, Any]) -> str:
+        return str(item.get("name") or "").strip().lower()
+
+    for item in core_items:
+        if not isinstance(item, dict):
+            continue
+        out = dict(item)
+        merged.append(out)
+        n = _norm_name(out)
+        if n:
+            by_name[n] = out
+
+    for item in enrich_items:
+        if not isinstance(item, dict):
+            continue
+        n = _norm_name(item)
+        if n and n in by_name:
+            target = by_name[n]
+            for k, v in item.items():
+                if _is_empty_value(v):
+                    continue
+                cur = target.get(k)
+                if isinstance(cur, list) and isinstance(v, list):
+                    target[k] = _dedupe_keep_order([str(x) for x in cur + v if not _is_empty_value(x)])
+                elif _is_empty_value(cur):
+                    target[k] = v
+                else:
+                    target[k] = v
+        else:
+            merged.append(dict(item))
+
+    return {"collection_events": merged}
+
+
 def _as_list_str(val: Any) -> List[str]:
     if isinstance(val, list):
         return [str(x) for x in val if x is not None and str(x).strip() != ""]
@@ -310,7 +364,7 @@ def cli() -> None:
         "-p", "--passes",
         nargs="+",
         default=["all"],
-        help="Specify passes: A, B, C, D, E, F/F1/F2, G, H, X1, X2, X3, Y or 'all'.",
+        help="Specify passes: A, B, C, D/D1/D2, E, F/F1/F2, G, H, X1, X2, X3, Y or 'all'.",
     )
     parser.add_argument(
         "--pdfs",
@@ -333,6 +387,8 @@ def cli() -> None:
     selected_passes = [p.upper() for p in args.passes]
     if "F" in selected_passes:
         selected_passes.extend(["F1", "F2"])
+    if "D" in selected_passes:
+        selected_passes.extend(["D1", "D2"])
 
     cfg_path = os.environ.get("PDF_EXTRACT_CONFIG", "config.final.toml")
     cfg = load_config(cfg_path)
@@ -358,25 +414,39 @@ def cli() -> None:
     )
 
     has_split_contributors = "task_contributors_org" in cfg and "task_contributors_people" in cfg
+    has_split_collection_events = (
+        "task_collection_events_core" in cfg
+        and "task_collection_events_enrichment" in cfg
+    )
 
     pass_defs = [
         ("A", "PASS A: Overview", "task_overview"),
         ("B", "PASS B: Design & structure", "task_design_structure"),
         ("C", "PASS C: Subpopulations", "task_subpopulations"),
-        ("D", "PASS D: Collection events", "task_collection_events"),
-        ("E", "PASS E: Population", "task_population"),
+    ]
+    if has_split_collection_events:
+        pass_defs.extend([
+            ("D1", "PASS D1: Collection events (core)", "task_collection_events_core"),
+            ("D2", "PASS D2: Collection events (enrichment)", "task_collection_events_enrichment"),
+        ])
+    else:
+        pass_defs.append(("D", "PASS D: Collection events", "task_collection_events"))
+    pass_defs.append(("E", "PASS E: Population", "task_population"))
+    if has_split_contributors:
+        pass_defs.extend([
+            ("F1", "PASS F1: Contributors (organisations)", "task_contributors_org"),
+            ("F2", "PASS F2: Contributors (people/contact)", "task_contributors_people"),
+        ])
+    else:
+        pass_defs.append(("F", "PASS F: Contributors", "task_contributors"))
+    pass_defs.extend([
         ("X1", "PASS X1: Datasets", "task_datasets"),
         ("X2", "PASS X2: Samplesets", "task_samplesets"),
         ("X3", "PASS X3: Areas of information", "task_areas_of_information"),
         ("Y", "PASS Y: Linkage", "task_linkage"),
         ("G", "PASS G: Access conditions", "task_access_conditions"),
         ("H", "PASS H: Information", "task_information"),
-    ]
-    if has_split_contributors:
-        pass_defs.insert(5, ("F1", "PASS F1: Contributors (organisations)", "task_contributors_org"))
-        pass_defs.insert(6, ("F2", "PASS F2: Contributors (people/contact)", "task_contributors_people"))
-    else:
-        pass_defs.insert(5, ("F", "PASS F: Contributors", "task_contributors"))
+    ])
 
     # Preload template orders for stable column order
     section_orders: Dict[str, List[str]] = {}
@@ -473,6 +543,12 @@ def cli() -> None:
                 log.info("Skipping %s (not selected)", name)
 
         _postprocess_section_results(per_section_results, paper_text)
+
+        if has_split_collection_events:
+            per_section_results["task_collection_events"] = _combine_collection_event_results(
+                per_section_results.get("task_collection_events_core", {}),
+                per_section_results.get("task_collection_events_enrichment", {}),
+            )
 
         # Resource-level combined row
         if has_split_contributors:

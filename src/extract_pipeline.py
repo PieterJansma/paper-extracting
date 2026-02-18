@@ -91,9 +91,97 @@ def _json_load_stripping_fences(s: str) -> Dict[str, Any]:
     try:
         return json.loads(t_no_trailing_commas)
     except json.JSONDecodeError as e:
+        salvaged = _salvage_top_level_list_output(t)
+        if salvaged:
+            log.warning(
+                "JSON decode failed (%s), salvaged %d items from partial output.",
+                e,
+                sum(len(v) for v in salvaged.values() if isinstance(v, list)),
+            )
+            return salvaged
         # Dit is belangrijk om te zien waarom passes "leeg" lijken.
         log.warning("JSON decode failed (%s). Raw head: %r", e, t[:400])
         return {}
+
+
+def _split_complete_json_objects(s: str) -> List[str]:
+    """
+    Extract complete top-level JSON object snippets from a string segment.
+    Robust to braces in quoted strings.
+    """
+    objs: List[str] = []
+    depth = 0
+    start = -1
+    in_str = False
+    esc = False
+
+    for i, ch in enumerate(s):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == "\"":
+                in_str = False
+            continue
+
+        if ch == "\"":
+            in_str = True
+            continue
+
+        if ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            if depth > 0:
+                depth -= 1
+                if depth == 0 and start >= 0:
+                    objs.append(s[start:i + 1])
+                    start = -1
+    return objs
+
+
+def _salvage_top_level_list_output(raw: str) -> Dict[str, Any]:
+    """
+    Try to salvage partial outputs for templates with one top-level list key.
+    Example: {"collection_events":[{...},{...}, ...truncated}
+    """
+    if not raw:
+        return {}
+
+    candidate_keys = [
+        "collection_events",
+        "subpopulations",
+        "datasets",
+        "samplesets",
+        "organisations_involved",
+        "people_involved",
+        "publications",
+        "documentation",
+    ]
+
+    for key in candidate_keys:
+        key_pat = f"\"{key}\""
+        pos = raw.find(key_pat)
+        if pos < 0:
+            continue
+        lb = raw.find("[", pos)
+        if lb < 0:
+            continue
+        arr_segment = raw[lb + 1:]
+        obj_snippets = _split_complete_json_objects(arr_segment)
+        items: List[Dict[str, Any]] = []
+        for snippet in obj_snippets:
+            try:
+                obj = json.loads(snippet)
+                if isinstance(obj, dict):
+                    items.append(obj)
+            except Exception:
+                continue
+        if items:
+            return {key: items}
+    return {}
 
 
 # ==============================================================================

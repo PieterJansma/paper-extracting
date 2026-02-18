@@ -578,6 +578,170 @@ applicable_legislation
 - Do NOT include ethics guidelines.
 """
 
+[task_collection_events_core]
+template_json = """
+{
+  "collection_events": [
+    {
+      "name": "string",
+      "pid": "string|null",
+      "description": "string",
+      "subpopulations": ["string"],
+      "keywords": ["string"],
+      "start_date": "string|null",
+      "end_date": "string|null",
+      "age_groups": ["string"],
+      "number_of_participants": "integer|null"
+    }
+  ]
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
+
+Extract core Collection Events only. Keep it compact and factual.
+
+SCOPE
+- A collection event is an explicit wave/visit/timepoint where data was collected.
+- Extract ONLY explicitly described events.
+- If no explicit events are described -> {"collection_events": []}.
+- Return at most 8 events (prefer the most explicitly described/core events).
+
+RULES
+- No placeholders ("Unknown", "N/A", "Not specified"). Use null or [].
+- Do NOT invent events.
+- Use paper wording as much as possible.
+- Keep description to max 1 short sentence per event.
+
+FIELDS
+- name (required): explicit label (e.g., baseline, follow-up, T1). If unnamed but explicit timing exists, use minimal timing label.
+- pid: only if explicit identifier exists, else null.
+- description (required): what is collected/done at this event, explicit only.
+- subpopulations: explicit only, else [].
+- keywords (required): 3-5 findability terms for this event, preferably verbatim from paper.
+- start_date/end_date: explicit only, else null.
+- age_groups: explicit only, else [].
+- number_of_participants: event-specific N only if explicit; approximate values such as "around 800" may be converted to integer when clearly stated for this event; else null.
+"""
+
+[task_collection_events_enrichment]
+template_json = """
+{
+  "collection_events": [
+    {
+      "name": "string",
+      "areas_of_information": ["string"],
+      "sample_categories": ["string"],
+      "data_categories": ["string"],
+      "data_categories_other": "string|null",
+      "standardized_tools": ["string"],
+      "standardized_tools_other": "string|null",
+      "core_variables": ["string"],
+      "issued": "string|null",
+      "modified": "string|null",
+      "theme": ["string"],
+      "access_rights": "string",
+      "applicable_legislation": ["string"]
+    }
+  ]
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
+
+Extract enrichment fields for collection events. Use the same event names as in D1 when possible.
+
+SCOPE
+- Output events only when at least one enrichment field has explicit evidence.
+- Prefer matching names from core events; do not create speculative new events.
+- If no enrichment evidence exists -> {"collection_events": []}.
+
+GLOBAL RULES
+- No placeholders ("Unknown", "N/A", "Not specified"). Use null or [].
+- Do NOT infer from general cohort context if event-level evidence is absent.
+- Keep lists concise and evidence-based.
+
+areas_of_information (exact strings only)
+- "Socio-demographic and economic characteristics"
+- "Lifestyle and behaviours"
+- "Birth, pregnancy and reproductive health history"
+- "Perception of health, quality of life, development and functional limitations"
+- "Symptoms and signs"
+- "Medication and supplements"
+- "Non-pharmacological interventions"
+- "Health and community care services utilization"
+- "Death"
+- "Physical measures and assessments"
+- "Laboratory measures"
+- "Cognition, personality and psychological measures and assessments"
+- "Life events, life plans, beliefs and values"
+- "Preschool, school and work life"
+- "Social environment and relationships"
+- "Physical environment"
+- "Administrative information"
+
+Rules:
+- Add only if explicit for THIS event.
+- Do not output subcategory labels.
+- If not explicit -> [].
+
+data_categories (exact strings only)
+- "Biological samples"
+- "Survey data"
+- "Imaging data"
+- "Medical records"
+- "National registries"
+- "Genealogical records"
+- "Physiological/Biochemical measurements"
+- "Genomics"
+- "Transcriptomics"
+- "Proteomics"
+- "Metabolomics"
+- "Other"
+
+Rules:
+- Event-level explicit evidence only.
+- If "Other" is used, set data_categories_other with exact paper wording; otherwise null.
+
+standardized_tools / standardized_tools_other
+- standardized_tools: explicit tool names only (max 5), else [].
+- standardized_tools_other: null unless "Other" is in standardized_tools.
+
+core_variables
+- Up to 8 explicitly listed variables for this event; else [].
+
+issued / modified
+- Only if explicit for event data; else null.
+
+theme (exact values)
+- "Health"
+- "Agriculture"
+- "Environment"
+- "Energy"
+- "Government and public sector"
+
+Rules:
+- For health events include "Health".
+- If nothing explicit beyond that, ["Health"] is allowed.
+
+access_rights (exact value)
+- "Open access"
+- "Restricted access"
+- "Non public"
+
+Rules:
+- "Open access" only for explicit public event-level data access.
+- "Restricted access" only if explicit controlled access.
+- Else default "Non public".
+
+applicable_legislation
+- For health events include "Data Governance Act".
+- Add explicitly named laws (e.g., GDPR/AVG).
+- Else [] for non-health events.
+"""
+
 
 # ---------- PASS E: Population (Resource-level) ----------
 [task_population]
