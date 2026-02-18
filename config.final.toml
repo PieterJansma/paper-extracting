@@ -1067,8 +1067,10 @@ GLOBAL RULES
 name (REQUIRED)
 ----------------------------------------
 - Use an explicit sample set name ONLY if the PDF explicitly names it (e.g., “Blood samples”, “Biobank sampleset”, “DNA collection”).
-- If no explicit sampleset name exists -> return {"samplesets": []}.
-  (Do NOT create “Sampleset 1”.)
+- If no formal sampleset title is present, you may use an explicit resource/module label that clearly denotes the sample collection
+  (e.g., "biobank", "biospecimen collection"), but only when that wording is explicit in the PDF.
+- If neither a sampleset name nor an explicit biobank/sample-collection label exists -> return {"samplesets": []}.
+- Do NOT create synthetic names like “Sampleset 1”.
 
 ----------------------------------------
 sample_types
@@ -1076,6 +1078,7 @@ sample_types
 - List biological sample types explicitly mentioned as being part of THIS sampleset (e.g., Blood, Serum, Plasma, Saliva, Urine, Tissue, DNA).
 - Use the exact wording from the PDF where possible.
 - If the PDF does not list sample types for the named sampleset -> [].
+- If a biobank/sample collection is explicitly described and explicit sample types are listed, output it as a sampleset row.
 """
 
 
