@@ -5,7 +5,6 @@ import json
 import argparse
 import logging
 import importlib.util
-import re
 from typing import Any, Dict, List, Iterable, Tuple
 
 import pandas as pd
@@ -245,41 +244,8 @@ def _dedupe_keep_order(items: List[str]) -> List[str]:
 
 def _postprocess_section_results(
     per_section_results: Dict[str, Dict[str, Any]],
-    paper_text: str,
+    _paper_text: str,
 ) -> None:
-    # ------------------------------------------------------------------
-    # PASS E fallback mappings for inclusion/exclusion category checkboxes
-    # ------------------------------------------------------------------
-    pop = per_section_results.get("task_population")
-    if isinstance(pop, dict):
-        inclusion = _as_list_str(pop.get("inclusion_criteria"))
-        exclusion = _as_list_str(pop.get("exclusion_criteria"))
-        other_incl = " ".join(_as_list_str(pop.get("other_inclusion_criteria"))).lower()
-        other_excl = " ".join(_as_list_str(pop.get("other_exclusion_criteria"))).lower()
-        disease = _as_list_str(pop.get("population_disease"))
-
-        # Inclusion category enrichment from explicit inclusion wording
-        if re.search(r"\b(aged?|years?|older than|younger than|>=|≤|under)\b", other_incl):
-            inclusion.append("Age group inclusion criterion")
-        if re.search(r"\b(men|male|women|female|sex)\b", other_incl):
-            inclusion.append("Sex inclusion criterion")
-        if disease or re.search(r"\b(angina|chest pain|thoracic complaints?|cad|coronary)\b", other_incl):
-            inclusion.append("Defined population inclusion criterion")
-            inclusion.append("Health status inclusion criterion")
-
-        # Exclusion category enrichment from explicit exclusion wording
-        if re.search(r"\b(pregnan|gravidity)\b", other_excl):
-            exclusion.append("Gravidity inclusion criterion")
-        if re.search(r"\b(prior|history|diagnosis|myocardial|infarct|cad|bypass|intervention)\b", other_excl):
-            exclusion.append("Health status inclusion criterion")
-        if re.search(r"\b(aged?|years?|older than|younger than|>=|≤|under)\b", other_excl):
-            exclusion.append("Age group inclusion criterion")
-        if re.search(r"\b(men|male|women|female|sex)\b", other_excl):
-            exclusion.append("Sex inclusion criterion")
-
-        pop["inclusion_criteria"] = _dedupe_keep_order(inclusion)
-        pop["exclusion_criteria"] = _dedupe_keep_order(exclusion)
-
     # ------------------------------------------------------------------
     # PASS X3 fallback: derive resource-level areas from collection events
     # ------------------------------------------------------------------
@@ -293,17 +259,6 @@ def _postprocess_section_results(
                 if isinstance(ev, dict):
                     merged.extend(_as_list_str(ev.get("areas_of_information")))
             aoi["areas_of_information"] = _dedupe_keep_order(merged)
-
-    # ------------------------------------------------------------------
-    # PASS G fallback: infer study-specific consent from explicit wording
-    # ------------------------------------------------------------------
-    access = per_section_results.get("task_access_conditions")
-    if isinstance(access, dict):
-        consent = access.get("informed_consent_type")
-        if consent in (None, ""):
-            t = paper_text.lower()
-            if "informed consent" in t and "broad consent" not in t and "passive consent" not in t and "tacit consent" not in t:
-                access["informed_consent_type"] = "Study specific consent"
 
     # ------------------------------------------------------------------
     # PASS H default: Data Governance Act for health resources
