@@ -246,6 +246,19 @@ def _postprocess_section_results(
     per_section_results: Dict[str, Dict[str, Any]],
     _paper_text: str,
 ) -> None:
+    overview = per_section_results.get("task_overview")
+    info = per_section_results.get("task_information")
+
+    health_context = False
+    if isinstance(overview, dict):
+        types = [x.lower() for x in _as_list_str(overview.get("type"))]
+        if any(x in types for x in ["clinical trial", "cohort study", "registry", "disease specific", "health records"]):
+            health_context = True
+    if isinstance(info, dict):
+        themes = [x.lower() for x in _as_list_str(info.get("theme"))]
+        if "health" in themes:
+            health_context = True
+
     # ------------------------------------------------------------------
     # PASS X3 fallback: derive resource-level areas from collection events
     # ------------------------------------------------------------------
@@ -263,21 +276,28 @@ def _postprocess_section_results(
     # ------------------------------------------------------------------
     # PASS H default: Data Governance Act for health resources
     # ------------------------------------------------------------------
-    info = per_section_results.get("task_information")
-    overview = per_section_results.get("task_overview")
     if isinstance(info, dict):
+        # Remove common article-editorial text that is not resource provenance.
+        prov = str(info.get("provenance_statement") or "").strip().lower()
+        if prov and ("not commissioned" in prov or "peer reviewed" in prov):
+            info["provenance_statement"] = None
+
         laws = _as_list_str(info.get("applicable_legislation"))
-        if not laws:
-            health_context = False
-            if isinstance(overview, dict):
-                types = [x.lower() for x in _as_list_str(overview.get("type"))]
-                if any(x in types for x in ["clinical trial", "cohort study", "registry", "disease specific", "health records"]):
-                    health_context = True
-            themes = [x.lower() for x in _as_list_str(info.get("theme"))]
-            if "health" in themes:
-                health_context = True
-            if health_context:
-                info["applicable_legislation"] = ["Data Governance Act"]
+        if health_context and "data governance act" not in [x.lower() for x in laws]:
+            info["applicable_legislation"] = _dedupe_keep_order(laws + ["Data Governance Act"])
+
+    # Keep legislation policy consistent in list sheets when context is health.
+    if health_context:
+        for item in (per_section_results.get("task_subpopulations", {}) or {}).get("subpopulations", []) or []:
+            if isinstance(item, dict):
+                laws = _as_list_str(item.get("applicable_legislation"))
+                if "data governance act" not in [x.lower() for x in laws]:
+                    item["applicable_legislation"] = _dedupe_keep_order(laws + ["Data Governance Act"])
+        for item in (per_section_results.get("task_collection_events", {}) or {}).get("collection_events", []) or []:
+            if isinstance(item, dict):
+                laws = _as_list_str(item.get("applicable_legislation"))
+                if "data governance act" not in [x.lower() for x in laws]:
+                    item["applicable_legislation"] = _dedupe_keep_order(laws + ["Data Governance Act"])
 
 
 # ==============================================================================
