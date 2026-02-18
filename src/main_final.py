@@ -5,6 +5,7 @@ import json
 import argparse
 import logging
 import importlib.util
+import re
 from typing import Any, Dict, List, Iterable, Tuple
 
 import pandas as pd
@@ -245,7 +246,33 @@ def _combine_collection_event_results(
     by_name: Dict[str, Dict[str, Any]] = {}
 
     def _norm_name(item: Dict[str, Any]) -> str:
-        return str(item.get("name") or "").strip().lower()
+        raw = str(item.get("name") or "").strip().lower()
+        if not raw:
+            return raw
+
+        txt = re.sub(r"[-_/]", " ", raw)
+        txt = re.sub(r"\s+", " ", txt).strip()
+
+        if txt in {"baseline", "enrolment", "enrollment", "t0", "time 0"}:
+            return "m0"
+
+        # "6 months", "6 month follow up", "month 6"
+        m = re.search(r"\b(\d+)\s*(?:month|months|mo)\b", txt)
+        if m:
+            return f"m{int(m.group(1))}"
+        m = re.search(r"\bmonth\s*(\d+)\b", txt)
+        if m:
+            return f"m{int(m.group(1))}"
+
+        # "year 1", "1 year", "12-month" equivalents
+        y = re.search(r"\byear\s*(\d+)\b", txt)
+        if y:
+            return f"m{int(y.group(1)) * 12}"
+        y = re.search(r"\b(\d+)\s*year\b", txt)
+        if y:
+            return f"m{int(y.group(1)) * 12}"
+
+        return txt
 
     for item in core_items:
         if not isinstance(item, dict):

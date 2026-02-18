@@ -329,6 +329,7 @@ Rules:
 - Do NOT create subpopulations from generic site lists, acknowledgements, or overall trial logistics.
 - Do NOT treat GP practices, hospitals, centers, or recruiting sites as subpopulations unless participants are explicitly grouped by those units.
 - Do NOT create subpopulations from care-pathway strategy descriptions unless participant-level grouping is explicit.
+- In cluster-randomized studies, do NOT output practice/site strategy arms as subpopulations unless participant-level subgroup characteristics or participant counts per arm are explicitly reported.
 - If the paper describes one cohort/resource population without explicit participant-level subgrouping -> {"subpopulations": []}.
 - pid: only if explicitly stated for the subpopulation; else null. Do NOT invent.
 - description (required): 1–3 sentences describing the subpopulation using paper wording; no inference.
@@ -789,6 +790,8 @@ number_of_participants
 Definition: total number of individuals for which data is collected (resource-level).
 Rules:
 - Use ONLY if the paper explicitly states a total cohort/registry N (e.g., "N=...", "included ... participants").
+- If explicitly approximate wording is used for total N (e.g., "around", "approximately", "about", "circa", "~"),
+  convert to nearest integer and use it.
 - Do NOT reuse event-level N (baseline visit N, follow-up N).
 - If multiple totals exist (e.g., different timepoints), pick ONLY the one explicitly described as the overall cohort size;
   otherwise return null.
@@ -1155,6 +1158,8 @@ Question:
 Rules:
 - true ONLY if the PDF explicitly states that the data ARE ALREADY LINKED
   (e.g. “data were linked to registry X”, “pre-linked with hospital records”).
+- Also set true for explicit present-tense operational linkage statements
+  (e.g., "is evaluated monthly by linkage to ...", "data are linked to ...").
 - false ONLY if the PDF explicitly states data are NOT linked.
 - If linkage status is not explicitly stated -> null.
 
@@ -1183,6 +1188,7 @@ Question:
 Rules:
 - true ONLY if the PDF explicitly states that linkage IS POSSIBLE
   (e.g. “can be linked”, “linkage is possible”, “allows linkage with…”).
+- Statements like "can also be linked to other sources of data" map to true.
 - false ONLY if the PDF explicitly states linkage is NOT possible.
 - If not explicitly stated -> null.
 
@@ -1527,6 +1533,7 @@ Rules:
 - true ONLY if the PDF explicitly states a fee/cost/charge is required for access.
 - false ONLY if explicitly states no fee / free of charge.
 - Treat wording like "external parties will be asked to cover expenses/running costs" as true.
+- Treat wording like "a cost will need to be charged" as true.
 - If not explicit -> null.
 
 --------------------------------------------------
