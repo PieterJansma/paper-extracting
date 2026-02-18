@@ -326,6 +326,8 @@ Rules:
 - Evidence threshold: only output a subpopulation when the paper explicitly frames a distinct subgroup
   (e.g., "subpopulation", "arm", "group", "stratum", "intervention arm", "control arm", "derivation/validation cohort").
 - Do NOT create subpopulations from generic site lists, acknowledgements, or overall trial logistics.
+- Do NOT create subpopulations from care-pathway strategy descriptions unless participant-level grouping is explicit.
+- If the paper describes one cohort/resource population without explicit participant-level subgrouping -> {"subpopulations": []}.
 - pid: only if explicitly stated for the subpopulation; else null. Do NOT invent.
 - description (required): 1–3 sentences describing the subpopulation using paper wording; no inference.
 - keywords (required): 5–12 terms to improve findability; try NOT to reuse words from description; no generic filler.
@@ -397,13 +399,16 @@ GLOBAL RULES
 - No placeholders ("Unknown", "N/A", "Not specified"). Use null or [].
 - Do NOT invent events.
 - Use paper wording as much as possible (verbatim or near-verbatim).
-- Do NOT convert generic trial timelines into collection events unless those timepoints are explicitly data-collection events.
+- Event evidence threshold:
+  - If a schedule/table/figure explicitly lists timepoints with measurements/questionnaires/assessments, treat each explicit timepoint as a collection event.
+  - If only generic follow-up duration is stated without explicit measurement moments, do NOT create events.
 
 --------------------------------------------------
 name (REQUIRED)
 --------------------------------------------------
 - Use explicit event labels from the paper (e.g., "baseline", "6-month follow-up", "T0", "visit 1").
 - If an event is clearly described but unnamed, you MAY create a minimal label using ONLY explicit timing wording (e.g., "Baseline", "Follow-up at 6 months").
+- For schedule tables (e.g., columns like baseline / 6 / 12 / 24 months), use those explicit column/timepoint labels as event names.
 - If you cannot produce a label from explicit wording -> do not output that event.
 
 --------------------------------------------------
@@ -416,6 +421,7 @@ description (REQUIRED)
 --------------------------------------------------
 - 1–3 sentences describing what is collected/done in this event, using paper wording.
 - No inference.
+- If a table/schedule is the source, summarize only explicitly marked measurements for that timepoint.
 
 --------------------------------------------------
 subpopulations
@@ -451,6 +457,7 @@ number_of_participants
 - Only if the paper explicitly gives the N for THIS event/wave.
 - Do NOT reuse total cohort size.
 - Else null.
+- If the same participant set is implied but event-specific N is not explicitly provided -> null.
 
 --------------------------------------------------
 areas_of_information (STRICT UI top-level categories)
@@ -506,6 +513,10 @@ Use ONLY these exact strings if explicitly supported by the paper:
 
 Rules:
 - Add items ONLY if explicitly stated for this event.
+- For schedule-based evidence:
+  - questionnaires/PROs -> "Survey data"
+  - EHR/clinical record extraction -> "Medical records"
+  - biospecimen collection explicitly listed -> "Biological samples"
 - If "Other" is included -> fill data_categories_other with exact wording from the paper.
 - Otherwise data_categories_other = null.
 - If not explicit -> [].
@@ -981,7 +992,9 @@ Rules:
 - Fill ONLY if the PDF explicitly mentions linkable or linked external resources
   (e.g. named registries, databases, administrative records).
 - Use short verbatim or near-verbatim wording.
-- Do NOT list variables or outcomes (e.g. mortality, survival).
+- Include ONLY source-system names/types (e.g., municipal registry, pharmacy database, national registry).
+- Do NOT list variables, endpoints, outcomes, or derived measures
+  (e.g., mortality, survival, quality of life, risk factors).
 - If multiple sources are mentioned, combine into a single string separated by "; ".
 - If nothing explicit -> null.
 
@@ -1067,8 +1080,14 @@ GLOBAL RULES
 --------------------------------------------------
 publications (table; Publications)
 --------------------------------------------------
-- Output one row per publication ABOUT this resource only if explicitly indicated.
-- If no explicit publications are provided -> [].
+- Output one row per publication ABOUT this resource when supported by explicit bibliographic evidence.
+- If no publication evidence is present -> [].
+
+Evidence policy (important):
+- The current paper itself MAY be included as a publication row if:
+  - it is clearly about the resource/cohort/biobank (title/abstract/scope), AND
+  - DOI and title are explicitly present.
+- Do not require a separate "publications list" section when the paper itself is an explicit resource/design/protocol publication.
 
 Fields:
 - doi (REQUIRED):
@@ -1079,7 +1098,8 @@ Fields:
     Only if explicitly provided as a publication title.
 
 - is_design_publication (boolean|null):
-    true ONLY if explicitly stated as design/marker/design paper/publication describing design of the cohort.
+    true if the publication is explicitly a protocol/design/marker paper for the resource
+    (e.g., title includes "protocol", "design", "cohort profile", or equivalent explicit wording).
     false ONLY if explicitly stated as NOT design publication.
     If not explicit -> null.
 
@@ -1342,6 +1362,9 @@ Allowed values (exact strings only):
 Rules:
 - Set ONLY if the PDF explicitly states the release cycle of the resource or dataset updates.
 - Do NOT infer release type from recruitment period or follow-up schedule.
+- Do NOT infer release type from ongoing data collection, hospital embedding, governance setup, or long-term project duration.
+- "Continuous" requires explicit wording equivalent to continuous/real-time/ongoing release or update cadence.
+- "Periodically"/"Annually" require explicit cadence wording.
 - If the release cycle is explicitly stated but does not match allowed values:
     -> set "Other release type" and describe the exact wording in release_description.
 
