@@ -394,6 +394,7 @@ SCOPE
 - A "collection event" is a distinct data-collection moment/wave/round/visit (e.g., baseline, follow-up, questionnaire wave).
 - Extract ONLY events explicitly described in the paper.
 - If no explicit events are described -> {"collection_events": []}.
+- Return at most 10 collection events (prefer the most explicitly described/core events if more are mentioned).
 
 GLOBAL RULES
 - No placeholders ("Unknown", "N/A", "Not specified"). Use null or [].
@@ -419,7 +420,7 @@ pid
 --------------------------------------------------
 description (REQUIRED)
 --------------------------------------------------
-- 1–3 sentences describing what is collected/done in this event, using paper wording.
+- Max 1 concise sentence describing what is collected/done in this event, using paper wording.
 - No inference.
 - If a table/schedule is the source, summarize only explicitly marked measurements for that timepoint.
 
@@ -433,7 +434,7 @@ subpopulations
 --------------------------------------------------
 keywords (REQUIRED)
 --------------------------------------------------
-- 5–12 terms to improve findability of THIS collection event.
+- 3–5 terms to improve findability of THIS collection event.
 - Must be verbatim terms from the paper (no invented synonyms).
 - No generic filler.
 
@@ -524,7 +525,7 @@ Rules:
 --------------------------------------------------
 standardized_tools / standardized_tools_other
 --------------------------------------------------
-- standardized_tools: list explicit questionnaire/instrument/tool names used in THIS event.
+- standardized_tools: list explicit questionnaire/instrument/tool names used in THIS event (max 5).
 - Do NOT invent.
 - standardized_tools_other must be null unless standardized_tools includes "Other".
 - If no explicit tools -> [] and standardized_tools_other = null.
@@ -532,7 +533,7 @@ standardized_tools / standardized_tools_other
 --------------------------------------------------
 core_variables
 --------------------------------------------------
-- List 10–20 variable names ONLY if the paper explicitly lists them for this event.
+- List up to 8 variable names ONLY if the paper explicitly lists them for this event.
 - If not explicitly enumerated -> [] (do NOT guess).
 
 --------------------------------------------------
