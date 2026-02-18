@@ -325,7 +325,9 @@ If none are explicitly defined -> {"subpopulations": []}.
 Rules:
 - Evidence threshold: only output a subpopulation when the paper explicitly frames a distinct subgroup
   (e.g., "subpopulation", "arm", "group", "stratum", "intervention arm", "control arm", "derivation/validation cohort").
+- Subpopulation must be participant-level (people/patients/participants), not site-level units.
 - Do NOT create subpopulations from generic site lists, acknowledgements, or overall trial logistics.
+- Do NOT treat GP practices, hospitals, centers, or recruiting sites as subpopulations unless participants are explicitly grouped by those units.
 - Do NOT create subpopulations from care-pathway strategy descriptions unless participant-level grouping is explicit.
 - If the paper describes one cohort/resource population without explicit participant-level subgrouping -> {"subpopulations": []}.
 - pid: only if explicitly stated for the subpopulation; else null. Do NOT invent.
@@ -657,6 +659,7 @@ SCOPE
 - Output events only when at least one enrichment field has explicit evidence.
 - Prefer matching names from core events; do not create speculative new events.
 - If no enrichment evidence exists -> {"collection_events": []}.
+- Use short canonical event names so they can match D1 names (e.g., "Baseline", "6-month follow-up", "Year 1").
 
 GLOBAL RULES
 - No placeholders ("Unknown", "N/A", "Not specified"). Use null or [].
@@ -686,6 +689,7 @@ Rules:
 - Add only if explicit for THIS event.
 - Do not output subcategory labels.
 - If not explicit -> [].
+- If the paper states a measure is collected repeatedly across all follow-up waves/events, you may repeat the mapped category for each explicitly described event.
 
 data_categories (exact strings only)
 - "Biological samples"
@@ -704,6 +708,7 @@ data_categories (exact strings only)
 Rules:
 - Event-level explicit evidence only.
 - If "Other" is used, set data_categories_other with exact paper wording; otherwise null.
+- If the paper explicitly states one data source type applies to all measurements/events (e.g., all via questionnaires), you may apply it across all explicitly described events.
 
 standardized_tools / standardized_tools_other
 - standardized_tools: explicit tool names only (max 5), else [].
@@ -961,8 +966,10 @@ GLOBAL RULES
 name (REQUIRED)
 ----------------------------------------
 - Use an explicit dataset/table name ONLY if the PDF explicitly names it (e.g., “baseline dataset”, “harmonised dataset X”, “questionnaire dataset”).
-- If the PDF does not explicitly name datasets -> return {"datasets": []}.
-  (Do NOT create names like "Dataset 1".)
+- If no explicit "dataset" name is used, you may use an explicit data module/source label as dataset name
+  (e.g., "Quality of life questionnaires", "Clinical records", "Biobank samples", "Registry linkage data"),
+  but only when the label is clearly present in the paper text.
+- Do NOT create synthetic names like "Dataset 1".
 
 ----------------------------------------
 label
@@ -981,6 +988,10 @@ Allowed values (exact strings only):
 Rules:
 - Add a value ONLY if the PDF explicitly uses wording that maps directly to one of these.
 - If nothing explicit -> [].
+- Practical mapping:
+  - newly collected study/cohort data -> "Collected dataset"
+  - merged/combined/cross-source harmonized data -> "Harmonised dataset"
+  - explicit schema/model/standard for harmonization -> "Harmonisation schema"
 
 ----------------------------------------
 unit_of_observation (single select)
@@ -992,8 +1003,8 @@ unit_of_observation (single select)
 ----------------------------------------
 keywords
 ----------------------------------------
-- Only if explicitly listed for the dataset OR explicitly stated as tags/topics.
-- Must be verbatim terms from the PDF.
+- If not explicitly listed, extract up to 6 concise descriptive terms from explicit dataset/module wording in the paper.
+- Prefer specific terms over generic words.
 - Otherwise [].
 
 ----------------------------------------
@@ -1453,6 +1464,8 @@ Rules:
   - "for research purposes" / "for scientific research" (non-domain-specific) -> "general research use"
   - "for medical/health/biomedical research" -> "health or medical or biomedical research"
   - "restricted to [disease area]" -> "disease specific research"
+- If access requires proposal review and approval by a scientific/data-access board for defined study aims,
+  map to "health or medical or biomedical research" when domain is medical/biomedical.
 - If wording is ambiguous (e.g., only states study topic, not access scope), do not map.
 
 --------------------------------------------------
@@ -1490,6 +1503,7 @@ Rules:
   - non-commercial / not-for-profit limitation -> "not for profit, non commercial use only"
   - institution-only or user-group-only restriction -> "institution specific restriction" / "user specific restriction"
   - project-by-project approval language -> "project specific restriction"
+- If text states requests/proposals are reviewed and approved case-by-case, map "project specific restriction".
 - IMPORTANT: do not map participation criteria (e.g., patient informed consent at enrollment) to data_use_conditions
   unless the text explicitly frames them as conditions for external data reuse/access.
 
@@ -1512,6 +1526,7 @@ Allowed values:
 Rules:
 - true ONLY if the PDF explicitly states a fee/cost/charge is required for access.
 - false ONLY if explicitly states no fee / free of charge.
+- Treat wording like "external parties will be asked to cover expenses/running costs" as true.
 - If not explicit -> null.
 
 --------------------------------------------------
