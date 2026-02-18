@@ -895,6 +895,7 @@ Rules:
 - Apply the same mapping logic to BOTH inclusion_criteria and exclusion_criteria.
 - Important: although labels include the word "inclusion", they are category names used for exclusion_criteria as well.
 - If an explicit exclusion is present and maps to one of these categories, include the mapped category in exclusion_criteria.
+- Explicit safeguard: if exclusion text contains pregnancy/pregnant (e.g., "pregnancy" as exclusion), include "Gravidity inclusion criterion" in exclusion_criteria.
 - If multiple criterion types are explicitly present, include all matching labels (do not keep only one).
 - Do NOT infer from demographic descriptions.
 - If not explicit -> [].
@@ -1077,6 +1078,8 @@ sample_types
 ----------------------------------------
 - List biological sample types explicitly mentioned as being part of THIS sampleset (e.g., Blood, Serum, Plasma, Saliva, Urine, Tissue, DNA).
 - Use the exact wording from the PDF where possible.
+- Treat explicit wording like "DNA samples ... collected" as a sample type and include "DNA" in sample_types.
+- When the sampleset is an explicit biobank/biospecimen collection, aggregate all explicitly listed biospecimen types for that biobank section.
 - If the PDF does not list sample types for the named sampleset -> [].
 - If a biobank/sample collection is explicitly described and explicit sample types are listed, output it as a sampleset row.
 """
@@ -1337,6 +1340,7 @@ Fields:
     If a document is referenced generically (e.g., “study protocol”) without a name -> do NOT output a row.
     Do NOT create pseudo-document names from generic phrases ("information brochure", "informed consent form")
     unless the PDF explicitly presents them as named documents.
+    If text only says participants "receive" or "sign" a brochure/consent form, treat this as process evidence, NOT a named document row.
 
 - type (string|null):
     Only if the PDF explicitly labels the documentation type (e.g., “Harmonisation protocol”, “Informed consent”).
@@ -1371,6 +1375,8 @@ Allowed values (exact strings only):
 Rules:
 - Add values ONLY if explicitly stated as themes/categories.
 - Do NOT infer "Health" unless explicitly stated in the PDF.
+- Being a medical/clinical/biobank/cancer study is NOT sufficient evidence for theme.
+- If no explicit theme/category label appears, return [] (even when all content is health-related).
 NOTE: The UI sets a default, but extraction must not default. If not explicit -> [].
 
 --------------------------------------------------
