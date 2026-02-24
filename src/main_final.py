@@ -323,22 +323,247 @@ def _dedupe_keep_order(items: List[str]) -> List[str]:
     return out
 
 
+def _normalize_ws(text: str) -> str:
+    text = (
+        text
+        .replace("\u00ad", "")
+        .replace("\u00a0", " ")
+        .replace("\u2010", "-")
+        .replace("\u2011", "-")
+        .replace("\u2012", "-")
+        .replace("\u2013", "-")
+        .replace("\u2014", "-")
+    )
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _extract_first_doi(text: str) -> str | None:
+    m = re.search(r"\b10\.\d{4,9}/[-._;()/:A-Za-z0-9]+\b", text)
+    if not m:
+        return None
+    return m.group(0).rstrip(".,;:)")
+
+
+def _extract_participant_count_hint(text: str) -> int | None:
+    m = re.search(
+        r"\b(?:about|approximately|approx\.?|circa|around|at least)?\s*(\d{2,6})\s*"
+        r"(?:patients|participants)\s*(?:will be included|included)\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except Exception:
+        return None
+
+
+def _extract_dataset_name_hints(text: str, limit: int = 3) -> List[str]:
+    names: List[str] = []
+    seen = set()
+    for m in re.finditer(
+        r"\b([A-Za-z0-9][A-Za-z0-9'()/\- ]{0,60}\bdataset)\b",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        cand = _normalize_ws(m.group(1))
+        if len(cand) < 8:
+            continue
+        toks = cand.split()
+        if len(toks) > 6:
+            cand = " ".join(toks[-6:])
+        toks = cand.split()
+        while toks and toks[0].lower() in {"and", "or", "the", "a", "an", "of", "for", "in"}:
+            toks = toks[1:]
+        cand = " ".join(toks)
+        if cand.lower() in {"dataset", "data set"}:
+            continue
+        key = cand.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        names.append(cand)
+        if len(names) >= limit:
+            break
+    return names
+
+
+def _extract_sampleset_hints(text: str) -> Tuple[str | None, List[str]]:
+    name = None
+    for pat in [
+        r"\bbiological samples?\b",
+        r"\bbiomaterials?\b",
+        r"\bbiobank samples?\b",
+        r"\bdata-biobank\b",
+    ]:
+        m = re.search(pat, text, flags=re.IGNORECASE)
+        if m:
+            name = _normalize_ws(m.group(0))
+            break
+
+    terms: List[Tuple[str, str]] = [
+        ("bone marrow", "Bone marrow"),
+        ("whole blood", "Whole blood"),
+        ("blood", "Blood"),
+        ("serum", "Serum"),
+        ("plasma", "Plasma"),
+        ("urine", "Urine"),
+        ("saliva", "Saliva"),
+        ("tissue", "Tissue"),
+        ("feces", "Feces"),
+        ("stool", "Stool"),
+        ("dna", "DNA"),
+        ("rna", "RNA"),
+    ]
+    found: List[str] = []
+    for needle, label in terms:
+        if re.search(rf"\b{re.escape(needle)}\b", text, flags=re.IGNORECASE):
+            found.append(label)
+    return name, _dedupe_keep_order(found)
+
+
+def _repair_contact_point_from_people(result: Dict[str, Any]) -> None:
+    people = result.get("people_involved", [])
+    if not isinstance(people, list) or not people:
+        return
+
+    cp_first = str(result.get("contact_point_first_name") or "").strip()
+    cp_last = str(result.get("contact_point_last_name") or "").strip()
+    cp_email = str(result.get("contact_point_email") or "").strip().lower()
+
+    if len(cp_first) > 1:
+        return
+
+    for person in people:
+        if not isinstance(person, dict):
+            continue
+
+        p_first = str(person.get("first_name") or "").strip()
+        p_last = str(person.get("last_name") or "").strip()
+        p_email = str(person.get("email") or "").strip().lower()
+
+        if len(p_first) <= 1:
+            continue
+
+        if cp_email and p_email and cp_email == p_email:
+            result["contact_point_first_name"] = p_first
+            if not cp_last and p_last:
+                result["contact_point_last_name"] = p_last
+            return
+
+        if cp_last and p_last and cp_last.lower() == p_last.lower():
+            result["contact_point_first_name"] = p_first
+            if not cp_email and p_email:
+                result["contact_point_email"] = p_email
+            return
+
+
 def _postprocess_section_results(
     per_section_results: Dict[str, Dict[str, Any]],
     _paper_text: str,
 ) -> None:
+    paper_text = _normalize_ws(_paper_text)
+
     overview = per_section_results.get("task_overview")
     info = per_section_results.get("task_information")
+    population = per_section_results.get("task_population")
+    linkage = per_section_results.get("task_linkage")
+    access = per_section_results.get("task_access_conditions")
+    datasets = per_section_results.get("task_datasets")
+    samplesets = per_section_results.get("task_samplesets")
 
     health_context = False
     if isinstance(overview, dict):
         types = [x.lower() for x in _as_list_str(overview.get("type"))]
-        if any(x in types for x in ["clinical trial", "cohort study", "registry", "disease specific", "health records"]):
+        if any(x in types for x in ["clinical trial", "cohort study", "registry", "disease specific", "health records", "biobank"]):
             health_context = True
     if isinstance(info, dict):
         themes = [x.lower() for x in _as_list_str(info.get("theme"))]
         if "health" in themes:
             health_context = True
+
+    # Repair contact point name truncation from the extracted people list.
+    for contrib_key in ("task_contributors", "task_contributors_people"):
+        contrib = per_section_results.get(contrib_key)
+        if isinstance(contrib, dict):
+            _repair_contact_point_from_people(contrib)
+
+    # Fix obvious population contradictions and recover explicit participant counts.
+    if isinstance(population, dict):
+        groups = [x.lower() for x in _as_list_str(population.get("population_age_groups"))]
+        age_min = population.get("age_min")
+        try:
+            if "adult (18+ years)" in groups and age_min is not None and float(age_min) < 18:
+                population["age_min"] = None
+        except Exception:
+            pass
+
+        if _is_empty_value(population.get("number_of_participants")):
+            hinted_n = _extract_participant_count_hint(paper_text)
+            if hinted_n is not None:
+                population["number_of_participants"] = hinted_n
+
+    # If access wording says "available upon request", map to restricted access.
+    if isinstance(access, dict):
+        request_pat = r"available (?:upon|on) request|upon reasonable request|made available on request"
+        if _is_empty_value(access.get("access_rights")) and re.search(request_pat, paper_text, flags=re.IGNORECASE):
+            access["access_rights"] = "Restricted access"
+        if _is_empty_value(access.get("data_access_conditions_description")):
+            m = re.search(rf"[^.]*({request_pat})[^.]*\.", paper_text, flags=re.IGNORECASE)
+            if m:
+                access["data_access_conditions_description"] = _normalize_ws(m.group(0))[:400]
+
+    # Clean linkage_options: keep only source-like entries, drop outcomes.
+    if isinstance(linkage, dict):
+        opts = linkage.get("linkage_options")
+        if isinstance(opts, str) and opts.strip():
+            parts = [p.strip() for p in re.split(r"[;,]", opts) if p.strip()]
+            cleaned = [
+                p for p in parts
+                if not re.search(r"\b(survival|mortality|outcome|response|recurrence)\b", p, flags=re.IGNORECASE)
+            ]
+            linkage["linkage_options"] = "; ".join(_dedupe_keep_order(cleaned)) if cleaned else None
+
+    # Recover datasets from explicit "... dataset" phrases when extraction returns empty.
+    if isinstance(datasets, dict):
+        ds_items = datasets.get("datasets")
+        if isinstance(ds_items, list) and not ds_items:
+            names = _extract_dataset_name_hints(paper_text)
+            if names:
+                datasets["datasets"] = [
+                    {
+                        "name": nm,
+                        "label": None,
+                        "dataset_type": [],
+                        "unit_of_observation": None,
+                        "keywords": [],
+                        "description": None,
+                        "number_of_rows": None,
+                        "since_version": None,
+                        "until_version": None,
+                    }
+                    for nm in names
+                ]
+
+    # Recover one sampleset from explicit sample-type evidence when empty.
+    if isinstance(samplesets, dict):
+        ss_items = samplesets.get("samplesets")
+        if isinstance(ss_items, list) and not ss_items:
+            ss_name, ss_types = _extract_sampleset_hints(paper_text)
+            if ss_name and ss_types:
+                samplesets["samplesets"] = [
+                    {
+                        "name": ss_name,
+                        "sample_types": ss_types,
+                    }
+                ]
+
+    # Fill missing PID with the first explicit DOI (if present).
+    if isinstance(overview, dict) and _is_empty_value(overview.get("pid")):
+        doi = _extract_first_doi(paper_text)
+        if doi:
+            overview["pid"] = doi
 
     # ------------------------------------------------------------------
     # PASS X3 fallback: derive resource-level areas from collection events
@@ -358,6 +583,9 @@ def _postprocess_section_results(
     # PASS H default: Data Governance Act for health resources
     # ------------------------------------------------------------------
     if isinstance(info, dict):
+        if health_context and not _as_list_str(info.get("theme")):
+            info["theme"] = ["Health"]
+
         # Remove common article-editorial text that is not resource provenance.
         prov = str(info.get("provenance_statement") or "").strip().lower()
         if prov and ("not commissioned" in prov or "peer reviewed" in prov):
@@ -366,6 +594,21 @@ def _postprocess_section_results(
         laws = _as_list_str(info.get("applicable_legislation"))
         if health_context and "data governance act" not in [x.lower() for x in laws]:
             info["applicable_legislation"] = _dedupe_keep_order(laws + ["Data Governance Act"])
+
+        # If name mirrors article title and does not look like a resource label, drop it.
+        if isinstance(overview, dict):
+            ov_name = str(overview.get("name") or "").strip()
+            pub_titles = {
+                str(p.get("title") or "").strip().lower()
+                for p in (info.get("publications") or [])
+                if isinstance(p, dict)
+            }
+            if (
+                ov_name
+                and ov_name.lower() in pub_titles
+                and not re.search(r"\b(study|cohort|biobank|registry|trial|database|databank|network)\b", ov_name, flags=re.IGNORECASE)
+            ):
+                overview["name"] = None
 
     # Keep legislation policy consistent in list sheets when context is health.
     if health_context:

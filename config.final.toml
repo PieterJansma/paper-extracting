@@ -77,6 +77,8 @@ pid / name / local_name / acronym
 - name:
   Only if the text explicitly labels a resource name (e.g. "<name> study/cohort/registry").
   Article title alone ≠ resource name.
+  If the candidate equals the full paper/article title and is not explicitly labeled as a resource name,
+  set name = null.
 
 - local_name:
   Only if explicitly stated as a local or participant-facing name.
@@ -770,8 +772,10 @@ GLOBAL RULES
 name (REQUIRED)
 ----------------------------------------
 - Use an explicit dataset/table name ONLY if the PDF explicitly names it (e.g., “baseline dataset”, “harmonised dataset X”, “questionnaire dataset”).
-- If the PDF does not explicitly name datasets -> return {"datasets": []}.
-  (Do NOT create names like "Dataset 1".)
+- If there is no formal dataset name, but the PDF explicitly mentions a concrete dataset phrase
+  containing "dataset"/"data set" (or a named registry dataset), you MAY use that explicit phrase as name.
+- If neither exists -> return {"datasets": []}.
+  (Do NOT create generic names like "Dataset 1".)
 
 ----------------------------------------
 label
@@ -862,8 +866,11 @@ GLOBAL RULES
 name (REQUIRED)
 ----------------------------------------
 - Use an explicit sample set name ONLY if the PDF explicitly names it (e.g., “Blood samples”, “Biobank sampleset”, “DNA collection”).
-- If no explicit sampleset name exists -> return {"samplesets": []}.
-  (Do NOT create “Sampleset 1”.)
+- If no formal sampleset name exists, but the PDF explicitly uses a grouping phrase
+  such as "biological samples", "biomaterials", or "biobank samples",
+  you MAY use that explicit phrase as name.
+- If nothing explicit exists -> return {"samplesets": []}.
+  (Do NOT create generic names like “Sampleset 1”.)
 
 ----------------------------------------
 sample_types
@@ -1029,6 +1036,8 @@ publications (table; Publications)
 --------------------------------------------------
 - Output one row per publication ABOUT this resource only if explicitly indicated.
 - If no explicit publications are provided -> [].
+- If the current paper itself is a cohort/profile/protocol/methods publication describing this resource
+  and the header provides DOI + title, include one publication row for this paper.
 
 Fields:
 - doi (REQUIRED):
@@ -1170,6 +1179,8 @@ Rules:
 - "Open access" ONLY if explicitly stated data are publicly accessible without restrictions.
 - "Restricted access" ONLY if explicitly stated access requires approval/application/DAC/contract.
 - "Non public" ONLY if explicitly stated as not publicly accessible or closed.
+- Statements like "data available on/upon request" or "available from corresponding author on reasonable request"
+  count as "Restricted access".
 - If not explicitly stated -> null.
 NOTE: The UI may default to non-public, but extraction must not default; only extract explicit statements.
 - IMPORTANT: publication status text (e.g., "Open access article", CC-BY license for the paper) is NOT evidence
