@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
+import shutil
+import subprocess
+import tempfile
 from typing import Optional, Dict, Any, List, Tuple, Union
 
 from pypdf import PdfReader
@@ -20,6 +24,7 @@ SYSTEM_EXTRACT_MSG = (
     "You are `Qwen`. Extract structured data as JSON only. "
     "Do not output markdown fences or explanations."
 )
+OCR_FALLBACK_MIN_CHARS = 3000
 
 
 # ==============================================================================
@@ -27,9 +32,44 @@ SYSTEM_EXTRACT_MSG = (
 # ==============================================================================
 
 def load_pdf_text(path: str, max_pages: Optional[int] = None) -> str:
-    """Load text from PDF, optionally limiting pages."""
+    """
+    Load text from PDF, optionally limiting pages.
+
+    OCR fallback is attempted only when extracted text is very short
+    (< OCR_FALLBACK_MIN_CHARS), because OCR is much slower.
+    """
     if not path:
         return ""
+    text = _load_pdf_text_pypdf(path, max_pages=max_pages)
+    if len(text.strip()) >= OCR_FALLBACK_MIN_CHARS:
+        return text
+
+    # OCR fallback is intentionally conservative because it is expensive.
+    log.warning(
+        "Low extracted text from PDF (%d chars). Trying OCR fallback for %s.",
+        len(text.strip()),
+        path,
+    )
+    ocr_text = _load_pdf_text_with_ocr(path, max_pages=max_pages)
+    if not ocr_text:
+        return text
+
+    if len(ocr_text.strip()) > len(text.strip()):
+        log.info(
+            "OCR fallback improved extracted text size: %d -> %d chars for %s.",
+            len(text.strip()),
+            len(ocr_text.strip()),
+            path,
+        )
+        return ocr_text
+
+    # Keep OCR text when initial extraction was effectively empty.
+    if not text.strip() and ocr_text.strip():
+        return ocr_text
+    return text
+
+
+def _load_pdf_text_pypdf(path: str, max_pages: Optional[int] = None) -> str:
     try:
         reader = PdfReader(path)
     except Exception as e:
@@ -38,7 +78,6 @@ def load_pdf_text(path: str, max_pages: Optional[int] = None) -> str:
 
     pages = reader.pages[:max_pages] if max_pages else reader.pages
     texts: List[str] = []
-
     for i, p in enumerate(pages):
         try:
             extracted = p.extract_text()
@@ -46,8 +85,44 @@ def load_pdf_text(path: str, max_pages: Optional[int] = None) -> str:
                 texts.append(extracted)
         except Exception as e:
             log.warning("Page %d could not be extracted: %s", i + 1, e)
-
     return "\n\n".join(texts)
+
+
+def _load_pdf_text_with_ocr(path: str, max_pages: Optional[int] = None) -> str:
+    ocrmypdf_bin = shutil.which("ocrmypdf")
+    if not ocrmypdf_bin:
+        log.warning("OCR fallback skipped: 'ocrmypdf' not found in PATH.")
+        return ""
+
+    tmp_out = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+    tmp_out_path = tmp_out.name
+    tmp_out.close()
+
+    try:
+        # --skip-text avoids re-OCR on text PDFs while still handling scanned pages.
+        cmd = [
+            ocrmypdf_bin,
+            "--skip-text",
+            "--rotate-pages",
+            "--deskew",
+            "--quiet",
+            path,
+            tmp_out_path,
+        ]
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        return _load_pdf_text_pypdf(tmp_out_path, max_pages=max_pages)
+    except subprocess.CalledProcessError as e:
+        err = (e.stderr or e.stdout or "").strip()
+        log.warning("OCR fallback failed for %s: %s", path, err[:500])
+        return ""
+    except Exception as e:
+        log.warning("OCR fallback failed for %s: %s", path, e)
+        return ""
+    finally:
+        try:
+            os.remove(tmp_out_path)
+        except Exception:
+            pass
 
 
 # ==============================================================================

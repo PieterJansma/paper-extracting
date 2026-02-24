@@ -129,6 +129,9 @@ Long-paper tuning (optional, in `[llm]`):
   - verify `[llm]` in `config.final.toml` or `PDF_EXTRACT_CONFIG`
 - PDF not found:
   - fix `[pdf].path` or use `--pdfs`
+- Scanned/image PDF gives almost no text:
+  - OCR fallback runs only when extracted text is under 3000 chars
+  - install `ocrmypdf` on cluster/node to enable OCR fallback
 - Excel writer error:
   - install `openpyxl` or `xlsxwriter`
 
