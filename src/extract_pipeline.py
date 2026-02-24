@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import io
 import json
 import logging
 import os
@@ -10,6 +12,7 @@ import tempfile
 from typing import Optional, Dict, Any, List, Tuple, Union
 
 from pypdf import PdfReader
+import requests
 
 from llm_client import OpenAICompatibleClient
 
@@ -26,6 +29,19 @@ SYSTEM_EXTRACT_MSG = (
 )
 OCR_FALLBACK_MIN_CHARS = 3000
 LOW_QUALITY_ALNUM_RATIO = 0.35
+OCR_VLM_DEFAULT_MAX_PAGES = 3
+OCR_VLM_DEFAULT_TIMEOUT = 180
+OCR_VLM_DEFAULT_MAX_TOKENS = 4000
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except Exception:
+        return default
 
 
 # ==============================================================================
@@ -36,8 +52,15 @@ def load_pdf_text(path: str, max_pages: Optional[int] = None) -> str:
     """
     Load text from PDF, optionally limiting pages.
 
-    OCR fallback is attempted only when extracted text is very short
-    (< OCR_FALLBACK_MIN_CHARS), because OCR is much slower.
+    Fallback order:
+    1) pypdf default extraction
+    2) pypdf layout extraction
+    3) OCR fallback chain:
+       - ocrmypdf (if available)
+       - vision LLM OCR (if configured, e.g. GLM OCR endpoint)
+
+    OCR fallback is attempted only when extracted text quality is low
+    (including < OCR_FALLBACK_MIN_CHARS), because OCR is much slower.
     """
     if not path:
         return ""
@@ -150,6 +173,17 @@ def _load_pdf_text_pypdf(
 
 
 def _load_pdf_text_with_ocr(path: str, max_pages: Optional[int] = None) -> str:
+    ocrmypdf_text = _load_pdf_text_with_ocrmypdf(path, max_pages=max_pages)
+    if ocrmypdf_text and not _needs_text_fallback(ocrmypdf_text):
+        return ocrmypdf_text
+
+    # Optional second OCR backend via OpenAI-compatible vision model.
+    # This supports setups like GLM OCR when configured through env vars.
+    vlm_text = _load_pdf_text_with_vlm_ocr(path, max_pages=max_pages)
+    return _pick_better_text(ocrmypdf_text, vlm_text, "ocrmypdf", "vlm_ocr")
+
+
+def _load_pdf_text_with_ocrmypdf(path: str, max_pages: Optional[int] = None) -> str:
     ocrmypdf_bin = shutil.which("ocrmypdf")
     if not ocrmypdf_bin:
         log.warning("OCR fallback skipped: 'ocrmypdf' not found in PATH.")
@@ -184,6 +218,239 @@ def _load_pdf_text_with_ocr(path: str, max_pages: Optional[int] = None) -> str:
             os.remove(tmp_out_path)
         except Exception:
             pass
+
+
+def _load_pdf_text_with_vlm_ocr(path: str, max_pages: Optional[int] = None) -> str:
+    base_url = (os.getenv("OCR_VLM_BASE_URL") or "").strip()
+    model = (os.getenv("OCR_VLM_MODEL") or "").strip()
+    api_key = (os.getenv("OCR_VLM_API_KEY") or "").strip()
+    timeout = max(30, _env_int("OCR_VLM_TIMEOUT_SEC", OCR_VLM_DEFAULT_TIMEOUT))
+    max_tokens = max(256, _env_int("OCR_VLM_MAX_TOKENS", OCR_VLM_DEFAULT_MAX_TOKENS))
+    configured_page_limit = max(1, _env_int("OCR_VLM_MAX_PAGES", OCR_VLM_DEFAULT_MAX_PAGES))
+
+    if not base_url or not model:
+        log.warning(
+            "Vision OCR fallback skipped: set OCR_VLM_BASE_URL and OCR_VLM_MODEL "
+            "to enable vision OCR (e.g. GLM OCR endpoint)."
+        )
+        return ""
+
+    if max_pages and max_pages > 0:
+        page_limit = min(int(max_pages), configured_page_limit)
+    else:
+        page_limit = configured_page_limit
+
+    page_images = _render_pdf_pages_to_png(path, page_limit=page_limit)
+    if not page_images:
+        log.warning("Vision OCR fallback skipped: no rendered page images for %s.", path)
+        return ""
+
+    url = _with_v1(base_url) + "/chat/completions"
+    headers: Dict[str, str] = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    page_texts: List[str] = []
+    total_pages = len(page_images)
+    for idx, img_bytes in enumerate(page_images, start=1):
+        b64 = base64.b64encode(img_bytes).decode("ascii")
+        payload: Dict[str, Any] = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an OCR engine. Return only transcribed text. "
+                        "No summary, no JSON, no markdown."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                f"Transcribe this PDF page ({idx}/{total_pages}) verbatim. "
+                                "Keep headings and table values as plain text."
+                            ),
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{b64}"},
+                        },
+                    ],
+                },
+            ],
+            "temperature": 0.0,
+            "max_tokens": int(max_tokens),
+            "stream": False,
+        }
+
+        page_txt = ""
+        last_err: Optional[str] = None
+        for attempt in range(2):
+            try:
+                resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
+                if resp.status_code >= 400:
+                    body = (resp.text or "")[:600]
+                    last_err = f"HTTP {resp.status_code}: {body}"
+                    if attempt == 0 and 500 <= resp.status_code < 600:
+                        continue
+                    break
+                data = resp.json()
+                page_txt = _extract_chat_content_text(data)
+                if page_txt.strip():
+                    break
+            except Exception as e:
+                last_err = str(e)
+
+        if not page_txt.strip():
+            log.warning(
+                "Vision OCR page %d/%d failed for %s: %s",
+                idx,
+                total_pages,
+                path,
+                last_err or "empty response",
+            )
+            continue
+
+        page_texts.append(page_txt.strip())
+
+    return "\n\n".join(page_texts)
+
+
+def _extract_chat_content_text(data: Dict[str, Any]) -> str:
+    choices = data.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return ""
+    first = choices[0] if isinstance(choices[0], dict) else {}
+    msg = first.get("message") if isinstance(first, dict) else {}
+    if not isinstance(msg, dict):
+        return ""
+    content = msg.get("content", "")
+
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: List[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+                continue
+            if not isinstance(item, dict):
+                continue
+            txt = item.get("text")
+            if isinstance(txt, str):
+                parts.append(txt)
+        return "\n".join(p for p in parts if p and p.strip())
+    return str(content) if content is not None else ""
+
+
+def _with_v1(base_url: str) -> str:
+    base = (base_url or "").rstrip("/")
+    return base if base.endswith("/v1") else base + "/v1"
+
+
+def _render_pdf_pages_to_png(path: str, page_limit: int) -> List[bytes]:
+    page_limit = max(1, int(page_limit))
+
+    imgs = _render_pdf_pages_to_png_pdfium(path, page_limit)
+    if imgs:
+        return imgs
+
+    imgs = _render_pdf_pages_to_png_pdftoppm(path, page_limit)
+    if imgs:
+        return imgs
+
+    return []
+
+
+def _render_pdf_pages_to_png_pdfium(path: str, page_limit: int) -> List[bytes]:
+    try:
+        import pypdfium2 as pdfium  # type: ignore
+    except Exception:
+        return []
+
+    out: List[bytes] = []
+    try:
+        doc = pdfium.PdfDocument(path)
+        total = len(doc)
+        limit = min(total, page_limit)
+        for i in range(limit):
+            page = doc[i]
+            try:
+                bitmap = page.render(scale=2.0)
+                pil = bitmap.to_pil()
+                buf = io.BytesIO()
+                pil.save(buf, format="PNG")
+                out.append(buf.getvalue())
+            finally:
+                try:
+                    page.close()
+                except Exception:
+                    pass
+        try:
+            doc.close()
+        except Exception:
+            pass
+    except Exception as e:
+        log.warning("Vision OCR render with pypdfium2 failed for %s: %s", path, e)
+        return []
+
+    return out
+
+
+def _render_pdf_pages_to_png_pdftoppm(path: str, page_limit: int) -> List[bytes]:
+    pdftoppm_bin = shutil.which("pdftoppm")
+    if not pdftoppm_bin:
+        return []
+
+    with tempfile.TemporaryDirectory(prefix="ocr_pages_") as tmpdir:
+        prefix = os.path.join(tmpdir, "page")
+        cmd = [
+            pdftoppm_bin,
+            "-r",
+            "220",
+            "-png",
+            "-f",
+            "1",
+            "-l",
+            str(page_limit),
+            path,
+            prefix,
+        ]
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as e:
+            err = (e.stderr or e.stdout or "").strip()
+            log.warning("Vision OCR render with pdftoppm failed for %s: %s", path, err[:500])
+            return []
+        except Exception as e:
+            log.warning("Vision OCR render with pdftoppm failed for %s: %s", path, e)
+            return []
+
+        def _page_sort_key(name: str) -> Tuple[int, str]:
+            m = re.search(r"-(\d+)\.png$", name.lower())
+            if m:
+                return (int(m.group(1)), name)
+            return (10**9, name)
+
+        names = sorted(
+            (n for n in os.listdir(tmpdir) if n.lower().endswith(".png")),
+            key=_page_sort_key,
+        )
+        out: List[bytes] = []
+        for name in names:
+            p = os.path.join(tmpdir, name)
+            try:
+                with open(p, "rb") as f:
+                    out.append(f.read())
+            except Exception:
+                continue
+        return out
 
 
 # ==============================================================================
