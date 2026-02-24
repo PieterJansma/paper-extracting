@@ -25,6 +25,7 @@ SYSTEM_EXTRACT_MSG = (
     "Do not output markdown fences or explanations."
 )
 OCR_FALLBACK_MIN_CHARS = 3000
+LOW_QUALITY_ALNUM_RATIO = 0.35
 
 
 # ==============================================================================
@@ -41,35 +42,89 @@ def load_pdf_text(path: str, max_pages: Optional[int] = None) -> str:
     if not path:
         return ""
     text = _load_pdf_text_pypdf(path, max_pages=max_pages)
-    if len(text.strip()) >= OCR_FALLBACK_MIN_CHARS:
+    if not _needs_text_fallback(text):
         return text
 
-    # OCR fallback is intentionally conservative because it is expensive.
+    # First fallback: alternative pypdf extraction mode (no external tools required).
     log.warning(
-        "Low extracted text from PDF (%d chars). Trying OCR fallback for %s.",
+        "Primary extraction looks weak (%d chars, alnum_ratio=%.2f). "
+        "Trying pypdf layout fallback for %s.",
         len(text.strip()),
+        _alnum_ratio(text),
+        path,
+    )
+    layout_text = _load_pdf_text_pypdf(path, max_pages=max_pages, layout_mode=True)
+    text = _pick_better_text(text, layout_text, "default", "layout")
+    if not _needs_text_fallback(text):
+        return text
+
+    # OCR fallback is intentionally conservative because it is expensive
+    # and depends on external binaries.
+    log.warning(
+        "Text still weak after layout fallback (%d chars, alnum_ratio=%.2f). "
+        "Trying OCR fallback for %s.",
+        len(text.strip()),
+        _alnum_ratio(text),
         path,
     )
     ocr_text = _load_pdf_text_with_ocr(path, max_pages=max_pages)
-    if not ocr_text:
-        return text
+    return _pick_better_text(text, ocr_text, "pre_ocr", "ocr")
 
-    if len(ocr_text.strip()) > len(text.strip()):
+
+def _alnum_ratio(text: str) -> float:
+    t = text.strip()
+    if not t:
+        return 0.0
+    alnum = sum(1 for ch in t if ch.isalnum())
+    return alnum / len(t)
+
+
+def _text_quality_score(text: str) -> float:
+    t = text.strip()
+    if not t:
+        return 0.0
+    alnum = sum(1 for ch in t if ch.isalnum())
+    words = re.findall(r"[A-Za-z]{2,}", t)
+    unique_words = min(len(set(w.lower() for w in words)), 2000)
+    # Prefer text with real lexical content over symbol-heavy noise.
+    return float(alnum) + 10.0 * float(len(words)) + 2.0 * float(unique_words)
+
+
+def _needs_text_fallback(text: str) -> bool:
+    t = text.strip()
+    if len(t) < OCR_FALLBACK_MIN_CHARS:
+        return True
+    if _alnum_ratio(t) < LOW_QUALITY_ALNUM_RATIO:
+        return True
+    return False
+
+
+def _pick_better_text(current: str, candidate: str, current_name: str, candidate_name: str) -> str:
+    if not candidate or not candidate.strip():
+        return current
+
+    cur_score = _text_quality_score(current)
+    cand_score = _text_quality_score(candidate)
+    if cand_score > cur_score:
         log.info(
-            "OCR fallback improved extracted text size: %d -> %d chars for %s.",
-            len(text.strip()),
-            len(ocr_text.strip()),
-            path,
+            "Text fallback improved quality (%s -> %s): chars %d -> %d, score %.1f -> %.1f.",
+            current_name,
+            candidate_name,
+            len(current.strip()),
+            len(candidate.strip()),
+            cur_score,
+            cand_score,
         )
-        return ocr_text
-
-    # Keep OCR text when initial extraction was effectively empty.
-    if not text.strip() and ocr_text.strip():
-        return ocr_text
-    return text
+        return candidate
+    return current
 
 
-def _load_pdf_text_pypdf(path: str, max_pages: Optional[int] = None) -> str:
+def _load_pdf_text_pypdf(
+    path: str,
+    max_pages: Optional[int] = None,
+    *,
+    layout_mode: bool = False,
+) -> str:
     try:
         reader = PdfReader(path)
     except Exception as e:
@@ -80,7 +135,13 @@ def _load_pdf_text_pypdf(path: str, max_pages: Optional[int] = None) -> str:
     texts: List[str] = []
     for i, p in enumerate(pages):
         try:
-            extracted = p.extract_text()
+            if layout_mode:
+                try:
+                    extracted = p.extract_text(extraction_mode="layout")
+                except TypeError:
+                    extracted = p.extract_text()
+            else:
+                extracted = p.extract_text()
             if extracted:
                 texts.append(extracted)
         except Exception as e:

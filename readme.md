@@ -130,7 +130,8 @@ Long-paper tuning (optional, in `[llm]`):
 - PDF not found:
   - fix `[pdf].path` or use `--pdfs`
 - Scanned/image PDF gives almost no text:
-  - OCR fallback runs only when extracted text is under 3000 chars
+  - fallback order is: normal pypdf -> pypdf layout mode -> OCR fallback
+  - OCR fallback runs only when extracted text quality is still low (including under 3000 chars)
   - install `ocrmypdf` on cluster/node to enable OCR fallback
 - Excel writer error:
   - install `openpyxl` or `xlsxwriter`
