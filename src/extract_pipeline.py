@@ -55,9 +55,7 @@ def load_pdf_text(path: str, max_pages: Optional[int] = None) -> str:
     Fallback order:
     1) pypdf default extraction
     2) pypdf layout extraction
-    3) OCR fallback chain:
-       - ocrmypdf (if available)
-       - vision LLM OCR (if configured, e.g. GLM OCR endpoint)
+    3) vision LLM OCR fallback (if configured, e.g. GLM OCR endpoint)
 
     OCR fallback is attempted only when extracted text quality is low
     (including < OCR_FALLBACK_MIN_CHARS), because OCR is much slower.
@@ -173,51 +171,9 @@ def _load_pdf_text_pypdf(
 
 
 def _load_pdf_text_with_ocr(path: str, max_pages: Optional[int] = None) -> str:
-    ocrmypdf_text = _load_pdf_text_with_ocrmypdf(path, max_pages=max_pages)
-    if ocrmypdf_text and not _needs_text_fallback(ocrmypdf_text):
-        return ocrmypdf_text
-
-    # Optional second OCR backend via OpenAI-compatible vision model.
+    # OCR fallback via OpenAI-compatible vision model.
     # This supports setups like GLM OCR when configured through env vars.
-    vlm_text = _load_pdf_text_with_vlm_ocr(path, max_pages=max_pages)
-    return _pick_better_text(ocrmypdf_text, vlm_text, "ocrmypdf", "vlm_ocr")
-
-
-def _load_pdf_text_with_ocrmypdf(path: str, max_pages: Optional[int] = None) -> str:
-    ocrmypdf_bin = shutil.which("ocrmypdf")
-    if not ocrmypdf_bin:
-        log.warning("OCR fallback skipped: 'ocrmypdf' not found in PATH.")
-        return ""
-
-    tmp_out = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
-    tmp_out_path = tmp_out.name
-    tmp_out.close()
-
-    try:
-        # --skip-text avoids re-OCR on text PDFs while still handling scanned pages.
-        cmd = [
-            ocrmypdf_bin,
-            "--skip-text",
-            "--rotate-pages",
-            "--deskew",
-            "--quiet",
-            path,
-            tmp_out_path,
-        ]
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
-        return _load_pdf_text_pypdf(tmp_out_path, max_pages=max_pages)
-    except subprocess.CalledProcessError as e:
-        err = (e.stderr or e.stdout or "").strip()
-        log.warning("OCR fallback failed for %s: %s", path, err[:500])
-        return ""
-    except Exception as e:
-        log.warning("OCR fallback failed for %s: %s", path, e)
-        return ""
-    finally:
-        try:
-            os.remove(tmp_out_path)
-        except Exception:
-            pass
+    return _load_pdf_text_with_vlm_ocr(path, max_pages=max_pages)
 
 
 def _load_pdf_text_with_vlm_ocr(path: str, max_pages: Optional[int] = None) -> str:

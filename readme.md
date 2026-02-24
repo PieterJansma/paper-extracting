@@ -33,7 +33,7 @@ source .venv/bin/activate
 2. Install the project (recommended).
 
 ```bash
-pip install -e . --no-build-isolation
+pip3 install -e . --no-build-isolation
 ```
 
 3. Configure `config.final.toml`:
@@ -93,6 +93,26 @@ All PDFs in `data/`:
 bash src/run_cluster_final.sh -p all --pdfs data/*.pdf -o final_all.xlsx
 ```
 
+Enable local Vision OCR endpoint inside the same cluster script (optional):
+
+```bash
+pip3 install pypdfium2 pillow
+
+export OCR_VLM_ENABLE=1
+export OCR_VLM_MODEL_PATH=/path/to/vision-model.gguf
+# required for many vision models:
+export OCR_VLM_MMPROJ_PATH=/path/to/mmproj.gguf
+
+# optional tuning:
+export OCR_VLM_ALIAS=glm-ocr
+export OCR_VLM_PORT=18090
+export OCR_VLM_CTX=8192
+export OCR_VLM_NGL=0
+export OCR_VLM_GPU=0
+
+bash src/run_cluster_final.sh -p all --pdfs data/*.pdf -o final_all.xlsx
+```
+
 ## Key Behavior and Defaults
 
 - `config.final.toml` is the source of truth for extraction logic.
@@ -132,9 +152,7 @@ Long-paper tuning (optional, in `[llm]`):
 - Scanned/image PDF gives almost no text:
   - fallback order is: normal pypdf -> pypdf layout mode -> OCR fallback
   - OCR fallback runs only when extracted text quality is still low (including under 3000 chars)
-  - OCR fallback backend order:
-    - `ocrmypdf` (requires `ocrmypdf` + `tesseract` + `gs`)
-    - vision OCR via OpenAI-compatible endpoint (for example GLM OCR)
+  - OCR fallback backend: vision OCR via OpenAI-compatible endpoint (for example GLM OCR)
   - to enable vision OCR fallback, set env vars before running:
     - `OCR_VLM_BASE_URL` (for example `http://host:port/v1`)
     - `OCR_VLM_MODEL` (for example your GLM OCR model id)

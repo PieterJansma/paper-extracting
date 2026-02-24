@@ -10,6 +10,7 @@ MODEL_GPU1="$MODEL_PATH"
 PORT_LB=18000
 PORT_GPU0=18080
 PORT_GPU1=18081
+PORT_OCR=18090
 
 CTX=20000
 SLOTS=1
@@ -23,6 +24,17 @@ mkdir -p "$LOG_DIR"
 # - If LOCAL_RSYNC_HOST is set, destination is interpreted on that remote host.
 LOCAL_RSYNC_DEST="/Users/p.jansma/Documents/cluster_data/"
 LOCAL_RSYNC_HOST=""
+
+# Optional local vision OCR endpoint for PDF text fallback.
+# Enable by exporting OCR_VLM_ENABLE=1 before running this script.
+OCR_VLM_ENABLE="${OCR_VLM_ENABLE:-0}"
+OCR_VLM_MODEL_PATH="${OCR_VLM_MODEL_PATH:-}"
+OCR_VLM_MMPROJ_PATH="${OCR_VLM_MMPROJ_PATH:-}"
+OCR_VLM_ALIAS="${OCR_VLM_ALIAS:-glm-ocr}"
+OCR_VLM_PORT="${OCR_VLM_PORT:-$PORT_OCR}"
+OCR_VLM_CTX="${OCR_VLM_CTX:-8192}"
+OCR_VLM_NGL="${OCR_VLM_NGL:-0}"
+OCR_VLM_GPU="${OCR_VLM_GPU:-}"
 
 # ------------------------------------------------------------------------------
 # CLI passthrough:
@@ -64,7 +76,7 @@ else
   echo "   module load Python/3.10.4-GCCcore-11.3.0"
   echo "   python3 -m venv .venv"
   echo "   source .venv/bin/activate"
-  echo "   pip install -e . --no-build-isolation"
+  echo "   pip3 install -e . --no-build-isolation"
   exit 1
 fi
 
@@ -87,10 +99,14 @@ export PDF_EXTRACT_CONFIG="$RUNTIME_CFG"
 
 pids=()
 LB_PID=""
+OCR_PID=""
 
 cleanup() {
   echo
   echo "[CLEANUP] Stoppen..."
+  if [[ -n "${OCR_PID}" ]]; then
+    kill "${OCR_PID}" 2>/dev/null || true
+  fi
   if [[ -n "${LB_PID}" ]]; then
     kill "${LB_PID}" 2>/dev/null || true
   fi
@@ -132,6 +148,86 @@ wait_health_ok() {
   return 1
 }
 
+check_ocr_render_deps() {
+  if [[ "$OCR_VLM_ENABLE" != "1" ]]; then
+    return 0
+  fi
+
+  if python3 - <<'PY' >/dev/null 2>&1
+import importlib
+importlib.import_module("pypdfium2")
+importlib.import_module("PIL")
+PY
+  then
+    echo "[OCR] Renderer deps OK via pypdfium2 + Pillow."
+    return 0
+  fi
+
+  if command -v pdftoppm >/dev/null 2>&1; then
+    echo "[OCR] Renderer deps OK via pdftoppm."
+    return 0
+  fi
+
+  echo "❌ ERROR: OCR_VLM_ENABLE=1, maar geen PDF page renderer beschikbaar."
+  echo "   Installeer in .venv: pip3 install pypdfium2 pillow"
+  echo "   Of zorg dat pdftoppm in PATH staat."
+  exit 1
+}
+
+start_ocr_server_if_enabled() {
+  if [[ "$OCR_VLM_ENABLE" != "1" ]]; then
+    return 0
+  fi
+
+  if [[ -z "$OCR_VLM_MODEL_PATH" ]]; then
+    echo "❌ ERROR: OCR_VLM_ENABLE=1 maar OCR_VLM_MODEL_PATH is leeg."
+    echo "   Bijvoorbeeld:"
+    echo "   export OCR_VLM_MODEL_PATH=/path/to/vision-model.gguf"
+    exit 1
+  fi
+
+  if [[ ! -f "$OCR_VLM_MODEL_PATH" ]]; then
+    echo "❌ ERROR: OCR model niet gevonden: $OCR_VLM_MODEL_PATH"
+    exit 1
+  fi
+
+  local cmd=(
+    "$LLAMA_BIN"
+    -m "$OCR_VLM_MODEL_PATH"
+    --alias "$OCR_VLM_ALIAS"
+    --host 127.0.0.1
+    --port "$OCR_VLM_PORT"
+    -c "$OCR_VLM_CTX"
+    -ngl "$OCR_VLM_NGL"
+  )
+
+  if [[ -n "$OCR_VLM_MMPROJ_PATH" ]]; then
+    if [[ ! -f "$OCR_VLM_MMPROJ_PATH" ]]; then
+      echo "❌ ERROR: OCR mmproj niet gevonden: $OCR_VLM_MMPROJ_PATH"
+      exit 1
+    fi
+    cmd+=(--mmproj "$OCR_VLM_MMPROJ_PATH")
+  fi
+
+  echo "[OCR] Starten vision OCR server op poort $OCR_VLM_PORT..."
+  if [[ -n "$OCR_VLM_GPU" ]]; then
+    echo "[OCR] CUDA_VISIBLE_DEVICES=$OCR_VLM_GPU"
+    CUDA_VISIBLE_DEVICES="$OCR_VLM_GPU" nohup "${cmd[@]}" >>"$LOG_DIR/ocr.log" 2>&1 &
+  else
+    echo "[OCR] Geen OCR_VLM_GPU gezet; starten zonder GPU pinning."
+    nohup "${cmd[@]}" >>"$LOG_DIR/ocr.log" 2>&1 &
+  fi
+  OCR_PID=$!
+  pids+=("$OCR_PID")
+
+  wait_health_ok "$OCR_VLM_PORT" || exit 1
+
+  export OCR_VLM_BASE_URL="http://127.0.0.1:${OCR_VLM_PORT}/v1"
+  export OCR_VLM_MODEL="$OCR_VLM_ALIAS"
+  echo "[OCR] OCR_VLM_BASE_URL=$OCR_VLM_BASE_URL"
+  echo "[OCR] OCR_VLM_MODEL=$OCR_VLM_MODEL"
+}
+
 warmup_chat() {
   local port="$1"
   echo "  🔥 Warmup chat op poort $port..."
@@ -160,6 +256,8 @@ wait_health_ok "$PORT_GPU1" || exit 1
 echo "[2b/4] Warmup (voorkomt 503 Loading model bij eerste zware prompt)..."
 warmup_chat "$PORT_GPU0"
 warmup_chat "$PORT_GPU1"
+
+check_ocr_render_deps
 
 echo "[3/4] Starten Load Balancer..."
 cat > tcp_lb.py <<EOF
@@ -232,6 +330,9 @@ EOF
 
 python3 tcp_lb.py > "$LOG_DIR/lb.log" 2>&1 &
 LB_PID=$!
+
+echo "[3b/4] Starten Vision OCR endpoint (optioneel)..."
+start_ocr_server_if_enabled
 
 echo "[4/4] Starten main_final.py (PDF extractie → Excel)..."
 echo "  PDF_EXTRACT_CONFIG=$PDF_EXTRACT_CONFIG"
