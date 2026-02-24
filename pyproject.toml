@@ -6,15 +6,29 @@ build-backend = "setuptools.build_meta"
 name = "pdf-extract"
 version = "0.1.0"
 description = "PDF → NuExtract (OpenAI-compatible) JSON extraction pipeline"
-readme = "README.md"
+readme = "readme.md"
 authors = [{name = "you"}]
 requires-python = ">=3.10"
 dependencies = [
+  "pandas>=2.0",
   "requests>=2.31",
   "pypdf>=4.2.0",
-  "python-dotenv>=1.0.1",
+  "openpyxl>=3.1.0",
   "tomli>=2.0.1; python_version<'3.11'",
 ]
 
 [project.scripts]
-pdf-extract = "src.main:cli"
+pdf-extract = "main_final:cli"
+
+[tool.setuptools]
+py-modules = [
+  "main_final",
+  "main",
+  "extract_pipeline",
+  "llm_client",
+  "llm_grammar",
+  "prompts",
+]
+
+[tool.setuptools.package-dir]
+"" = "src"

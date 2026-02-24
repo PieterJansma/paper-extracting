@@ -1,3 +1,14 @@
 .venv/
 .history/
 .pycache_local/
+.DS_Store
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+logs/
+src/logs/
+config.runtime.toml
+tcp_lb.py

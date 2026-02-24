@@ -64,7 +64,7 @@ else
   echo "   module load Python/3.10.4-GCCcore-11.3.0"
   echo "   python3 -m venv .venv"
   echo "   source .venv/bin/activate"
-  echo "   pip install pandas openpyxl requests tomli pypdf"
+  echo "   pip install -e . --no-build-isolation"
   exit 1
 fi
 

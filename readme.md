@@ -1,151 +1,130 @@
 # Paper Extracting (Final Pipeline)
 
-This repo extracts structured fields from PDFs using a local OpenAI-compatible LLM server.
-The *final* workflow is centered around these three files:
+This repository extracts structured metadata from papers (PDFs) into a multi-sheet Excel file.
+The final pipeline is built around:
 
-- `config.final.toml` (all extraction rules + templates)
-- `src/main_final.py` (runs the multi-pass extractor and writes Excel)
-- `src/run_cluster_final.sh` (cluster launcher + load balancer + extraction)
+- `config.final.toml` (prompts, schemas, extraction rules)
+- `src/main_final.py` (multi-pass extraction + Excel writer)
+- `src/run_cluster_final.sh` (cluster runtime with 2x llama-server + load balancer)
 
----
+## What It Produces
 
-## 1) `config.final.toml` (the source of truth)
+One Excel workbook with these sheets:
 
-`config.final.toml` defines **all prompts, schemas, and rules** for the final pipeline. It is divided into passes, each one extracting a specific section.
+- `resources`
+- `subpopulations`
+- `collection_events`
+- `datasets`
+- `samplesets`
+- `organisations`
+- `people`
+- `publications`
+- `documentation`
 
-### LLM + PDF settings
+## Quick Start (Local)
 
-```
-[llm]
-base_url = "http://127.0.0.1:8080/v1"
-model    = "numind/NuExtract-2.0-8B"
-api_key  = "sk-local"
-use_grammar = false
-max_tokens = 6000
-temperature = 0.0
+1. Create and activate a virtual environment.
 
-[pdf]
-path = "data/concrete.pdf"
-max_pages = 40
-```
-
-### Passes (what gets extracted)
-
-The final config uses these passes (names must match in `main_final.py`):
-
-- **A: Overview** -> `[task_overview]`
-- **B: Design & structure** -> `[task_design_structure]`
-- **C: Subpopulations** -> `[task_subpopulations]`
-- **D: Collection events** -> `[task_collection_events]`
-- **E: Population** -> `[task_population]`
-- **F: Contributors** -> `[task_contributors]`
-- **G: Access conditions** -> `[task_access_conditions]`
-- **H: Information** -> `[task_information]`
-- **X1: Datasets** -> `[task_datasets]`
-- **X2: Samplesets** -> `[task_samplesets]`
-- **X3: Areas of information** -> `[task_areas_of_information]`
-- **Y: Linkage** -> `[task_linkage]`
-
-Each pass has:
-
-- `template_json` (strict JSON schema)
-- `instructions` (exact extraction rules)
-
-If you want to change what is extracted or how strict the rules are, **edit only this file**.
-
----
-
-## 2) `src/main_final.py` (the extractor)
-
-This script:
-
-1. Loads `config.final.toml` (or `PDF_EXTRACT_CONFIG`).
-2. Runs the selected passes against the PDF text.
-3. Writes a multi-sheet Excel file with consistent columns.
-
-### Key behavior
-
-- Uses `extract_pipeline.extract_fields()` for each pass.
-- Outputs **one Excel file** with sheets:
-  - `resources`
-  - `subpopulations`
-  - `collection_events`
-  - `datasets`
-  - `samplesets`
-  - `organisations`
-  - `people`
-  - `publications`
-  - `documentation`
-
-### Run locally
-
-```
-python3 src/main_final.py -p all -o final_result.xlsx
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-### Run specific passes
+2. Install the project (recommended).
 
-```
-python3 src/main_final.py -p A B E -o out.xlsx
+```bash
+pip install -e . --no-build-isolation
 ```
 
-### Run multiple PDFs
+3. Configure `config.final.toml`:
+- `[llm]` -> your OpenAI-compatible endpoint (`base_url`, `model`, `api_key`)
+- `[pdf].path` -> default PDF path
 
+4. Run all passes on one PDF.
+
+```bash
+pdf-extract -p all -o final_result.xlsx
 ```
-python3 src/main_final.py -p all \
+
+## Common CLI Usage
+
+Run selected passes:
+
+```bash
+pdf-extract -p A B E -o out.xlsx
+```
+
+Run multiple PDFs:
+
+```bash
+pdf-extract -p all \
   --pdfs data/a.pdf data/b.pdf \
   --paper-names paper_a paper_b \
   -o out.xlsx
 ```
 
----
+Show CLI help:
 
-## 3) `src/run_cluster_final.sh` (cluster workflow)
-
-This script is the **production cluster runner**. It:
-
-1. Starts two `llama-server` instances (GPU 0 and GPU 1).
-2. Waits for `/health` to be OK.
-3. Runs a TCP load balancer on port 18000.
-4. Creates `config.runtime.toml` with `base_url` pointing to the load balancer.
-5. Runs `src/main_final.py` with your args.
-6. Copies the Excel output to your local destination (rsync).
-
-### Default usage
-
+```bash
+pdf-extract --help
 ```
+
+## Cluster Usage
+
+`src/run_cluster_final.sh` does the full runtime setup:
+
+- starts 2 llama-server instances (GPU0/GPU1)
+- waits for health checks
+- starts a local TCP load balancer
+- writes `config.runtime.toml` with LB URL
+- runs `src/main_final.py`
+- syncs output if `LOCAL_RSYNC_DEST` is usable
+
+Default run:
+
+```bash
 bash src/run_cluster_final.sh
 ```
 
-### Custom usage (passes, output, PDFs)
+All PDFs in `data/`:
 
+```bash
+bash src/run_cluster_final.sh -p all --pdfs data/*.pdf -o final_all.xlsx
 ```
-bash src/run_cluster_final.sh -p A -o out.xlsx --pdfs data/concrete.pdf data/oncolifes.pdf
-```
 
-### Important settings inside the script
+## Key Behavior and Defaults
 
-- `LLAMA_BIN` -> path to `llama-server`
-- `MODEL_PATH` -> GGUF model
-- `PORT_LB` / `PORT_GPU0` / `PORT_GPU1`
-- `CTX`, `SLOTS`, `NGL`
-- `LOCAL_RSYNC_DEST` (where results are synced)
+- `config.final.toml` is the source of truth for extraction logic.
+- In health context, post-processing keeps HRI defaults consistent:
+  - `theme` includes `Health`
+  - `applicable_legislation` includes `Data Governance Act`
+- Output is deterministic in column order (template-driven).
 
-If you move models or change servers, update these variables at the top of the script.
+## Files You Will Most Often Edit
 
----
-
-## Typical workflow
-
-1. Edit extraction rules in `config.final.toml`.
-2. Run locally for quick tests: `python3 src/main_final.py -p A -o out.xlsx`.
-3. Run on cluster for full output: `bash src/run_cluster_final.sh -p all -o final_result.xlsx`.
-
----
+- `config.final.toml`
+  - change extraction instructions and templates
+- `src/main_final.py`
+  - change post-processing, fallbacks, and output logic
+- `src/run_cluster_final.sh`
+  - change model path, llama binary path, ports, rsync destination
 
 ## Troubleshooting
 
-- **No output / empty fields**: check `instructions` in `config.final.toml` for overly strict rules.
-- **Wrong model / server**: update `[llm]` in `config.final.toml` or use `PDF_EXTRACT_CONFIG`.
-- **Cluster failure**: check `logs/gpu0.log`, `logs/gpu1.log`, `logs/lb.log`.
-- **PDF not found**: update `[pdf].path` or pass `--pdfs` to `main_final.py`.
+- No output or very sparse output:
+  - prompts may be too strict; relax rules in `config.final.toml`
+- Cluster model startup fails:
+  - check `logs/gpu0.log`, `logs/gpu1.log`, `logs/lb.log`
+- Wrong endpoint/model at runtime:
+  - verify `[llm]` in `config.final.toml` or `PDF_EXTRACT_CONFIG`
+- PDF not found:
+  - fix `[pdf].path` or use `--pdfs`
+- Excel writer error:
+  - install `openpyxl` or `xlsxwriter`
+
+## Typical Workflow
+
+1. Update extraction logic in `config.final.toml`.
+2. Test quickly on 1 PDF locally.
+3. Run full batch on cluster.
+4. Review output workbook and audit issues.
