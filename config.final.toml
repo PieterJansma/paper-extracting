@@ -8,10 +8,15 @@ sticky_session = true
 max_tokens = 8000
 timeout = 900
 temperature = 0.0
+chunking_enabled = true
+long_text_threshold_chars = 60000
+chunk_size_chars = 45000
+chunk_overlap_chars = 4000
 
 [pdf]
 path = "data/concrete.pdf"
-max_pages = 40
+# 0 = read all pages
+max_pages = 0
 
 # =============================================================================
 # OPTIMIZED CONFIGURATION 

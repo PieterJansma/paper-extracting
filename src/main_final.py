@@ -138,6 +138,15 @@ def _collect_pass_result(
         prefix_messages=prefix_messages,
         cache_prompt=bool(llm_cfg.get("prompt_cache", False)),
         timeout=int(llm_cfg.get("timeout", 600)),
+        chunking_enabled=bool(llm_cfg.get("chunking_enabled", True)),
+        long_text_threshold_chars=int(llm_cfg.get("long_text_threshold_chars", 60000)),
+        chunk_size_chars=int(llm_cfg.get("chunk_size_chars", 45000)),
+        chunk_overlap_chars=int(llm_cfg.get("chunk_overlap_chars", 4000)),
+        max_chunks=(
+            int(llm_cfg["max_chunks"])
+            if llm_cfg.get("max_chunks") is not None
+            else None
+        ),
     )
 
 
@@ -787,11 +796,21 @@ def cli() -> None:
         log.info("PDF '%s' loaded (%d chars)", pdf_path, len(paper_text))
 
         prefix_messages: List[Dict[str, str]] | None = None
-        if bool(llm_cfg.get("prompt_cache", False)):
+        prompt_cache_enabled = bool(llm_cfg.get("prompt_cache", False))
+        chunking_enabled = bool(llm_cfg.get("chunking_enabled", True))
+        long_text_threshold = int(llm_cfg.get("long_text_threshold_chars", 60000))
+        if prompt_cache_enabled and not (chunking_enabled and len(paper_text) > long_text_threshold):
             prefix_messages = build_context_prefix_messages(paper_text)
             log.info(
                 "Prompt cache enabled: using reusable paper prefix (%d chars).",
                 len(paper_text),
+            )
+        elif prompt_cache_enabled:
+            log.info(
+                "Prompt cache disabled for this paper (%d chars > long_text_threshold_chars=%d); "
+                "chunked extraction will use per-chunk context.",
+                len(paper_text),
+                long_text_threshold,
             )
 
         per_section_results: Dict[str, Dict[str, Any]] = {}

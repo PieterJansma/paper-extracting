@@ -23,11 +23,9 @@ pdf-extract = "main_final:cli"
 [tool.setuptools]
 py-modules = [
   "main_final",
-  "main",
   "extract_pipeline",
   "llm_client",
   "llm_grammar",
-  "prompts",
 ]
 
 [tool.setuptools.package-dir]

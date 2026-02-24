@@ -218,6 +218,67 @@ def build_context_prefix_messages(paper_text: str) -> List[Dict[str, str]]:
     ]
 
 
+def _split_text_chunks(
+    text: str,
+    chunk_size_chars: int,
+    overlap_chars: int,
+    max_chunks: Optional[int] = None,
+) -> List[str]:
+    """
+    Split long context text into overlapping chunks.
+    Prefers splitting near newline/space to avoid cutting sentences mid-way.
+    """
+    if not text:
+        return []
+
+    size = max(2000, int(chunk_size_chars))
+    overlap = max(0, min(int(overlap_chars), size // 2))
+
+    chunks: List[str] = []
+    n = len(text)
+    start = 0
+    while start < n:
+        if max_chunks is not None and max_chunks > 0 and len(chunks) >= max_chunks:
+            break
+
+        end = min(n, start + size)
+        if end < n:
+            lower_bound = start + int(size * 0.6)
+            cut_nl = text.rfind("\n", lower_bound, end)
+            cut_sp = text.rfind(" ", lower_bound, end)
+            cut = max(cut_nl, cut_sp)
+            if cut > start + 1000:
+                end = cut
+
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+
+        if end >= n:
+            break
+
+        next_start = max(0, end - overlap)
+        if next_start <= start:
+            next_start = end
+        start = next_start
+
+    if not chunks:
+        return [text]
+    return chunks
+
+
+def _has_payload_value(obj: Any) -> bool:
+    if obj is None:
+        return False
+    if isinstance(obj, str):
+        return obj.strip() != ""
+    if isinstance(obj, list):
+        return any(_has_payload_value(x) for x in obj)
+    if isinstance(obj, dict):
+        return any(_has_payload_value(v) for v in obj.values())
+    return True
+
+
 # ==============================================================================
 # Schema completion + type normalization
 # ==============================================================================
@@ -399,84 +460,151 @@ def extract_fields(
     prefix_messages: Optional[List[Dict[str, str]]] = None,
     cache_prompt: bool = False,
     timeout: int = 600,
+    chunking_enabled: bool = True,
+    long_text_threshold_chars: int = 60000,
+    chunk_size_chars: int = 45000,
+    chunk_overlap_chars: int = 4000,
+    max_chunks: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Execute a single extraction pass using the LLM."""
     if not paper_text:
         return {}
 
-    # If prefix_messages are provided, paper context is already in the prefix and
-    # this per-pass prompt should only contain template + instructions.
-    prompt = _build_nuextract_prompt(
-        template_json or "",
-        instructions,
-        "" if prefix_messages else paper_text,
-    )
+    schema = _parse_template_schema(template_json)
 
-    log.info(
-        "Prompt size: %d chars (max_tokens=%d, temp=%.2f, cache_prompt=%s)",
-        len(prompt),
-        int(max_tokens),
-        float(temperature),
-        bool(cache_prompt),
-    )
-
-    if prefix_messages:
-        messages = list(prefix_messages) + [{"role": "user", "content": prompt}]
-    else:
-        messages = [
-            {"role": "system", "content": SYSTEM_EXTRACT_MSG},
-            {"role": "user", "content": prompt},
-        ]
-
-    try:
-        raw_response = client.chat(
-            messages,
-            temperature=float(temperature),
-            max_tokens=int(max_tokens),
-            response_format={"type": "json_object"},
-            grammar=(GRAMMAR_JSON_INT_OR_NULL if use_grammar else None),
-            extra_body={"cache_prompt": True} if cache_prompt else None,
-            timeout=int(timeout),
+    def _run_single(
+        context_text: str,
+        *,
+        use_prefix_messages: bool,
+        apply_schema_defaults: bool,
+    ) -> Tuple[Dict[str, Any], bool, bool]:
+        # Returns (result, has_payload, had_llm_error)
+        prompt = _build_nuextract_prompt(
+            template_json or "",
+            instructions,
+            "" if use_prefix_messages else context_text,
         )
-    except Exception as e:
-        log.error("LLM Call failed: %s", e)
-        return {}
 
-    parsed = _json_load_stripping_fences(raw_response)
+        log.info(
+            "Prompt size: %d chars (max_tokens=%d, temp=%.2f, cache_prompt=%s, prefix=%s)",
+            len(prompt),
+            int(max_tokens),
+            float(temperature),
+            bool(cache_prompt),
+            bool(use_prefix_messages),
+        )
 
-    # If model returned invalid JSON, retry once with stricter JSON-object enforcement.
-    if not parsed:
-        log.warning("Invalid JSON output; retrying this pass once with stricter JSON mode.")
-        try:
-            retry_messages = messages + [
-                {
-                    "role": "user",
-                    "content": (
-                        "Your previous answer was not valid JSON. "
-                        "Return ONLY one valid JSON object that matches the template."
-                    ),
-                }
+        if use_prefix_messages and prefix_messages:
+            messages = list(prefix_messages) + [{"role": "user", "content": prompt}]
+        else:
+            messages = [
+                {"role": "system", "content": SYSTEM_EXTRACT_MSG},
+                {"role": "user", "content": prompt},
             ]
-            retry_raw = client.chat(
-                retry_messages,
+
+        had_llm_error = False
+        try:
+            raw_response = client.chat(
+                messages,
                 temperature=float(temperature),
                 max_tokens=int(max_tokens),
                 response_format={"type": "json_object"},
                 grammar=(GRAMMAR_JSON_INT_OR_NULL if use_grammar else None),
                 extra_body={"cache_prompt": True} if cache_prompt else None,
                 timeout=int(timeout),
-                max_retries=4,
             )
-            retry_parsed = _json_load_stripping_fences(retry_raw)
-            if retry_parsed:
-                parsed = retry_parsed
         except Exception as e:
-            log.warning("Retry after invalid JSON failed: %s", e)
+            log.error("LLM Call failed: %s", e)
+            had_llm_error = True
+            raw_response = ""
 
-    parsed = _normalize_values(parsed)
+        parsed = _json_load_stripping_fences(raw_response)
 
-    # ✅ Fill missing keys based on template schema so RAW JSON is never "sparse"
-    schema = _parse_template_schema(template_json)
-    parsed = _apply_schema_defaults(parsed, schema)
+        # If model returned invalid JSON, retry once with stricter JSON-object enforcement.
+        if not parsed and not had_llm_error:
+            log.warning("Invalid JSON output; retrying this pass once with stricter JSON mode.")
+            try:
+                retry_messages = messages + [
+                    {
+                        "role": "user",
+                        "content": (
+                            "Your previous answer was not valid JSON. "
+                            "Return ONLY one valid JSON object that matches the template."
+                        ),
+                    }
+                ]
+                retry_raw = client.chat(
+                    retry_messages,
+                    temperature=float(temperature),
+                    max_tokens=int(max_tokens),
+                    response_format={"type": "json_object"},
+                    grammar=(GRAMMAR_JSON_INT_OR_NULL if use_grammar else None),
+                    extra_body={"cache_prompt": True} if cache_prompt else None,
+                    timeout=int(timeout),
+                    max_retries=4,
+                )
+                retry_parsed = _json_load_stripping_fences(retry_raw)
+                if retry_parsed:
+                    parsed = retry_parsed
+            except Exception as e:
+                log.warning("Retry after invalid JSON failed: %s", e)
 
-    return parsed
+        parsed = _normalize_values(parsed)
+        has_payload = _has_payload_value(parsed)
+        if apply_schema_defaults:
+            parsed = _apply_schema_defaults(parsed, schema)
+        return parsed, has_payload, had_llm_error
+
+    def _run_chunked() -> Dict[str, Any]:
+        chunks = _split_text_chunks(
+            paper_text,
+            chunk_size_chars=int(chunk_size_chars),
+            overlap_chars=int(chunk_overlap_chars),
+            max_chunks=max_chunks,
+        )
+        log.warning(
+            "Using chunked extraction for long paper: %d chunks (size=%d, overlap=%d).",
+            len(chunks),
+            int(chunk_size_chars),
+            int(chunk_overlap_chars),
+        )
+
+        merged: Dict[str, Any] = {}
+        payload_chunks = 0
+        for idx, chunk in enumerate(chunks, start=1):
+            log.info("Chunk %d/%d (%d chars)", idx, len(chunks), len(chunk))
+            part, has_payload, _had_llm_error = _run_single(
+                chunk,
+                use_prefix_messages=False,
+                apply_schema_defaults=False,
+            )
+            if has_payload:
+                payload_chunks += 1
+            merged = _merge_json_results(merged, part)
+
+        log.info(
+            "Chunked extraction complete: %d/%d chunks returned payload.",
+            payload_chunks,
+            len(chunks),
+        )
+        merged = _normalize_values(merged)
+        return _apply_schema_defaults(merged, schema)
+
+    long_text = len(paper_text) > int(long_text_threshold_chars)
+    if chunking_enabled and long_text:
+        return _run_chunked()
+
+    single, has_payload, had_llm_error = _run_single(
+        paper_text,
+        use_prefix_messages=bool(prefix_messages),
+        apply_schema_defaults=True,
+    )
+    if has_payload:
+        return single
+
+    # Fallback for short/medium papers when one-shot fails unexpectedly.
+    if chunking_enabled and (had_llm_error or len(paper_text) > int(chunk_size_chars)):
+        log.warning("One-shot extraction produced no payload; retrying with chunked mode.")
+        return _run_chunked()
+
+    return single

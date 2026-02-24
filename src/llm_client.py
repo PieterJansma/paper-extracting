@@ -23,7 +23,7 @@ class OpenAICompatibleClient:
     - No requests.Session(): avoids sticky TCP connections behind a TCP load balancer.
     - Forces "Connection: close" to make each request use a fresh TCP connection.
     - Retries on 503 "Loading model" and on transient disconnects.
-    - Keeps the same interface for main.py
+    - Keeps the same interface for the final extraction CLI
     """
 
     def __init__(

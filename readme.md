@@ -39,6 +39,7 @@ pip install -e . --no-build-isolation
 3. Configure `config.final.toml`:
 - `[llm]` -> your OpenAI-compatible endpoint (`base_url`, `model`, `api_key`)
 - `[pdf].path` -> default PDF path
+- `[pdf].max_pages = 0` -> read full paper (recommended for completeness)
 
 4. Run all passes on one PDF.
 
@@ -95,10 +96,19 @@ bash src/run_cluster_final.sh -p all --pdfs data/*.pdf -o final_all.xlsx
 ## Key Behavior and Defaults
 
 - `config.final.toml` is the source of truth for extraction logic.
+- Long papers are handled with automatic chunked extraction fallback.
+- Prompt cache is automatically disabled for very long papers when chunking is active.
 - In health context, post-processing keeps HRI defaults consistent:
   - `theme` includes `Health`
   - `applicable_legislation` includes `Data Governance Act`
 - Output is deterministic in column order (template-driven).
+
+Long-paper tuning (optional, in `[llm]`):
+- `chunking_enabled`
+- `long_text_threshold_chars`
+- `chunk_size_chars`
+- `chunk_overlap_chars`
+- `max_chunks` (optional cap)
 
 ## Files You Will Most Often Edit
 
