@@ -33,7 +33,8 @@ STATUS_LOG="${RUN_DIR}/status.jsonl"
 # - If LOCAL_RSYNC_HOST is set, destination is interpreted on that remote host.
 LOCAL_RSYNC_DEST="/Users/p.jansma/Documents/cluster_data/"
 LOCAL_RSYNC_HOST=""
-SYNC_OUTPUT_ENABLE="${SYNC_OUTPUT_ENABLE:-0}"
+SYNC_OUTPUT_ENABLE="${SYNC_OUTPUT_ENABLE:-1}"
+SYNC_REQUIRED="${SYNC_REQUIRED:-0}"
 
 # Optional local vision OCR endpoint for PDF text fallback.
 # Defaults below are set for this cluster/user setup.
@@ -743,25 +744,42 @@ fi
 
 if [[ "$SYNC_OUTPUT_ENABLE" == "1" ]]; then
   echo "[4b/4] Sync output naar lokaal..."
+  sync_failed=0
   if [[ -n "$LOCAL_RSYNC_HOST" ]]; then
     # Ensure destination directory exists on remote receiver before syncing.
-    rsync -avhP \
+    if ! rsync -avhP \
       --rsync-path="mkdir -p \"$LOCAL_RSYNC_DEST\" && rsync" \
-      "$OUTPUT_FILE" "$RSYNC_TARGET"
+      "$OUTPUT_FILE" "$RSYNC_TARGET"; then
+      sync_failed=1
+    fi
   else
     # Guard: on cluster nodes, macOS paths like /Users/... are not local paths.
     if [[ "$LOCAL_RSYNC_DEST" == /Users/* ]]; then
       echo "⚠️  Skip sync: '$LOCAL_RSYNC_DEST' is een macOS pad en bestaat niet op de cluster node."
       echo "   Haal het bestand op vanaf je Mac met:"
       echo "   rsync -avhP tunnel+nibbler:${PWD}/$OUTPUT_FILE \"$LOCAL_RSYNC_DEST\""
+      status_event "sync_skipped" "destination appears local macOS path on cluster node"
     else
       # Ensure destination directory exists for local receiver.
       mkdir -p "$LOCAL_RSYNC_DEST"
-      rsync -avhP "$OUTPUT_FILE" "$RSYNC_TARGET"
+      if ! rsync -avhP "$OUTPUT_FILE" "$RSYNC_TARGET"; then
+        sync_failed=1
+      fi
     fi
+  fi
+  if [[ "$sync_failed" -eq 1 ]]; then
+    status_event "warning" "rsync sync failed"
+    if [[ "$SYNC_REQUIRED" == "1" ]]; then
+      echo "❌ ERROR: sync failed and SYNC_REQUIRED=1"
+      exit 1
+    fi
+    echo "⚠️  Sync failed, but extraction output is available locally at: ${PWD}/${OUTPUT_FILE}"
+  else
+    status_event "synced" "output synced via rsync"
   fi
 else
   echo "[4b/4] Sync skipped (SYNC_OUTPUT_ENABLE=0)."
+  status_event "sync_skipped" "SYNC_OUTPUT_ENABLE=0"
 fi
 
 echo "✅ Klaar."

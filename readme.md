@@ -79,7 +79,7 @@ pdf-extract --help
 - starts a local TCP load balancer
 - writes `config.runtime.toml` with LB URL
 - runs `src/main_final.py`
-- optional sync (`SYNC_OUTPUT_ENABLE=0` by default)
+- syncs output via `rsync` by default (`SYNC_OUTPUT_ENABLE=1`)
 
 Default run:
 
@@ -91,6 +91,12 @@ Run via Slurm batch:
 
 ```bash
 sbatch src/run_cluster_final.sbatch -p all --pdfs data/*.pdf -o final_all.xlsx
+```
+
+Disable sync if your wrapper handles transfer:
+
+```bash
+SYNC_OUTPUT_ENABLE=0 bash src/run_cluster_final.sh -p all --pdfs data/*.pdf -o final_all.xlsx
 ```
 
 All PDFs in `data/`:
