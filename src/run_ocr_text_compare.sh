@@ -24,6 +24,10 @@ OCR_PORT="${OCR_VLM_PORT:-18090}"
 OCR_CTX="${OCR_VLM_CTX:-8192}"
 OCR_NGL="${OCR_VLM_NGL:-999}"
 OCR_GPU="${OCR_VLM_GPU:-0,1}"
+OCR_VLM_USE_TENSOR_SPLIT="${OCR_VLM_USE_TENSOR_SPLIT:-1}"
+OCR_VLM_TENSOR_SPLIT="${OCR_VLM_TENSOR_SPLIT:-}"
+OCR_VLM_SPLIT_MODE="${OCR_VLM_SPLIT_MODE:-layer}"
+OCR_VLM_MAIN_GPU="${OCR_VLM_MAIN_GPU:-0}"
 OCR_TEST_MAX_PAGES="${OCR_TEST_MAX_PAGES:-0}" # 0 = all pages
 
 mkdir -p "$LOG_DIR" "$OUT_DIR"
@@ -96,6 +100,54 @@ cmd=(
 )
 if [[ -n "$OCR_MMPROJ_PATH" ]]; then
   cmd+=(--mmproj "$OCR_MMPROJ_PATH")
+fi
+
+llama_help="$("$LLAMA_BIN" --help 2>&1 || true)"
+supports_flag() {
+  local flag="$1"
+  grep -Fq -- "$flag" <<<"$llama_help"
+}
+build_tensor_split() {
+  local split="$OCR_VLM_TENSOR_SPLIT"
+  if [[ -n "$split" ]]; then
+    echo "$split"
+    return 0
+  fi
+  local IFS=','
+  local gpus=()
+  read -r -a gpus <<<"$OCR_GPU"
+  local n="${#gpus[@]}"
+  if [[ "$n" -le 1 ]]; then
+    echo ""
+    return 0
+  fi
+  local out=""
+  for ((i=0; i<n; i++)); do
+    if [[ -z "$out" ]]; then
+      out="1"
+    else
+      out="${out},1"
+    fi
+  done
+  echo "$out"
+}
+
+if [[ "$OCR_VLM_USE_TENSOR_SPLIT" == "1" && "$OCR_GPU" == *","* ]]; then
+  split="$(build_tensor_split)"
+  if [[ -n "$split" ]]; then
+    if supports_flag "--tensor-split"; then
+      cmd+=(--tensor-split "$split")
+      if supports_flag "--split-mode"; then
+        cmd+=(--split-mode "$OCR_VLM_SPLIT_MODE")
+      fi
+      if supports_flag "--main-gpu"; then
+        cmd+=(--main-gpu "$OCR_VLM_MAIN_GPU")
+      fi
+      echo "[INFO] OCR multi-GPU tensor split: tensor_split=$split split_mode=$OCR_VLM_SPLIT_MODE main_gpu=$OCR_VLM_MAIN_GPU"
+    else
+      echo "[WARN] This llama-server does not support --tensor-split; OCR may run mostly on one GPU."
+    fi
+  fi
 fi
 
 echo "[INFO] Starting OCR server..."

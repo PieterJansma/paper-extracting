@@ -36,6 +36,10 @@ OCR_VLM_PORT="${OCR_VLM_PORT:-$PORT_OCR}"
 OCR_VLM_CTX="${OCR_VLM_CTX:-8192}"
 OCR_VLM_NGL="${OCR_VLM_NGL:-999}"
 OCR_VLM_GPU="${OCR_VLM_GPU:-0,1}"
+OCR_VLM_USE_TENSOR_SPLIT="${OCR_VLM_USE_TENSOR_SPLIT:-1}"
+OCR_VLM_TENSOR_SPLIT="${OCR_VLM_TENSOR_SPLIT:-}"
+OCR_VLM_SPLIT_MODE="${OCR_VLM_SPLIT_MODE:-layer}"
+OCR_VLM_MAIN_GPU="${OCR_VLM_MAIN_GPU:-0}"
 OCR_VLM_LLAMA_BIN="${OCR_VLM_LLAMA_BIN:-/groups/umcg-gcc/tmp02/users/umcg-pjansma/Repositories/llama.cpp-glmtest/build/bin/llama-server}"
 OCR_VLM_PREFETCH_MODE="${OCR_VLM_PREFETCH_MODE:-1}"
 OCR_PREFETCH_DIR="${OCR_PREFETCH_DIR:-${PWD}/logs/ocr_prefetch}"
@@ -242,6 +246,37 @@ start_ocr_server_if_enabled() {
     exit 1
   fi
 
+  local llama_help=""
+  llama_help="$("$OCR_VLM_LLAMA_BIN" --help 2>&1 || true)"
+  supports_flag() {
+    local flag="$1"
+    grep -Fq -- "$flag" <<<"$llama_help"
+  }
+  build_tensor_split() {
+    local split="$OCR_VLM_TENSOR_SPLIT"
+    if [[ -n "$split" ]]; then
+      echo "$split"
+      return 0
+    fi
+    local IFS=','
+    local gpus=()
+    read -r -a gpus <<<"$OCR_VLM_GPU"
+    local n="${#gpus[@]}"
+    if [[ "$n" -le 1 ]]; then
+      echo ""
+      return 0
+    fi
+    local out=""
+    for ((i=0; i<n; i++)); do
+      if [[ -z "$out" ]]; then
+        out="1"
+      else
+        out="${out},1"
+      fi
+    done
+    echo "$out"
+  }
+
   local cmd=(
     "$OCR_VLM_LLAMA_BIN"
     -m "$OCR_VLM_MODEL_PATH"
@@ -258,6 +293,25 @@ start_ocr_server_if_enabled() {
       exit 1
     fi
     cmd+=(--mmproj "$OCR_VLM_MMPROJ_PATH")
+  fi
+
+  if [[ "$OCR_VLM_USE_TENSOR_SPLIT" == "1" && "$OCR_VLM_GPU" == *","* ]]; then
+    local split
+    split="$(build_tensor_split)"
+    if [[ -n "$split" ]]; then
+      if supports_flag "--tensor-split"; then
+        cmd+=(--tensor-split "$split")
+        if supports_flag "--split-mode"; then
+          cmd+=(--split-mode "$OCR_VLM_SPLIT_MODE")
+        fi
+        if supports_flag "--main-gpu"; then
+          cmd+=(--main-gpu "$OCR_VLM_MAIN_GPU")
+        fi
+        echo "[OCR] Multi-GPU tensor split actief: tensor_split=$split split_mode=$OCR_VLM_SPLIT_MODE main_gpu=$OCR_VLM_MAIN_GPU"
+      else
+        echo "[OCR] Waarschuwing: OCR llama-server ondersteunt --tensor-split niet. OCR kan dan vooral op 1 GPU draaien."
+      fi
+    fi
   fi
 
   echo "[OCR] Starten vision OCR server op poort $OCR_VLM_PORT..."
