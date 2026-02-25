@@ -107,7 +107,8 @@ OCR_PID=$!
 
 READY=0
 for _ in {1..180}; do
-  if curl -sS -m 5 "http://127.0.0.1:${OCR_PORT}/health" \
+  health="$(curl -s -m 5 "http://127.0.0.1:${OCR_PORT}/health" 2>/dev/null || true)"
+  if printf "%s" "$health" \
     | tr -d '\n' \
     | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"'; then
     READY=1

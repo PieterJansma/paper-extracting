@@ -34,6 +34,7 @@ OCR_VLM_DEFAULT_MAX_PAGES = 0
 OCR_VLM_DEFAULT_TIMEOUT = 180
 OCR_VLM_DEFAULT_MAX_TOKENS = 4000
 OCR_VLM_DEFAULT_IMAGE_MAX_SIDE = 1536
+OCR_VLM_DEFAULT_PAGE_RETRIES = 2
 
 
 def _env_int(name: str, default: int) -> int:
@@ -186,6 +187,7 @@ def _load_pdf_text_with_vlm_ocr(path: str, max_pages: Optional[int] = None) -> s
     max_tokens = max(256, _env_int("OCR_VLM_MAX_TOKENS", OCR_VLM_DEFAULT_MAX_TOKENS))
     configured_page_limit_raw = _env_int("OCR_VLM_MAX_PAGES", OCR_VLM_DEFAULT_MAX_PAGES)
     image_max_side = max(512, _env_int("OCR_VLM_IMAGE_MAX_SIDE", OCR_VLM_DEFAULT_IMAGE_MAX_SIDE))
+    page_retries = max(1, _env_int("OCR_VLM_PAGE_RETRIES", OCR_VLM_DEFAULT_PAGE_RETRIES))
 
     if not base_url or not model:
         log.warning(
@@ -259,22 +261,24 @@ def _load_pdf_text_with_vlm_ocr(path: str, max_pages: Optional[int] = None) -> s
                 "stream": False,
             }
 
-            try:
-                resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
-                if resp.status_code >= 400:
-                    body = (resp.text or "")[:600]
-                    last_err = f"HTTP {resp.status_code}: {body}"
-                    # Retry on transient server-side image processing failures.
-                    if 500 <= resp.status_code < 600:
-                        continue
-                    break
-                data = resp.json()
-                page_txt = _extract_chat_content_text(data)
-                if page_txt.strip():
-                    break
-            except Exception as e:
-                last_err = str(e)
-                continue
+            for _attempt in range(page_retries):
+                try:
+                    resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
+                    if resp.status_code >= 400:
+                        body = (resp.text or "")[:600]
+                        last_err = f"HTTP {resp.status_code}: {body}"
+                        # Retry on transient server-side image processing failures.
+                        if 500 <= resp.status_code < 600:
+                            continue
+                        break
+                    data = resp.json()
+                    page_txt = _extract_chat_content_text(data)
+                    if page_txt.strip():
+                        break
+                    last_err = "empty response"
+                except Exception as e:
+                    last_err = str(e)
+                    continue
 
             if page_txt.strip():
                 break
