@@ -1014,13 +1014,21 @@ def extract_fields(
 
     schema = _parse_template_schema(template_json)
 
+    def _is_context_overflow_error(err: BaseException) -> bool:
+        txt = str(err).lower()
+        return (
+            "exceed_context_size_error" in txt
+            or "exceeds the available context size" in txt
+            or ("context size" in txt and "exceed" in txt)
+        )
+
     def _run_single(
         context_text: str,
         *,
         use_prefix_messages: bool,
         apply_schema_defaults: bool,
-    ) -> Tuple[Dict[str, Any], bool, bool]:
-        # Returns (result, has_payload, had_llm_error)
+    ) -> Tuple[Dict[str, Any], bool, bool, bool]:
+        # Returns (result, has_payload, had_llm_error, had_context_overflow)
         prompt = _build_nuextract_prompt(
             template_json or "",
             instructions,
@@ -1045,6 +1053,7 @@ def extract_fields(
             ]
 
         had_llm_error = False
+        had_context_overflow = False
         try:
             raw_response = client.chat(
                 messages,
@@ -1058,6 +1067,7 @@ def extract_fields(
         except Exception as e:
             log.error("LLM Call failed: %s", e)
             had_llm_error = True
+            had_context_overflow = _is_context_overflow_error(e)
             raw_response = ""
 
         parsed = _json_load_stripping_fences(raw_response)
@@ -1095,7 +1105,7 @@ def extract_fields(
         has_payload = _has_payload_value(parsed)
         if apply_schema_defaults:
             parsed = _apply_schema_defaults(parsed, schema)
-        return parsed, has_payload, had_llm_error
+        return parsed, has_payload, had_llm_error, had_context_overflow
 
     def _run_chunked() -> Dict[str, Any]:
         chunks = _split_text_chunks(
@@ -1115,11 +1125,18 @@ def extract_fields(
         payload_chunks = 0
         for idx, chunk in enumerate(chunks, start=1):
             log.info("Chunk %d/%d (%d chars)", idx, len(chunks), len(chunk))
-            part, has_payload, _had_llm_error = _run_single(
+            part, has_payload, _had_llm_error, _had_context_overflow = _run_single(
                 chunk,
                 use_prefix_messages=False,
                 apply_schema_defaults=False,
             )
+            if _had_context_overflow:
+                log.warning(
+                    "Chunk %d/%d exceeded model context (chunk_size_chars=%d).",
+                    idx,
+                    len(chunks),
+                    int(chunk_size_chars),
+                )
             if has_payload:
                 payload_chunks += 1
             merged = _merge_json_results(merged, part)
@@ -1136,13 +1153,20 @@ def extract_fields(
     if chunking_enabled and long_text:
         return _run_chunked()
 
-    single, has_payload, had_llm_error = _run_single(
+    single, has_payload, had_llm_error, had_context_overflow = _run_single(
         paper_text,
         use_prefix_messages=bool(prefix_messages),
         apply_schema_defaults=True,
     )
     if has_payload:
         return single
+
+    # Always recover from context overflows with chunking, even when chunking_enabled is false.
+    if had_context_overflow:
+        log.warning(
+            "One-shot extraction exceeded model context; retrying with chunked mode."
+        )
+        return _run_chunked()
 
     # Fallback for short/medium papers when one-shot fails unexpectedly.
     if chunking_enabled and (had_llm_error or len(paper_text) > int(chunk_size_chars)):

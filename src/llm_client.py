@@ -67,6 +67,17 @@ class OpenAICompatibleClient:
     ) -> str:
         url = f"{self.base_url}/chat/completions"
 
+        def _is_context_overflow_error(resp: requests.Response) -> bool:
+            try:
+                txt = (resp.text or "").lower()
+            except Exception:
+                txt = ""
+            return (
+                "exceed_context_size_error" in txt
+                or "exceeds the available context size" in txt
+                or ("context size" in txt and "exceed" in txt)
+            )
+
         payload: Dict[str, Any] = {
             "model": self.model,
             "messages": messages,
@@ -94,6 +105,10 @@ class OpenAICompatibleClient:
                 http = self._session if self._session is not None else requests
                 resp = http.post(url, headers=self.headers, json=payload, timeout=timeout)
 
+                if resp.status_code == 400 and _is_context_overflow_error(resp):
+                    body = (resp.text or "")[:2000]
+                    raise RuntimeError(f"exceed_context_size_error: {body}")
+
                 # Common llama-server transient state
                 if resp.status_code == 503:
                     txt = ""
@@ -112,6 +127,9 @@ class OpenAICompatibleClient:
                     stripped.pop("response_format", None)
                     stripped.pop("grammar", None)
                     resp = http.post(url, headers=self.headers, json=stripped, timeout=timeout)
+                    if resp.status_code == 400 and _is_context_overflow_error(resp):
+                        body = (resp.text or "")[:2000]
+                        raise RuntimeError(f"exceed_context_size_error: {body}")
 
                 if resp.status_code >= 400:
                     try:
@@ -153,6 +171,9 @@ class OpenAICompatibleClient:
                 raise
             except Exception as e:
                 last_err = e
+                # Context overflow is deterministic for this request body; do not retry.
+                if "exceed_context_size_error" in str(e).lower():
+                    raise
                 # retry once or twice for generic transient issues
                 if attempt + 1 < max_retries:
                     log.warning("LLM error (attempt %d/%d): %s", attempt + 1, max_retries, e)
