@@ -11,8 +11,8 @@ DATA_DIR="${DATA_DIR:-data}"
 TARGET_PDF="${1:-}"
 
 LLAMA_BIN="${LLAMA_BIN:-/groups/umcg-gcc/tmp02/users/umcg-pjansma/Repositories/llama.cpp-glmtest/build/bin/llama-server}"
-OCR_MODEL_PATH="${OCR_MODEL_PATH:-}"
-OCR_MMPROJ_PATH="${OCR_MMPROJ_PATH:-}"
+OCR_MODEL_PATH="${OCR_MODEL_PATH:-/groups/umcg-gcc/tmp02/users/umcg-pjansma/Models/GGUF/GLM-OCR/GLM-OCR-Q8_0.gguf}"
+OCR_MMPROJ_PATH="${OCR_MMPROJ_PATH:-/groups/umcg-gcc/tmp02/users/umcg-pjansma/Models/GGUF/GLM-OCR/mmproj-GLM-OCR-Q8_0.gguf}"
 OCR_ALIAS="${OCR_ALIAS:-glm-ocr}"
 OCR_PORT="${OCR_PORT:-18090}"
 OCR_CTX="${OCR_CTX:-16384}"
@@ -47,7 +47,7 @@ fi
 if [[ -z "$OCR_MODEL_PATH" ]]; then
   echo "❌ ERROR: OCR_MODEL_PATH is empty."
   echo "Set for example:"
-  echo "export OCR_MODEL_PATH=/groups/.../GLM-4.6V-Flash-Q4_K_M.gguf"
+  echo "export OCR_MODEL_PATH=/groups/.../GLM-OCR/GLM-OCR-Q8_0.gguf"
   exit 1
 fi
 if [[ ! -f "$OCR_MODEL_PATH" ]]; then
@@ -55,7 +55,14 @@ if [[ ! -f "$OCR_MODEL_PATH" ]]; then
   exit 1
 fi
 
-if [[ -n "$OCR_MMPROJ_PATH" && ! -f "$OCR_MMPROJ_PATH" ]]; then
+if [[ -z "$OCR_MMPROJ_PATH" ]]; then
+  echo "❌ ERROR: OCR_MMPROJ_PATH is empty."
+  echo "Set for example:"
+  echo "export OCR_MMPROJ_PATH=/groups/.../GLM-OCR/mmproj-GLM-OCR-Q8_0.gguf"
+  exit 1
+fi
+
+if [[ ! -f "$OCR_MMPROJ_PATH" ]]; then
   echo "❌ ERROR: OCR mmproj file not found: $OCR_MMPROJ_PATH"
   exit 1
 fi
@@ -90,15 +97,13 @@ trap cleanup EXIT INT TERM
 cmd=(
   "$LLAMA_BIN"
   -m "$OCR_MODEL_PATH"
+  --mmproj "$OCR_MMPROJ_PATH"
   --alias "$OCR_ALIAS"
   --host 127.0.0.1
   --port "$OCR_PORT"
   -c "$OCR_CTX"
   -ngl "$OCR_NGL"
 )
-if [[ -n "$OCR_MMPROJ_PATH" ]]; then
-  cmd+=(--mmproj "$OCR_MMPROJ_PATH")
-fi
 
 echo "[INFO] Starting OCR server..."
 echo "[INFO] log: $OCR_LOG"
