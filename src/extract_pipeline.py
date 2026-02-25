@@ -29,9 +29,11 @@ SYSTEM_EXTRACT_MSG = (
 )
 OCR_FALLBACK_MIN_CHARS = 3000
 LOW_QUALITY_ALNUM_RATIO = 0.35
-OCR_VLM_DEFAULT_MAX_PAGES = 3
+# 0 means: no page cap (all pages)
+OCR_VLM_DEFAULT_MAX_PAGES = 0
 OCR_VLM_DEFAULT_TIMEOUT = 180
 OCR_VLM_DEFAULT_MAX_TOKENS = 4000
+OCR_VLM_DEFAULT_IMAGE_MAX_SIDE = 1536
 
 
 def _env_int(name: str, default: int) -> int:
@@ -182,7 +184,8 @@ def _load_pdf_text_with_vlm_ocr(path: str, max_pages: Optional[int] = None) -> s
     api_key = (os.getenv("OCR_VLM_API_KEY") or "").strip()
     timeout = max(30, _env_int("OCR_VLM_TIMEOUT_SEC", OCR_VLM_DEFAULT_TIMEOUT))
     max_tokens = max(256, _env_int("OCR_VLM_MAX_TOKENS", OCR_VLM_DEFAULT_MAX_TOKENS))
-    configured_page_limit = max(1, _env_int("OCR_VLM_MAX_PAGES", OCR_VLM_DEFAULT_MAX_PAGES))
+    configured_page_limit_raw = _env_int("OCR_VLM_MAX_PAGES", OCR_VLM_DEFAULT_MAX_PAGES)
+    image_max_side = max(512, _env_int("OCR_VLM_IMAGE_MAX_SIDE", OCR_VLM_DEFAULT_IMAGE_MAX_SIDE))
 
     if not base_url or not model:
         log.warning(
@@ -191,15 +194,21 @@ def _load_pdf_text_with_vlm_ocr(path: str, max_pages: Optional[int] = None) -> s
         )
         return ""
 
+    page_limit: Optional[int] = None
     if max_pages and max_pages > 0:
-        page_limit = min(int(max_pages), configured_page_limit)
-    else:
-        page_limit = configured_page_limit
+        page_limit = int(max_pages)
+    if configured_page_limit_raw > 0:
+        page_limit = (
+            configured_page_limit_raw
+            if page_limit is None
+            else min(page_limit, configured_page_limit_raw)
+        )
 
     page_images = _render_pdf_pages_to_png(path, page_limit=page_limit)
     if not page_images:
         log.warning("Vision OCR fallback skipped: no rendered page images for %s.", path)
         return ""
+    page_images = [_normalize_image_for_vlm(img, image_max_side) for img in page_images]
 
     url = _with_v1(base_url) + "/chat/completions"
     headers: Dict[str, str] = {
@@ -212,48 +221,51 @@ def _load_pdf_text_with_vlm_ocr(path: str, max_pages: Optional[int] = None) -> s
     page_texts: List[str] = []
     total_pages = len(page_images)
     for idx, img_bytes in enumerate(page_images, start=1):
-        b64 = base64.b64encode(img_bytes).decode("ascii")
-        payload: Dict[str, Any] = {
-            "model": model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an OCR engine. Return only transcribed text. "
-                        "No summary, no JSON, no markdown."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": (
-                                f"Transcribe this PDF page ({idx}/{total_pages}) verbatim. "
-                                "Keep headings and table values as plain text."
-                            ),
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{b64}"},
-                        },
-                    ],
-                },
-            ],
-            "temperature": 0.0,
-            "max_tokens": int(max_tokens),
-            "stream": False,
-        }
-
         page_txt = ""
         last_err: Optional[str] = None
-        for attempt in range(2):
+        # Retry same page with progressively smaller image to reduce VLM image-processing failures.
+        for side in _image_retry_sides(image_max_side):
+            img_try = _normalize_image_for_vlm(img_bytes, side)
+            b64 = base64.b64encode(img_try).decode("ascii")
+            payload: Dict[str, Any] = {
+                "model": model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an OCR engine. Return only transcribed text. "
+                            "No summary, no JSON, no markdown."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": (
+                                    f"Transcribe this PDF page ({idx}/{total_pages}) verbatim. "
+                                    "Keep headings and table values as plain text."
+                                ),
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:image/png;base64,{b64}"},
+                            },
+                        ],
+                    },
+                ],
+                "temperature": 0.0,
+                "max_tokens": int(max_tokens),
+                "stream": False,
+            }
+
             try:
                 resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
                 if resp.status_code >= 400:
                     body = (resp.text or "")[:600]
                     last_err = f"HTTP {resp.status_code}: {body}"
-                    if attempt == 0 and 500 <= resp.status_code < 600:
+                    # Retry on transient server-side image processing failures.
+                    if 500 <= resp.status_code < 600:
                         continue
                     break
                 data = resp.json()
@@ -262,6 +274,10 @@ def _load_pdf_text_with_vlm_ocr(path: str, max_pages: Optional[int] = None) -> s
                     break
             except Exception as e:
                 last_err = str(e)
+                continue
+
+            if page_txt.strip():
+                break
 
         if not page_txt.strip():
             log.warning(
@@ -310,8 +326,24 @@ def _with_v1(base_url: str) -> str:
     return base if base.endswith("/v1") else base + "/v1"
 
 
-def _render_pdf_pages_to_png(path: str, page_limit: int) -> List[bytes]:
-    page_limit = max(1, int(page_limit))
+def _image_retry_sides(start_side: int) -> List[int]:
+    start = max(512, int(start_side))
+    candidates = [start]
+    for s in (1280, 1024, 768, 640, 512):
+        if s < start:
+            candidates.append(s)
+    seen = set()
+    ordered: List[int] = []
+    for s in candidates:
+        if s not in seen:
+            seen.add(s)
+            ordered.append(s)
+    return ordered
+
+
+def _render_pdf_pages_to_png(path: str, page_limit: Optional[int]) -> List[bytes]:
+    if page_limit is not None:
+        page_limit = max(1, int(page_limit))
 
     imgs = _render_pdf_pages_to_png_pdfium(path, page_limit)
     if imgs:
@@ -324,7 +356,43 @@ def _render_pdf_pages_to_png(path: str, page_limit: int) -> List[bytes]:
     return []
 
 
-def _render_pdf_pages_to_png_pdfium(path: str, page_limit: int) -> List[bytes]:
+def _normalize_image_for_vlm(img_bytes: bytes, max_side: int) -> bytes:
+    """
+    Normalize rendered page images before sending to VLM OCR endpoints.
+    - convert to RGB
+    - optionally downscale very large pages
+    - write stable PNG bytes
+    """
+    try:
+        from PIL import Image  # type: ignore
+    except Exception:
+        return img_bytes
+
+    try:
+        with Image.open(io.BytesIO(img_bytes)) as im:
+            if im.mode != "RGB":
+                im = im.convert("RGB")
+
+            w, h = im.size
+            mx = max(w, h)
+            if mx > int(max_side):
+                scale = float(max_side) / float(mx)
+                nw = max(1, int(round(w * scale)))
+                nh = max(1, int(round(h * scale)))
+                try:
+                    resample = Image.Resampling.LANCZOS  # Pillow>=9
+                except Exception:
+                    resample = Image.LANCZOS
+                im = im.resize((nw, nh), resample=resample)
+
+            out = io.BytesIO()
+            im.save(out, format="PNG", optimize=True)
+            return out.getvalue()
+    except Exception:
+        return img_bytes
+
+
+def _render_pdf_pages_to_png_pdfium(path: str, page_limit: Optional[int]) -> List[bytes]:
     try:
         import pypdfium2 as pdfium  # type: ignore
     except Exception:
@@ -334,7 +402,7 @@ def _render_pdf_pages_to_png_pdfium(path: str, page_limit: int) -> List[bytes]:
     try:
         doc = pdfium.PdfDocument(path)
         total = len(doc)
-        limit = min(total, page_limit)
+        limit = total if page_limit is None else min(total, int(page_limit))
         for i in range(limit):
             page = doc[i]
             try:
@@ -359,7 +427,7 @@ def _render_pdf_pages_to_png_pdfium(path: str, page_limit: int) -> List[bytes]:
     return out
 
 
-def _render_pdf_pages_to_png_pdftoppm(path: str, page_limit: int) -> List[bytes]:
+def _render_pdf_pages_to_png_pdftoppm(path: str, page_limit: Optional[int]) -> List[bytes]:
     pdftoppm_bin = shutil.which("pdftoppm")
     if not pdftoppm_bin:
         return []
@@ -373,11 +441,11 @@ def _render_pdf_pages_to_png_pdftoppm(path: str, page_limit: int) -> List[bytes]
             "-png",
             "-f",
             "1",
-            "-l",
-            str(page_limit),
             path,
             prefix,
         ]
+        if page_limit is not None:
+            cmd[6:6] = ["-l", str(int(page_limit))]
         try:
             subprocess.run(cmd, check=True, capture_output=True, text=True)
         except subprocess.CalledProcessError as e:

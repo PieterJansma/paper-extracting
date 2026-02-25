@@ -156,7 +156,7 @@ Long-paper tuning (optional, in `[llm]`):
   - to enable vision OCR fallback, set env vars before running:
     - `OCR_VLM_BASE_URL` (for example `http://host:port/v1`)
     - `OCR_VLM_MODEL` (for example your GLM OCR model id)
-    - optional: `OCR_VLM_API_KEY`, `OCR_VLM_MAX_PAGES` (default `3`), `OCR_VLM_TIMEOUT_SEC` (default `180`), `OCR_VLM_MAX_TOKENS` (default `4000`)
+    - optional: `OCR_VLM_API_KEY`, `OCR_VLM_MAX_PAGES` (default `0` = all pages), `OCR_VLM_TIMEOUT_SEC` (default `180`), `OCR_VLM_MAX_TOKENS` (default `4000`), `OCR_VLM_IMAGE_MAX_SIDE` (default `1536`)
   - vision OCR page rendering uses `pypdfium2` (if installed) or `pdftoppm` (if available in PATH)
 - Excel writer error:
   - install `openpyxl` or `xlsxwriter`
