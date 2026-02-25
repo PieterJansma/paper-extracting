@@ -26,16 +26,17 @@ LOCAL_RSYNC_DEST="/Users/p.jansma/Documents/cluster_data/"
 LOCAL_RSYNC_HOST=""
 
 # Optional local vision OCR endpoint for PDF text fallback.
-# Enable by exporting OCR_VLM_ENABLE=1 before running this script.
-OCR_VLM_ENABLE="${OCR_VLM_ENABLE:-0}"
-OCR_VLM_MODEL_PATH="${OCR_VLM_MODEL_PATH:-}"
-OCR_VLM_MMPROJ_PATH="${OCR_VLM_MMPROJ_PATH:-}"
+# Defaults below are set for this cluster/user setup.
+# You can still override them via environment variables if needed.
+OCR_VLM_ENABLE="${OCR_VLM_ENABLE:-1}"
+OCR_VLM_MODEL_PATH="${OCR_VLM_MODEL_PATH:-/groups/umcg-gcc/tmp02/users/umcg-pjansma/Models/GGUF/GLM-OCR/GLM-OCR-Q8_0.gguf}"
+OCR_VLM_MMPROJ_PATH="${OCR_VLM_MMPROJ_PATH:-/groups/umcg-gcc/tmp02/users/umcg-pjansma/Models/GGUF/GLM-OCR/mmproj-GLM-OCR-Q8_0.gguf}"
 OCR_VLM_ALIAS="${OCR_VLM_ALIAS:-glm-ocr}"
 OCR_VLM_PORT="${OCR_VLM_PORT:-$PORT_OCR}"
 OCR_VLM_CTX="${OCR_VLM_CTX:-8192}"
-OCR_VLM_NGL="${OCR_VLM_NGL:-0}"
-OCR_VLM_GPU="${OCR_VLM_GPU:-}"
-OCR_VLM_LLAMA_BIN="${OCR_VLM_LLAMA_BIN:-$LLAMA_BIN}"
+OCR_VLM_NGL="${OCR_VLM_NGL:-999}"
+OCR_VLM_GPU="${OCR_VLM_GPU:-0,1}"
+OCR_VLM_LLAMA_BIN="${OCR_VLM_LLAMA_BIN:-/groups/umcg-gcc/tmp02/users/umcg-pjansma/Repositories/llama.cpp-glmtest/build/bin/llama-server}"
 
 # ------------------------------------------------------------------------------
 # CLI passthrough:

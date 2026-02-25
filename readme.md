@@ -93,12 +93,14 @@ All PDFs in `data/`:
 bash src/run_cluster_final.sh -p all --pdfs data/*.pdf -o final_all.xlsx
 ```
 
-Enable local Vision OCR endpoint inside the same cluster script (optional):
+Vision OCR in `run_cluster_final.sh` is preconfigured for this cluster setup (GLM-OCR defaults in script).
+You can run without extra OCR exports.
+
+Override only when needed:
 
 ```bash
 pip3 install pypdfium2 pillow
 
-export OCR_VLM_ENABLE=1
 export OCR_VLM_MODEL_PATH=/path/to/vision-model.gguf
 # required for many vision models:
 export OCR_VLM_MMPROJ_PATH=/path/to/mmproj.gguf
@@ -109,8 +111,8 @@ export OCR_VLM_LLAMA_BIN=/path/to/llama-server
 export OCR_VLM_ALIAS=glm-ocr
 export OCR_VLM_PORT=18090
 export OCR_VLM_CTX=8192
-export OCR_VLM_NGL=0
-export OCR_VLM_GPU=0
+export OCR_VLM_NGL=999
+export OCR_VLM_GPU=0,1
 
 bash src/run_cluster_final.sh -p all --pdfs data/*.pdf -o final_all.xlsx
 ```
