@@ -79,12 +79,18 @@ pdf-extract --help
 - starts a local TCP load balancer
 - writes `config.runtime.toml` with LB URL
 - runs `src/main_final.py`
-- syncs output if `LOCAL_RSYNC_DEST` is usable
+- optional sync (`SYNC_OUTPUT_ENABLE=0` by default)
 
 Default run:
 
 ```bash
 bash src/run_cluster_final.sh
+```
+
+Run via Slurm batch:
+
+```bash
+sbatch src/run_cluster_final.sbatch -p all --pdfs data/*.pdf -o final_all.xlsx
 ```
 
 All PDFs in `data/`:
@@ -104,6 +110,11 @@ Write side-by-side text compare files (`pypdf` vs OCR) without extra env exports
 ```bash
 bash src/run_cluster_final.sh --ocr --ocr-dump -p A --pdfs data/concrete.pdf -o onepaper.xlsx
 ```
+
+Per-run artifacts are written under `logs/runs/<run_id>/`:
+- `status.jsonl` (state transitions)
+- `pipeline_issues.json` (per-paper/pass warnings and errors)
+- run-specific logs and runtime config
 
 Single-paper OCR test (writes two full text files only):
 

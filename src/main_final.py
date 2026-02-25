@@ -244,6 +244,18 @@ def _is_empty_value(v: Any) -> bool:
     return False
 
 
+def _has_payload_value(v: Any) -> bool:
+    if v is None:
+        return False
+    if isinstance(v, str):
+        return v.strip() != ""
+    if isinstance(v, list):
+        return any(_has_payload_value(x) for x in v)
+    if isinstance(v, dict):
+        return any(_has_payload_value(x) for x in v.values())
+    return True
+
+
 def _combine_collection_event_results(
     core_result: Dict[str, Any] | None,
     enrich_result: Dict[str, Any] | None,
@@ -790,10 +802,33 @@ def cli() -> None:
     people_rows: List[Dict[str, Any]] = []
     publication_rows: List[Dict[str, Any]] = []
     documentation_rows: List[Dict[str, Any]] = []
+    run_issues: List[Dict[str, Any]] = []
+
+    issue_file = os.environ.get("PIPELINE_ISSUES_FILE", "").strip()
+    if not issue_file:
+        issue_file = f"{args.output}.issues.json"
+
+    core_payload_sections = {
+        "task_overview",
+        "task_design_structure",
+        "task_population",
+        "task_access_conditions",
+        "task_information",
+    }
 
     for pdf_path, label in zip(pdf_paths, labels):
         paper_text = load_pdf_text(pdf_path, max_pages=pdf_cfg.get("max_pages"))
         log.info("PDF '%s' loaded (%d chars)", pdf_path, len(paper_text))
+        if not paper_text.strip():
+            run_issues.append(
+                {
+                    "paper": label,
+                    "pdf_path": pdf_path,
+                    "severity": "error",
+                    "kind": "empty_pdf_text",
+                    "message": "No text extracted from PDF after fallback chain.",
+                }
+            )
 
         prefix_messages: List[Dict[str, str]] | None = None
         prompt_cache_enabled = bool(llm_cfg.get("prompt_cache", False))
@@ -818,16 +853,45 @@ def cli() -> None:
         for code, name, section_key in pass_defs:
             if "ALL" in selected_passes or code in selected_passes:
                 task_cfg = cfg.get(section_key, {})
-                result = _collect_pass_result(
-                    client,
-                    paper_text,
-                    task_cfg,
-                    llm_cfg,
-                    log,
-                    name,
-                    prefix_messages=prefix_messages,
-                )
+                try:
+                    result = _collect_pass_result(
+                        client,
+                        paper_text,
+                        task_cfg,
+                        llm_cfg,
+                        log,
+                        name,
+                        prefix_messages=prefix_messages,
+                    )
+                except Exception as e:
+                    log.exception("Pass failed: %s (%s)", name, section_key)
+                    run_issues.append(
+                        {
+                            "paper": label,
+                            "pdf_path": pdf_path,
+                            "pass_code": code,
+                            "pass_name": name,
+                            "section_key": section_key,
+                            "severity": "error",
+                            "kind": "pass_exception",
+                            "message": str(e),
+                        }
+                    )
+                    result = {}
                 per_section_results[section_key] = result
+                if section_key in core_payload_sections and not _has_payload_value(result):
+                    run_issues.append(
+                        {
+                            "paper": label,
+                            "pdf_path": pdf_path,
+                            "pass_code": code,
+                            "pass_name": name,
+                            "section_key": section_key,
+                            "severity": "warning",
+                            "kind": "empty_payload",
+                            "message": "Pass returned no payload values.",
+                        }
+                    )
             else:
                 log.info("Skipping %s (not selected)", name)
 
@@ -1058,6 +1122,19 @@ def cli() -> None:
         )
 
     log.info("Excel succesvol opgeslagen: %s", args.output)
+
+    issue_payload = {
+        "output_file": args.output,
+        "pdf_count": len(pdf_paths),
+        "issue_count": len(run_issues),
+        "issues": run_issues,
+    }
+    try:
+        with open(issue_file, "w", encoding="utf-8") as f:
+            json.dump(issue_payload, f, ensure_ascii=False, indent=2)
+        log.info("Run issues written: %s (%d issue(s))", issue_file, len(run_issues))
+    except Exception as e:
+        log.warning("Could not write issues file %s: %s", issue_file, e)
 
 
 if __name__ == "__main__":

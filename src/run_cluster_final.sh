@@ -7,23 +7,33 @@ MODEL_PATH="/groups/umcg-gcc/tmp02/users/umcg-pjansma/Models/GGUF/Qwen2.5-32B-In
 MODEL_GPU0="$MODEL_PATH"
 MODEL_GPU1="$MODEL_PATH"
 
-PORT_LB=18000
-PORT_GPU0=18080
-PORT_GPU1=18081
-PORT_OCR=18090
+DEFAULT_PORT_LB=18000
+DEFAULT_PORT_GPU0=18080
+DEFAULT_PORT_GPU1=18081
+DEFAULT_PORT_OCR=18090
+
+PORT_LB="${PORT_LB:-$DEFAULT_PORT_LB}"
+PORT_GPU0="${PORT_GPU0:-$DEFAULT_PORT_GPU0}"
+PORT_GPU1="${PORT_GPU1:-$DEFAULT_PORT_GPU1}"
+PORT_OCR="${PORT_OCR:-$DEFAULT_PORT_OCR}"
+AUTO_PORTS="${AUTO_PORTS:-1}"
 
 CTX=20000
 SLOTS=1
 NGL=999
 
-LOG_DIR="${PWD}/logs"
+RUN_ID="${RUN_ID:-${SLURM_JOB_ID:-$(date +%Y%m%d_%H%M%S)_$$}}"
+RUN_DIR="${RUN_DIR:-${PWD}/logs/runs/${RUN_ID}}"
+LOG_DIR="${RUN_DIR}/logs"
 mkdir -p "$LOG_DIR"
+STATUS_LOG="${RUN_DIR}/status.jsonl"
 
 # Sync destination:
 # - If LOCAL_RSYNC_HOST is empty, destination is interpreted on the cluster node.
 # - If LOCAL_RSYNC_HOST is set, destination is interpreted on that remote host.
 LOCAL_RSYNC_DEST="/Users/p.jansma/Documents/cluster_data/"
 LOCAL_RSYNC_HOST=""
+SYNC_OUTPUT_ENABLE="${SYNC_OUTPUT_ENABLE:-0}"
 
 # Optional local vision OCR endpoint for PDF text fallback.
 # Defaults below are set for this cluster/user setup.
@@ -32,6 +42,11 @@ OCR_VLM_ENABLE="${OCR_VLM_ENABLE:-1}"
 OCR_VLM_MODEL_PATH="${OCR_VLM_MODEL_PATH:-/groups/umcg-gcc/tmp02/users/umcg-pjansma/Models/GGUF/GLM-OCR/GLM-OCR-Q8_0.gguf}"
 OCR_VLM_MMPROJ_PATH="${OCR_VLM_MMPROJ_PATH:-/groups/umcg-gcc/tmp02/users/umcg-pjansma/Models/GGUF/GLM-OCR/mmproj-GLM-OCR-Q8_0.gguf}"
 OCR_VLM_ALIAS="${OCR_VLM_ALIAS:-glm-ocr}"
+if [[ "${OCR_VLM_PORT+x}" == "x" ]]; then
+  OCR_VLM_PORT_ENV_SET=1
+else
+  OCR_VLM_PORT_ENV_SET=0
+fi
 OCR_VLM_PORT="${OCR_VLM_PORT:-$PORT_OCR}"
 OCR_VLM_CTX="${OCR_VLM_CTX:-8192}"
 OCR_VLM_NGL="${OCR_VLM_NGL:-999}"
@@ -42,7 +57,7 @@ OCR_VLM_SPLIT_MODE="${OCR_VLM_SPLIT_MODE:-layer}"
 OCR_VLM_MAIN_GPU="${OCR_VLM_MAIN_GPU:-0}"
 OCR_VLM_LLAMA_BIN="${OCR_VLM_LLAMA_BIN:-/groups/umcg-gcc/tmp02/users/umcg-pjansma/Repositories/llama.cpp-glmtest/build/bin/llama-server}"
 OCR_VLM_PREFETCH_MODE="${OCR_VLM_PREFETCH_MODE:-1}"
-OCR_PREFETCH_DIR="${OCR_PREFETCH_DIR:-${PWD}/logs/ocr_prefetch}"
+OCR_PREFETCH_DIR="${OCR_PREFETCH_DIR:-${RUN_DIR}/ocr_prefetch}"
 
 # ------------------------------------------------------------------------------
 # CLI passthrough:
@@ -100,6 +115,57 @@ for ((i=0; i<${#RUN_ARGS[@]}; i++)); do
   esac
 done
 
+status_event() {
+  local state="$1"
+  local message="${2:-}"
+  local now
+  now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  python3 - "$STATUS_LOG" "$now" "$state" "$message" "$RUN_ID" "$OUTPUT_FILE" <<'PY'
+import json
+import os
+import sys
+
+status_log, ts, state, msg, run_id, output_file = sys.argv[1:]
+os.makedirs(os.path.dirname(status_log), exist_ok=True)
+event = {
+    "timestamp_utc": ts,
+    "run_id": run_id,
+    "state": state,
+    "message": msg,
+    "output_file": output_file,
+}
+with open(status_log, "a", encoding="utf-8") as f:
+    f.write(json.dumps(event, ensure_ascii=True) + "\n")
+PY
+}
+
+if [[ "$AUTO_PORTS" == "1" ]]; then
+  read -r PORT_LB PORT_GPU0 PORT_GPU1 PORT_OCR < <(
+    python3 - <<'PY'
+import socket
+
+socks = []
+ports = []
+for _ in range(4):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("127.0.0.1", 0))
+    socks.append(s)
+    ports.append(s.getsockname()[1])
+for s in socks:
+    s.close()
+print(*ports)
+PY
+  )
+  if [[ "$OCR_VLM_PORT_ENV_SET" != "1" ]]; then
+    OCR_VLM_PORT="$PORT_OCR"
+  fi
+fi
+
+echo "[Run] RUN_ID=$RUN_ID"
+echo "[Run] RUN_DIR=$RUN_DIR"
+echo "[Run] Ports LB/GPU0/GPU1/OCR: $PORT_LB / $PORT_GPU0 / $PORT_GPU1 / $OCR_VLM_PORT"
+status_event "initializing" "run bootstrap started"
+
 if command -v module >/dev/null 2>&1; then
   module purge || true
   module load GCCcore/11.3.0 || true
@@ -132,10 +198,11 @@ if [[ ! -f "config.final.toml" ]]; then
 fi
 
 echo "[0/4] Runtime config maken met base_url via Load Balancer..."
-RUNTIME_CFG="${PWD}/config.runtime.toml"
+RUNTIME_CFG="${RUN_DIR}/config.runtime.toml"
 cp -f "config.final.toml" "$RUNTIME_CFG"
 sed -i -E "s|^(base_url[[:space:]]*=[[:space:]]*\").*(\"[[:space:]]*)$|\1http://127.0.0.1:${PORT_LB}/v1\2|g" "$RUNTIME_CFG"
 export PDF_EXTRACT_CONFIG="$RUNTIME_CFG"
+status_event "runtime_config_ready" "runtime config prepared"
 
 if [[ "$OCR_DUMP_COMPARE" == "1" ]]; then
   if [[ -z "$OCR_DUMP_DIR" ]]; then
@@ -150,8 +217,11 @@ pids=()
 LB_PID=""
 OCR_PID=""
 WEAK_PDFS_FILE="${LOG_DIR}/ocr_weak_pdfs.txt"
+OCR_PREFETCH_FAILED_FILE="${LOG_DIR}/ocr_prefetch_failed.txt"
+PDF_TARGETS=()
 
 cleanup() {
+  local exit_code=$?
   echo
   echo "[CLEANUP] Stoppen..."
   if [[ -n "${OCR_PID}" ]]; then
@@ -163,8 +233,11 @@ cleanup() {
   if [[ ${#pids[@]} -gt 0 ]]; then
     kill "${pids[@]}" 2>/dev/null || true
   fi
-  rm -f tcp_lb.py
-  rm -f "$RUNTIME_CFG"
+  if [[ "$exit_code" -eq 0 ]]; then
+    status_event "completed" "run finished successfully"
+  else
+    status_event "failed" "run failed with exit_code=${exit_code}"
+  fi
 }
 trap cleanup EXIT INT TERM
 
@@ -379,6 +452,30 @@ PY
   fi
 }
 
+validate_pdf_targets() {
+  if [[ ${#PDF_TARGETS[@]} -eq 0 ]]; then
+    echo "❌ ERROR: No PDF targets resolved from --pdfs or config [pdf].path."
+    status_event "failed" "no pdf targets resolved"
+    exit 1
+  fi
+
+  local missing=0
+  : > "${RUN_DIR}/pdf_targets.resolved.txt"
+  for p in "${PDF_TARGETS[@]}"; do
+    if [[ ! -f "$p" ]]; then
+      echo "❌ ERROR: PDF target not found: $p"
+      missing=1
+    else
+      printf '%s\n' "$p" >> "${RUN_DIR}/pdf_targets.resolved.txt"
+    fi
+  done
+
+  if [[ "$missing" -ne 0 ]]; then
+    status_event "failed" "one or more PDF targets missing"
+    exit 1
+  fi
+}
+
 run_ocr_prefetch_if_enabled() {
   if [[ "$OCR_VLM_ENABLE" != "1" ]]; then
     return 0
@@ -387,13 +484,17 @@ run_ocr_prefetch_if_enabled() {
     return 0
   fi
 
-  resolve_pdf_targets
+  if [[ ${#PDF_TARGETS[@]} -eq 0 ]]; then
+    resolve_pdf_targets
+  fi
   if [[ ${#PDF_TARGETS[@]} -eq 0 ]]; then
     echo "[OCR] Geen PDF targets gevonden; skip OCR prefetch."
     OCR_VLM_ENABLE=0
+    status_event "ocr_prefetch_skipped" "no PDF targets resolved for OCR prefetch"
     return 0
   fi
 
+  status_event "ocr_prefetch_started" "evaluating OCR prefetch targets"
   printf '%s\n' "${PDF_TARGETS[@]}" > "${LOG_DIR}/pdf_targets.txt"
 
   check_ocr_render_deps
@@ -431,14 +532,16 @@ PY
   if [[ "${weak_count:-0}" -eq 0 ]]; then
     echo "[OCR] Geen zwakke PDFs gevonden; OCR server wordt niet gestart."
     OCR_VLM_ENABLE=0
+    status_event "ocr_prefetch_skipped" "no weak PDFs needed OCR prefetch"
     return 0
   fi
 
   echo "[OCR] Zwakke PDFs: $weak_count. OCR prefetch start..."
+  status_event "ocr_prefetch_running" "prefetching OCR text for weak PDFs"
   mkdir -p "$OCR_PREFETCH_DIR"
   start_ocr_server_if_enabled
 
-  PYTHONPATH=src WEAK_PDFS_FILE="$WEAK_PDFS_FILE" OCR_PREFETCH_DIR="$OCR_PREFETCH_DIR" python3 - <<'PY'
+  PYTHONPATH=src WEAK_PDFS_FILE="$WEAK_PDFS_FILE" OCR_PREFETCH_DIR="$OCR_PREFETCH_DIR" OCR_PREFETCH_FAILED_FILE="$OCR_PREFETCH_FAILED_FILE" python3 - <<'PY'
 import os
 import re
 from pathlib import Path
@@ -451,7 +554,9 @@ def safe_stem(p: str) -> str:
 
 weak_file = Path(os.environ["WEAK_PDFS_FILE"])
 out_dir = Path(os.environ["OCR_PREFETCH_DIR"])
+failed_file = Path(os.environ["OCR_PREFETCH_FAILED_FILE"])
 out_dir.mkdir(parents=True, exist_ok=True)
+failed = []
 
 for line in weak_file.read_text(encoding="utf-8").splitlines():
     p = line.strip()
@@ -460,13 +565,27 @@ for line in weak_file.read_text(encoding="utf-8").splitlines():
     txt = ep._load_pdf_text_with_vlm_ocr(p, max_pages=None)
     out = out_dir / f"{safe_stem(p)}.ocr.txt"
     out.write_text(txt or "", encoding="utf-8")
+    if not (txt or "").strip():
+        failed.append(p)
     print(f"prefetched\t{Path(p).name}\t{len(txt)}")
+failed_file.write_text("\n".join(failed), encoding="utf-8")
 PY
 
   stop_ocr_server_if_running
+  local fail_count
+  fail_count="$(grep -cve '^[[:space:]]*$' "$OCR_PREFETCH_FAILED_FILE" 2>/dev/null || echo 0)"
+  if [[ "${fail_count:-0}" -gt 0 ]]; then
+    echo "⚠️  OCR prefetch failed for ${fail_count} weak PDF(s). See $OCR_PREFETCH_FAILED_FILE"
+    if [[ "$OCR_FORCE_ALL" == "1" ]]; then
+      status_event "failed" "forced OCR prefetch failed for ${fail_count} PDF(s)"
+      exit 1
+    fi
+    status_event "warning" "OCR prefetch failed for ${fail_count} weak PDF(s); continuing with pypdf/layout for those files"
+  fi
   unset OCR_VLM_BASE_URL OCR_VLM_MODEL
   export OCR_PREFETCH_DIR
   echo "[OCR] Prefetch klaar. OCR_PREFETCH_DIR=$OCR_PREFETCH_DIR"
+  status_event "ocr_prefetch_completed" "OCR prefetch completed"
 
   # Prevent starting live OCR server concurrently with Qwen servers.
   OCR_VLM_ENABLE=0
@@ -489,10 +608,33 @@ warmup_chat() {
     "http://127.0.0.1:${port}/v1/chat/completions" >/dev/null 2>&1 || true
 }
 
+wait_lb_ready() {
+  local port="$1"
+  echo -n "  ⏳ Wachten tot LB verkeer doorstuurt op poort $port"
+  for _ in {1..120}; do
+    if curl -sS -m 5 "http://127.0.0.1:${port}/health" \
+      | tr -d '\n' \
+      | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"'; then
+      echo " ✅ READY"
+      return 0
+    fi
+    sleep 1
+    echo -n "."
+  done
+  echo " ❌ TIMEOUT"
+  return 1
+}
+
+echo "[0a/4] Resolving and validating PDF targets..."
+resolve_pdf_targets
+validate_pdf_targets
+status_event "pdf_targets_resolved" "resolved ${#PDF_TARGETS[@]} PDF target(s)"
+
 echo "[0b/4] OCR prefetch (indien nodig) vóór Qwen startup..."
 run_ocr_prefetch_if_enabled
 
 echo "[1/4] Starten Servers..."
+status_event "qwen_starting" "starting Qwen servers"
 start_server 0 "$MODEL_GPU0" "$PORT_GPU0" "$LOG_DIR/gpu0.log"
 start_server 1 "$MODEL_GPU1" "$PORT_GPU1" "$LOG_DIR/gpu1.log"
 
@@ -503,9 +645,11 @@ wait_health_ok "$PORT_GPU1" || exit 1
 echo "[2b/4] Warmup (voorkomt 503 Loading model bij eerste zware prompt)..."
 warmup_chat "$PORT_GPU0"
 warmup_chat "$PORT_GPU1"
+status_event "qwen_ready" "Qwen servers healthy and warmed"
 
 echo "[3/4] Starten Load Balancer..."
-cat > tcp_lb.py <<EOF
+LB_SCRIPT="${RUN_DIR}/tcp_lb.py"
+cat > "$LB_SCRIPT" <<EOF
 import socket, threading, select, itertools, time
 
 BIND_ADDR = ('0.0.0.0', $PORT_LB)
@@ -573,8 +717,10 @@ if __name__ == '__main__':
     main()
 EOF
 
-python3 tcp_lb.py > "$LOG_DIR/lb.log" 2>&1 &
+python3 "$LB_SCRIPT" > "$LOG_DIR/lb.log" 2>&1 &
 LB_PID=$!
+wait_lb_ready "$PORT_LB" || exit 1
+status_event "lb_ready" "load balancer ready"
 
 if [[ "$OCR_VLM_ENABLE" == "1" && "$OCR_VLM_PREFETCH_MODE" != "1" ]]; then
   echo "[3b/4] Starten Vision OCR endpoint (live fallback mode)..."
@@ -585,30 +731,37 @@ fi
 
 echo "[4/4] Starten main_final.py (PDF extractie → Excel)..."
 echo "  PDF_EXTRACT_CONFIG=$PDF_EXTRACT_CONFIG"
+export PIPELINE_ISSUES_FILE="${RUN_DIR}/pipeline_issues.json"
+status_event "extract_running" "starting main_final.py"
 python3 src/main_final.py "${RUN_ARGS[@]}"
+status_event "extract_done" "main_final.py completed"
 
 RSYNC_TARGET="$LOCAL_RSYNC_DEST"
 if [[ -n "$LOCAL_RSYNC_HOST" ]]; then
   RSYNC_TARGET="${LOCAL_RSYNC_HOST}:${LOCAL_RSYNC_DEST}"
 fi
 
-echo "[4b/4] Sync output naar lokaal..."
-if [[ -n "$LOCAL_RSYNC_HOST" ]]; then
-  # Ensure destination directory exists on remote receiver before syncing.
-  rsync -avhP \
-    --rsync-path="mkdir -p \"$LOCAL_RSYNC_DEST\" && rsync" \
-    "$OUTPUT_FILE" "$RSYNC_TARGET"
-else
-  # Guard: on cluster nodes, macOS paths like /Users/... are not local paths.
-  if [[ "$LOCAL_RSYNC_DEST" == /Users/* ]]; then
-    echo "⚠️  Skip sync: '$LOCAL_RSYNC_DEST' is een macOS pad en bestaat niet op de cluster node."
-    echo "   Haal het bestand op vanaf je Mac met:"
-    echo "   rsync -avhP tunnel+nibbler:${PWD}/$OUTPUT_FILE \"$LOCAL_RSYNC_DEST\""
+if [[ "$SYNC_OUTPUT_ENABLE" == "1" ]]; then
+  echo "[4b/4] Sync output naar lokaal..."
+  if [[ -n "$LOCAL_RSYNC_HOST" ]]; then
+    # Ensure destination directory exists on remote receiver before syncing.
+    rsync -avhP \
+      --rsync-path="mkdir -p \"$LOCAL_RSYNC_DEST\" && rsync" \
+      "$OUTPUT_FILE" "$RSYNC_TARGET"
   else
-    # Ensure destination directory exists for local receiver.
-    mkdir -p "$LOCAL_RSYNC_DEST"
-    rsync -avhP "$OUTPUT_FILE" "$RSYNC_TARGET"
+    # Guard: on cluster nodes, macOS paths like /Users/... are not local paths.
+    if [[ "$LOCAL_RSYNC_DEST" == /Users/* ]]; then
+      echo "⚠️  Skip sync: '$LOCAL_RSYNC_DEST' is een macOS pad en bestaat niet op de cluster node."
+      echo "   Haal het bestand op vanaf je Mac met:"
+      echo "   rsync -avhP tunnel+nibbler:${PWD}/$OUTPUT_FILE \"$LOCAL_RSYNC_DEST\""
+    else
+      # Ensure destination directory exists for local receiver.
+      mkdir -p "$LOCAL_RSYNC_DEST"
+      rsync -avhP "$OUTPUT_FILE" "$RSYNC_TARGET"
+    fi
   fi
+else
+  echo "[4b/4] Sync skipped (SYNC_OUTPUT_ENABLE=0)."
 fi
 
 echo "✅ Klaar."
