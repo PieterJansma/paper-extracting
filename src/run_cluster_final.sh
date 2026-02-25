@@ -389,6 +389,9 @@ warmup_chat() {
     "http://127.0.0.1:${port}/v1/chat/completions" >/dev/null 2>&1 || true
 }
 
+echo "[0b/4] OCR prefetch (indien nodig) vóór Qwen startup..."
+run_ocr_prefetch_if_enabled
+
 echo "[1/4] Starten Servers..."
 start_server 0 "$MODEL_GPU0" "$PORT_GPU0" "$LOG_DIR/gpu0.log"
 start_server 1 "$MODEL_GPU1" "$PORT_GPU1" "$LOG_DIR/gpu1.log"
@@ -400,8 +403,6 @@ wait_health_ok "$PORT_GPU1" || exit 1
 echo "[2b/4] Warmup (voorkomt 503 Loading model bij eerste zware prompt)..."
 warmup_chat "$PORT_GPU0"
 warmup_chat "$PORT_GPU1"
-
-run_ocr_prefetch_if_enabled
 
 echo "[3/4] Starten Load Balancer..."
 cat > tcp_lb.py <<EOF
