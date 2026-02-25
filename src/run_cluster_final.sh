@@ -44,16 +44,48 @@ OCR_PREFETCH_DIR="${OCR_PREFETCH_DIR:-${PWD}/logs/ocr_prefetch}"
 # CLI passthrough:
 # - run without args => defaults to main_final.py -p all -o final_result.xlsx
 # - run with args    => forwards args to main_final.py
+# - extra script-only flags:
+#     --ocr        force OCR prefetch for all selected PDFs
+#     --ocr-dump   write pypdf/ocr/diff/summary text files per paper
 # Example:
 #   bash src/run_cluster_final.sh
 #   bash src/run_cluster_final.sh -p A -o out.xlsx --pdfs data/concrete.pdf data/oncolifes.pdf
+#   bash src/run_cluster_final.sh --ocr --ocr-dump -p A --pdfs data/concrete.pdf -o out.xlsx
 # ------------------------------------------------------------------------------
 DEFAULT_ARGS=(-p all -o final_result.xlsx)
 if [[ $# -gt 0 ]]; then
-  RUN_ARGS=("$@")
+  INPUT_ARGS=("$@")
 else
-  RUN_ARGS=("${DEFAULT_ARGS[@]}")
+  INPUT_ARGS=("${DEFAULT_ARGS[@]}")
 fi
+
+OCR_FORCE_ALL="${OCR_FORCE_ALL:-0}"
+OCR_DUMP_COMPARE=0
+OCR_DUMP_DIR="${OCR_DUMP_DIR:-}"
+RUN_ARGS=()
+for ((i=0; i<${#INPUT_ARGS[@]}; i++)); do
+  arg="${INPUT_ARGS[$i]}"
+  case "$arg" in
+    --ocr)
+      OCR_FORCE_ALL=1
+      ;;
+    --ocr-dump)
+      OCR_DUMP_COMPARE=1
+      ;;
+    --ocr-dump-dir)
+      OCR_DUMP_COMPARE=1
+      if (( i + 1 >= ${#INPUT_ARGS[@]} )); then
+        echo "❌ ERROR: --ocr-dump-dir vereist een pad."
+        exit 1
+      fi
+      i=$((i + 1))
+      OCR_DUMP_DIR="${INPUT_ARGS[$i]}"
+      ;;
+    *)
+      RUN_ARGS+=("$arg")
+      ;;
+  esac
+done
 
 OUTPUT_FILE="final_result.xlsx"
 for ((i=0; i<${#RUN_ARGS[@]}; i++)); do
@@ -100,6 +132,15 @@ RUNTIME_CFG="${PWD}/config.runtime.toml"
 cp -f "config.final.toml" "$RUNTIME_CFG"
 sed -i -E "s|^(base_url[[:space:]]*=[[:space:]]*\").*(\"[[:space:]]*)$|\1http://127.0.0.1:${PORT_LB}/v1\2|g" "$RUNTIME_CFG"
 export PDF_EXTRACT_CONFIG="$RUNTIME_CFG"
+
+if [[ "$OCR_DUMP_COMPARE" == "1" ]]; then
+  if [[ -z "$OCR_DUMP_DIR" ]]; then
+    OCR_DUMP_DIR="${LOG_DIR}/text_compare"
+  fi
+  mkdir -p "$OCR_DUMP_DIR"
+  export OCR_COMPARE_DUMP_DIR="$OCR_DUMP_DIR"
+  echo "[OCR] Compare dumps enabled: $OCR_COMPARE_DUMP_DIR"
+fi
 
 pids=()
 LB_PID=""
@@ -303,6 +344,10 @@ run_ocr_prefetch_if_enabled() {
 
   check_ocr_render_deps
 
+  if [[ "$OCR_FORCE_ALL" == "1" ]]; then
+    echo "[OCR] --ocr actief: force OCR voor alle geselecteerde PDFs."
+    printf '%s\n' "${PDF_TARGETS[@]}" > "$WEAK_PDFS_FILE"
+  else
   echo "[OCR] Scannen welke PDFs echt OCR nodig hebben..."
   PYTHONPATH=src PDF_TARGET_FILE="${LOG_DIR}/pdf_targets.txt" WEAK_PDFS_FILE="$WEAK_PDFS_FILE" python3 - <<'PY'
 from pathlib import Path
@@ -325,9 +370,10 @@ for line in target_file.read_text(encoding="utf-8").splitlines():
 weak_file.write_text("\n".join(weak), encoding="utf-8")
 print(f"weak_pdfs={len(weak)}")
 PY
+  fi
 
   local weak_count
-  weak_count="$(wc -l < "$WEAK_PDFS_FILE" | tr -d ' ')"
+  weak_count="$(grep -cve '^[[:space:]]*$' "$WEAK_PDFS_FILE" 2>/dev/null || echo 0)"
   if [[ "${weak_count:-0}" -eq 0 ]]; then
     echo "[OCR] Geen zwakke PDFs gevonden; OCR server wordt niet gestart."
     OCR_VLM_ENABLE=0
@@ -476,8 +522,12 @@ EOF
 python3 tcp_lb.py > "$LOG_DIR/lb.log" 2>&1 &
 LB_PID=$!
 
-echo "[3b/4] Starten Vision OCR endpoint (optioneel)..."
-start_ocr_server_if_enabled
+if [[ "$OCR_VLM_ENABLE" == "1" && "$OCR_VLM_PREFETCH_MODE" != "1" ]]; then
+  echo "[3b/4] Starten Vision OCR endpoint (live fallback mode)..."
+  start_ocr_server_if_enabled
+else
+  echo "[3b/4] Vision OCR live start overgeslagen (prefetch mode)."
+fi
 
 echo "[4/4] Starten main_final.py (PDF extractie → Excel)..."
 echo "  PDF_EXTRACT_CONFIG=$PDF_EXTRACT_CONFIG"

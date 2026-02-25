@@ -93,6 +93,28 @@ All PDFs in `data/`:
 bash src/run_cluster_final.sh -p all --pdfs data/*.pdf -o final_all.xlsx
 ```
 
+Force OCR for selected papers:
+
+```bash
+bash src/run_cluster_final.sh --ocr -p A --pdfs data/concrete.pdf -o onepaper.xlsx
+```
+
+Write side-by-side text compare files (`pypdf` vs OCR) without extra env exports:
+
+```bash
+bash src/run_cluster_final.sh --ocr --ocr-dump -p A --pdfs data/concrete.pdf -o onepaper.xlsx
+```
+
+Single-paper OCR test (writes two full text files only):
+
+```bash
+bash src/run_ocr_text_compare.sh data/concrete.pdf
+```
+
+Default output location:
+- `logs/text_compare_single/<paper>.pypdf.txt`
+- `logs/text_compare_single/<paper>.ocr.txt`
+
 Vision OCR in `run_cluster_final.sh` is preconfigured for this cluster setup (GLM-OCR defaults in script).
 You can run without extra OCR exports.
 By default it uses prefetch mode (`OCR_VLM_PREFETCH_MODE=1`):

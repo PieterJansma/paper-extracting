@@ -69,15 +69,15 @@ def load_pdf_text(path: str, max_pages: Optional[int] = None) -> str:
         return ""
 
     prefetched_ocr = _load_prefetched_ocr_text(path)
-    if prefetched_ocr:
-        log.info("Using prefetched OCR text for %s (%d chars).", path, len(prefetched_ocr))
-        return prefetched_ocr
-
     pypdf_text = _load_pdf_text_pypdf(path, max_pages=max_pages)
     text = pypdf_text
-    ocr_text = ""
+    ocr_text = prefetched_ocr
 
-    if _needs_text_fallback(text):
+    if prefetched_ocr:
+        log.info("Using prefetched OCR text for %s (%d chars).", path, len(prefetched_ocr))
+        text = _pick_better_text(pypdf_text, prefetched_ocr, "pypdf", "prefetched_ocr")
+
+    if not prefetched_ocr and _needs_text_fallback(text):
         # First fallback: alternative pypdf extraction mode (no external tools required).
         log.warning(
             "Primary extraction looks weak (%d chars, alnum_ratio=%.2f). "
