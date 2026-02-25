@@ -18,9 +18,15 @@ PORT_GPU1="${PORT_GPU1:-$DEFAULT_PORT_GPU1}"
 PORT_OCR="${PORT_OCR:-$DEFAULT_PORT_OCR}"
 AUTO_PORTS="${AUTO_PORTS:-1}"
 
-CTX=20000
-SLOTS=1
-NGL=999
+CTX="${CTX:-20000}"
+SLOTS="${SLOTS:-1}"
+NGL="${NGL:-999}"
+
+# Optional runtime overrides for [llm] config values (applied to config.runtime.toml).
+LLM_CHUNKING_ENABLED="${LLM_CHUNKING_ENABLED:-}"
+LLM_LONG_TEXT_THRESHOLD_CHARS="${LLM_LONG_TEXT_THRESHOLD_CHARS:-}"
+LLM_CHUNK_SIZE_CHARS="${LLM_CHUNK_SIZE_CHARS:-}"
+LLM_CHUNK_OVERLAP_CHARS="${LLM_CHUNK_OVERLAP_CHARS:-}"
 
 RUN_ID="${RUN_ID:-${SLURM_JOB_ID:-$(date +%Y%m%d_%H%M%S)_$$}}"
 RUN_DIR="${RUN_DIR:-${PWD}/logs/runs/${RUN_ID}}"
@@ -202,6 +208,18 @@ echo "[0/4] Runtime config maken met base_url via Load Balancer..."
 RUNTIME_CFG="${RUN_DIR}/config.runtime.toml"
 cp -f "config.final.toml" "$RUNTIME_CFG"
 sed -i -E "s|^(base_url[[:space:]]*=[[:space:]]*\").*(\"[[:space:]]*)$|\1http://127.0.0.1:${PORT_LB}/v1\2|g" "$RUNTIME_CFG"
+if [[ -n "$LLM_CHUNKING_ENABLED" ]]; then
+  sed -i -E "s|^(chunking_enabled[[:space:]]*=[[:space:]]*).*$|\1${LLM_CHUNKING_ENABLED}|g" "$RUNTIME_CFG"
+fi
+if [[ -n "$LLM_LONG_TEXT_THRESHOLD_CHARS" ]]; then
+  sed -i -E "s|^(long_text_threshold_chars[[:space:]]*=[[:space:]]*).*$|\1${LLM_LONG_TEXT_THRESHOLD_CHARS}|g" "$RUNTIME_CFG"
+fi
+if [[ -n "$LLM_CHUNK_SIZE_CHARS" ]]; then
+  sed -i -E "s|^(chunk_size_chars[[:space:]]*=[[:space:]]*).*$|\1${LLM_CHUNK_SIZE_CHARS}|g" "$RUNTIME_CFG"
+fi
+if [[ -n "$LLM_CHUNK_OVERLAP_CHARS" ]]; then
+  sed -i -E "s|^(chunk_overlap_chars[[:space:]]*=[[:space:]]*).*$|\1${LLM_CHUNK_OVERLAP_CHARS}|g" "$RUNTIME_CFG"
+fi
 export PDF_EXTRACT_CONFIG="$RUNTIME_CFG"
 status_event "runtime_config_ready" "runtime config prepared"
 
@@ -477,6 +495,11 @@ validate_pdf_targets() {
   fi
 }
 
+count_nonempty_lines() {
+  local f="$1"
+  awk 'NF{c++} END{print c+0}' "$f" 2>/dev/null
+}
+
 run_ocr_prefetch_if_enabled() {
   if [[ "$OCR_VLM_ENABLE" != "1" ]]; then
     return 0
@@ -529,7 +552,7 @@ PY
   fi
 
   local weak_count
-  weak_count="$(grep -cve '^[[:space:]]*$' "$WEAK_PDFS_FILE" 2>/dev/null || echo 0)"
+  weak_count="$(count_nonempty_lines "$WEAK_PDFS_FILE")"
   if [[ "${weak_count:-0}" -eq 0 ]]; then
     echo "[OCR] Geen zwakke PDFs gevonden; OCR server wordt niet gestart."
     OCR_VLM_ENABLE=0
@@ -574,7 +597,7 @@ PY
 
   stop_ocr_server_if_running
   local fail_count
-  fail_count="$(grep -cve '^[[:space:]]*$' "$OCR_PREFETCH_FAILED_FILE" 2>/dev/null || echo 0)"
+  fail_count="$(count_nonempty_lines "$OCR_PREFETCH_FAILED_FILE")"
   if [[ "${fail_count:-0}" -gt 0 ]]; then
     echo "⚠️  OCR prefetch failed for ${fail_count} weak PDF(s). See $OCR_PREFETCH_FAILED_FILE"
     if [[ "$OCR_FORCE_ALL" == "1" ]]; then
