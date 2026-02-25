@@ -37,6 +37,8 @@ OCR_VLM_CTX="${OCR_VLM_CTX:-8192}"
 OCR_VLM_NGL="${OCR_VLM_NGL:-999}"
 OCR_VLM_GPU="${OCR_VLM_GPU:-0,1}"
 OCR_VLM_LLAMA_BIN="${OCR_VLM_LLAMA_BIN:-/groups/umcg-gcc/tmp02/users/umcg-pjansma/Repositories/llama.cpp-glmtest/build/bin/llama-server}"
+OCR_VLM_PREFETCH_MODE="${OCR_VLM_PREFETCH_MODE:-1}"
+OCR_PREFETCH_DIR="${OCR_PREFETCH_DIR:-${PWD}/logs/ocr_prefetch}"
 
 # ------------------------------------------------------------------------------
 # CLI passthrough:
@@ -102,6 +104,7 @@ export PDF_EXTRACT_CONFIG="$RUNTIME_CFG"
 pids=()
 LB_PID=""
 OCR_PID=""
+WEAK_PDFS_FILE="${LOG_DIR}/ocr_weak_pdfs.txt"
 
 cleanup() {
   echo
@@ -235,6 +238,140 @@ start_ocr_server_if_enabled() {
   echo "[OCR] OCR_VLM_MODEL=$OCR_VLM_MODEL"
 }
 
+stop_ocr_server_if_running() {
+  if [[ -n "${OCR_PID}" ]]; then
+    kill "${OCR_PID}" 2>/dev/null || true
+    wait "${OCR_PID}" 2>/dev/null || true
+    OCR_PID=""
+  fi
+}
+
+resolve_pdf_targets() {
+  PDF_TARGETS=()
+  local n="${#RUN_ARGS[@]}"
+  for ((i=0; i<n; i++)); do
+    if [[ "${RUN_ARGS[$i]}" == "--pdfs" ]]; then
+      for ((j=i+1; j<n; j++)); do
+        local arg="${RUN_ARGS[$j]}"
+        if [[ "$arg" == -* ]]; then
+          break
+        fi
+        PDF_TARGETS+=("$arg")
+      done
+    fi
+  done
+
+  if [[ ${#PDF_TARGETS[@]} -eq 0 ]]; then
+    local cfg_pdf
+    cfg_pdf="$(
+      PDF_EXTRACT_CONFIG="${PDF_EXTRACT_CONFIG}" python3 - <<'PY'
+import os
+try:
+    import tomllib as toml
+except ModuleNotFoundError:
+    import tomli as toml
+
+cfg = os.environ.get("PDF_EXTRACT_CONFIG", "config.final.toml")
+with open(cfg, "rb") as f:
+    data = toml.load(f)
+path = ((data.get("pdf") or {}).get("path") or "").strip()
+print(path)
+PY
+    )"
+    if [[ -n "$cfg_pdf" ]]; then
+      PDF_TARGETS+=("$cfg_pdf")
+    fi
+  fi
+}
+
+run_ocr_prefetch_if_enabled() {
+  if [[ "$OCR_VLM_ENABLE" != "1" ]]; then
+    return 0
+  fi
+  if [[ "$OCR_VLM_PREFETCH_MODE" != "1" ]]; then
+    return 0
+  fi
+
+  resolve_pdf_targets
+  if [[ ${#PDF_TARGETS[@]} -eq 0 ]]; then
+    echo "[OCR] Geen PDF targets gevonden; skip OCR prefetch."
+    OCR_VLM_ENABLE=0
+    return 0
+  fi
+
+  printf '%s\n' "${PDF_TARGETS[@]}" > "${LOG_DIR}/pdf_targets.txt"
+
+  check_ocr_render_deps
+
+  echo "[OCR] Scannen welke PDFs echt OCR nodig hebben..."
+  PYTHONPATH=src PDF_TARGET_FILE="${LOG_DIR}/pdf_targets.txt" WEAK_PDFS_FILE="$WEAK_PDFS_FILE" python3 - <<'PY'
+from pathlib import Path
+import os
+import extract_pipeline as ep
+
+target_file = Path(os.environ["PDF_TARGET_FILE"])
+weak_file = Path(os.environ["WEAK_PDFS_FILE"])
+weak = []
+for line in target_file.read_text(encoding="utf-8").splitlines():
+    p = line.strip()
+    if not p:
+        continue
+    txt = ep._load_pdf_text_pypdf(p, max_pages=None)
+    if ep._needs_text_fallback(txt):
+        layout = ep._load_pdf_text_pypdf(p, max_pages=None, layout_mode=True)
+        best = ep._pick_better_text(txt, layout, "default", "layout")
+        if ep._needs_text_fallback(best):
+            weak.append(p)
+weak_file.write_text("\n".join(weak), encoding="utf-8")
+print(f"weak_pdfs={len(weak)}")
+PY
+
+  local weak_count
+  weak_count="$(wc -l < "$WEAK_PDFS_FILE" | tr -d ' ')"
+  if [[ "${weak_count:-0}" -eq 0 ]]; then
+    echo "[OCR] Geen zwakke PDFs gevonden; OCR server wordt niet gestart."
+    OCR_VLM_ENABLE=0
+    return 0
+  fi
+
+  echo "[OCR] Zwakke PDFs: $weak_count. OCR prefetch start..."
+  mkdir -p "$OCR_PREFETCH_DIR"
+  start_ocr_server_if_enabled
+
+  PYTHONPATH=src WEAK_PDFS_FILE="$WEAK_PDFS_FILE" OCR_PREFETCH_DIR="$OCR_PREFETCH_DIR" python3 - <<'PY'
+import os
+import re
+from pathlib import Path
+import extract_pipeline as ep
+
+def safe_stem(p: str) -> str:
+    stem = Path(p).stem
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "_", stem).strip("._")
+    return stem or "paper"
+
+weak_file = Path(os.environ["WEAK_PDFS_FILE"])
+out_dir = Path(os.environ["OCR_PREFETCH_DIR"])
+out_dir.mkdir(parents=True, exist_ok=True)
+
+for line in weak_file.read_text(encoding="utf-8").splitlines():
+    p = line.strip()
+    if not p:
+        continue
+    txt = ep._load_pdf_text_with_vlm_ocr(p, max_pages=None)
+    out = out_dir / f"{safe_stem(p)}.ocr.txt"
+    out.write_text(txt or "", encoding="utf-8")
+    print(f"prefetched\t{Path(p).name}\t{len(txt)}")
+PY
+
+  stop_ocr_server_if_running
+  unset OCR_VLM_BASE_URL OCR_VLM_MODEL
+  export OCR_PREFETCH_DIR
+  echo "[OCR] Prefetch klaar. OCR_PREFETCH_DIR=$OCR_PREFETCH_DIR"
+
+  # Prevent starting live OCR server concurrently with Qwen servers.
+  OCR_VLM_ENABLE=0
+}
+
 warmup_chat() {
   local port="$1"
   echo "  🔥 Warmup chat op poort $port..."
@@ -264,7 +401,7 @@ echo "[2b/4] Warmup (voorkomt 503 Loading model bij eerste zware prompt)..."
 warmup_chat "$PORT_GPU0"
 warmup_chat "$PORT_GPU1"
 
-check_ocr_render_deps
+run_ocr_prefetch_if_enabled
 
 echo "[3/4] Starten Load Balancer..."
 cat > tcp_lb.py <<EOF

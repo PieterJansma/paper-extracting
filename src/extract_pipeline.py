@@ -67,6 +67,12 @@ def load_pdf_text(path: str, max_pages: Optional[int] = None) -> str:
     """
     if not path:
         return ""
+
+    prefetched_ocr = _load_prefetched_ocr_text(path)
+    if prefetched_ocr:
+        log.info("Using prefetched OCR text for %s (%d chars).", path, len(prefetched_ocr))
+        return prefetched_ocr
+
     pypdf_text = _load_pdf_text_pypdf(path, max_pages=max_pages)
     text = pypdf_text
     ocr_text = ""
@@ -163,6 +169,23 @@ def _safe_file_stem(path: str) -> str:
     stem = os.path.splitext(os.path.basename(path))[0]
     stem = re.sub(r"[^A-Za-z0-9._-]+", "_", stem).strip("._")
     return stem or "paper"
+
+
+def _load_prefetched_ocr_text(pdf_path: str) -> str:
+    prefetch_dir = (os.getenv("OCR_PREFETCH_DIR") or "").strip()
+    if not prefetch_dir:
+        return ""
+    stem = _safe_file_stem(pdf_path)
+    candidate = os.path.join(prefetch_dir, f"{stem}.ocr.txt")
+    if not os.path.isfile(candidate):
+        return ""
+    try:
+        with open(candidate, "r", encoding="utf-8") as f:
+            txt = f.read()
+        return txt if txt.strip() else ""
+    except Exception as e:
+        log.warning("Failed reading prefetched OCR text %s: %s", candidate, e)
+        return ""
 
 
 def _write_compare_artifacts(

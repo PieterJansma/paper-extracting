@@ -95,6 +95,11 @@ bash src/run_cluster_final.sh -p all --pdfs data/*.pdf -o final_all.xlsx
 
 Vision OCR in `run_cluster_final.sh` is preconfigured for this cluster setup (GLM-OCR defaults in script).
 You can run without extra OCR exports.
+By default it uses prefetch mode (`OCR_VLM_PREFETCH_MODE=1`):
+- script first checks which PDFs are weak with pypdf/layout
+- starts OCR server only for those weak PDFs to prefetch OCR text
+- stops OCR server
+- starts Qwen servers for extraction (no concurrent GPU contention)
 
 Override only when needed:
 
@@ -106,6 +111,7 @@ export OCR_VLM_MODEL_PATH=/path/to/vision-model.gguf
 export OCR_VLM_MMPROJ_PATH=/path/to/mmproj.gguf
 # optional separate llama-server binary for OCR (if different build):
 export OCR_VLM_LLAMA_BIN=/path/to/llama-server
+export OCR_VLM_PREFETCH_MODE=1
 
 # optional tuning:
 export OCR_VLM_ALIAS=glm-ocr
