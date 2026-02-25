@@ -35,6 +35,7 @@ OCR_VLM_PORT="${OCR_VLM_PORT:-$PORT_OCR}"
 OCR_VLM_CTX="${OCR_VLM_CTX:-8192}"
 OCR_VLM_NGL="${OCR_VLM_NGL:-0}"
 OCR_VLM_GPU="${OCR_VLM_GPU:-}"
+OCR_VLM_LLAMA_BIN="${OCR_VLM_LLAMA_BIN:-$LLAMA_BIN}"
 
 # ------------------------------------------------------------------------------
 # CLI passthrough:
@@ -179,6 +180,11 @@ start_ocr_server_if_enabled() {
     return 0
   fi
 
+  if [[ ! -x "$OCR_VLM_LLAMA_BIN" ]]; then
+    echo "❌ ERROR: OCR llama-server niet gevonden op $OCR_VLM_LLAMA_BIN"
+    exit 1
+  fi
+
   if [[ -z "$OCR_VLM_MODEL_PATH" ]]; then
     echo "❌ ERROR: OCR_VLM_ENABLE=1 maar OCR_VLM_MODEL_PATH is leeg."
     echo "   Bijvoorbeeld:"
@@ -192,7 +198,7 @@ start_ocr_server_if_enabled() {
   fi
 
   local cmd=(
-    "$LLAMA_BIN"
+    "$OCR_VLM_LLAMA_BIN"
     -m "$OCR_VLM_MODEL_PATH"
     --alias "$OCR_VLM_ALIAS"
     --host 127.0.0.1

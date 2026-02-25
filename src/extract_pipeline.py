@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import difflib
 import io
 import json
 import logging
@@ -35,6 +36,7 @@ OCR_VLM_DEFAULT_TIMEOUT = 180
 OCR_VLM_DEFAULT_MAX_TOKENS = 4000
 OCR_VLM_DEFAULT_IMAGE_MAX_SIDE = 1536
 OCR_VLM_DEFAULT_PAGE_RETRIES = 2
+OCR_COMPARE_DIFF_MAX_LINES = 120000
 
 
 def _env_int(name: str, default: int) -> int:
@@ -65,34 +67,48 @@ def load_pdf_text(path: str, max_pages: Optional[int] = None) -> str:
     """
     if not path:
         return ""
-    text = _load_pdf_text_pypdf(path, max_pages=max_pages)
-    if not _needs_text_fallback(text):
-        return text
+    pypdf_text = _load_pdf_text_pypdf(path, max_pages=max_pages)
+    text = pypdf_text
+    ocr_text = ""
 
-    # First fallback: alternative pypdf extraction mode (no external tools required).
-    log.warning(
-        "Primary extraction looks weak (%d chars, alnum_ratio=%.2f). "
-        "Trying pypdf layout fallback for %s.",
-        len(text.strip()),
-        _alnum_ratio(text),
-        path,
-    )
-    layout_text = _load_pdf_text_pypdf(path, max_pages=max_pages, layout_mode=True)
-    text = _pick_better_text(text, layout_text, "default", "layout")
-    if not _needs_text_fallback(text):
-        return text
+    if _needs_text_fallback(text):
+        # First fallback: alternative pypdf extraction mode (no external tools required).
+        log.warning(
+            "Primary extraction looks weak (%d chars, alnum_ratio=%.2f). "
+            "Trying pypdf layout fallback for %s.",
+            len(text.strip()),
+            _alnum_ratio(text),
+            path,
+        )
+        layout_text = _load_pdf_text_pypdf(path, max_pages=max_pages, layout_mode=True)
+        text = _pick_better_text(text, layout_text, "default", "layout")
 
-    # OCR fallback is intentionally conservative because it is expensive
-    # and depends on external binaries.
-    log.warning(
-        "Text still weak after layout fallback (%d chars, alnum_ratio=%.2f). "
-        "Trying OCR fallback for %s.",
-        len(text.strip()),
-        _alnum_ratio(text),
-        path,
-    )
-    ocr_text = _load_pdf_text_with_ocr(path, max_pages=max_pages)
-    return _pick_better_text(text, ocr_text, "pre_ocr", "ocr")
+        if _needs_text_fallback(text):
+            # OCR fallback is intentionally conservative because it is expensive
+            # and depends on external binaries.
+            log.warning(
+                "Text still weak after layout fallback (%d chars, alnum_ratio=%.2f). "
+                "Trying OCR fallback for %s.",
+                len(text.strip()),
+                _alnum_ratio(text),
+                path,
+            )
+            ocr_text = _load_pdf_text_with_ocr(path, max_pages=max_pages)
+            text = _pick_better_text(text, ocr_text, "pre_ocr", "ocr")
+
+    compare_dir = (os.getenv("OCR_COMPARE_DUMP_DIR") or "").strip()
+    if compare_dir:
+        compare_ocr = ocr_text
+        if not compare_ocr.strip():
+            compare_ocr = _load_pdf_text_with_ocr(path, max_pages=max_pages)
+        _write_compare_artifacts(
+            pdf_path=path,
+            pypdf_text=pypdf_text,
+            ocr_text=compare_ocr,
+            out_dir=compare_dir,
+        )
+
+    return text
 
 
 def _alnum_ratio(text: str) -> float:
@@ -141,6 +157,78 @@ def _pick_better_text(current: str, candidate: str, current_name: str, candidate
         )
         return candidate
     return current
+
+
+def _safe_file_stem(path: str) -> str:
+    stem = os.path.splitext(os.path.basename(path))[0]
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "_", stem).strip("._")
+    return stem or "paper"
+
+
+def _write_compare_artifacts(
+    *,
+    pdf_path: str,
+    pypdf_text: str,
+    ocr_text: str,
+    out_dir: str,
+) -> None:
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+    except Exception as e:
+        log.warning("Could not create OCR compare dir %r: %s", out_dir, e)
+        return
+
+    stem = _safe_file_stem(pdf_path)
+    pypdf_path = os.path.join(out_dir, f"{stem}.pypdf.txt")
+    ocr_path = os.path.join(out_dir, f"{stem}.ocr.txt")
+    diff_path = os.path.join(out_dir, f"{stem}.diff.txt")
+    summary_path = os.path.join(out_dir, f"{stem}.summary.txt")
+
+    try:
+        with open(pypdf_path, "w", encoding="utf-8") as f:
+            f.write(pypdf_text or "")
+        with open(ocr_path, "w", encoding="utf-8") as f:
+            f.write(ocr_text or "")
+
+        max_diff_lines = max(1000, _env_int("OCR_COMPARE_DIFF_MAX_LINES", OCR_COMPARE_DIFF_MAX_LINES))
+        diff_lines = difflib.unified_diff(
+            (pypdf_text or "").splitlines(),
+            (ocr_text or "").splitlines(),
+            fromfile=f"{stem}.pypdf.txt",
+            tofile=f"{stem}.ocr.txt",
+            lineterm="",
+        )
+        diff_acc: List[str] = []
+        for i, line in enumerate(diff_lines):
+            if i >= max_diff_lines:
+                diff_acc.append(
+                    f"... diff truncated after {max_diff_lines} lines. "
+                    "Set OCR_COMPARE_DIFF_MAX_LINES higher for full diff."
+                )
+                break
+            diff_acc.append(line)
+        with open(diff_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(diff_acc))
+
+        summary = [
+            f"pdf_path={pdf_path}",
+            f"pypdf_chars={len(pypdf_text or '')}",
+            f"ocr_chars={len(ocr_text or '')}",
+            f"delta_ocr_minus_pypdf={len(ocr_text or '') - len(pypdf_text or '')}",
+            f"pypdf_file={pypdf_path}",
+            f"ocr_file={ocr_path}",
+            f"diff_file={diff_path}",
+        ]
+        with open(summary_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(summary) + "\n")
+
+        log.info(
+            "Wrote OCR compare artifacts for %s -> %s",
+            pdf_path,
+            out_dir,
+        )
+    except Exception as e:
+        log.warning("Failed to write OCR compare artifacts for %s: %s", pdf_path, e)
 
 
 def _load_pdf_text_pypdf(

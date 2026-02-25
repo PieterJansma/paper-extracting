@@ -102,6 +102,8 @@ export OCR_VLM_ENABLE=1
 export OCR_VLM_MODEL_PATH=/path/to/vision-model.gguf
 # required for many vision models:
 export OCR_VLM_MMPROJ_PATH=/path/to/mmproj.gguf
+# optional separate llama-server binary for OCR (if different build):
+export OCR_VLM_LLAMA_BIN=/path/to/llama-server
 
 # optional tuning:
 export OCR_VLM_ALIAS=glm-ocr
@@ -112,6 +114,20 @@ export OCR_VLM_GPU=0
 
 bash src/run_cluster_final.sh -p all --pdfs data/*.pdf -o final_all.xlsx
 ```
+
+Write side-by-side text comparison artifacts (`pypdf` vs OCR) for inspection:
+
+```bash
+export OCR_COMPARE_DUMP_DIR=logs/text_compare
+# optional: include more/less diff lines
+export OCR_COMPARE_DIFF_MAX_LINES=120000
+```
+
+With `OCR_COMPARE_DUMP_DIR` enabled, for each processed paper the pipeline writes:
+- `<paper>.pypdf.txt`
+- `<paper>.ocr.txt`
+- `<paper>.diff.txt`
+- `<paper>.summary.txt`
 
 ## Key Behavior and Defaults
 
