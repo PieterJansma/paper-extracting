@@ -204,9 +204,18 @@ if [[ ! -f "config.final.toml" ]]; then
   exit 1
 fi
 
+PROMPTS_SRC="${PDF_EXTRACT_PROMPTS:-prompts.toml}"
+if [[ ! -f "$PROMPTS_SRC" ]]; then
+  echo "❌ ERROR: prompts bestand ontbreekt: $PROMPTS_SRC"
+  echo "   Zet PDF_EXTRACT_PROMPTS of plaats prompts.toml in ${PWD}"
+  exit 1
+fi
+
 echo "[0/4] Runtime config maken met base_url via Load Balancer..."
 RUNTIME_CFG="${RUN_DIR}/config.runtime.toml"
 cp -f "config.final.toml" "$RUNTIME_CFG"
+RUNTIME_PROMPTS="${RUN_DIR}/prompts.runtime.toml"
+cp -f "$PROMPTS_SRC" "$RUNTIME_PROMPTS"
 sed -i -E "s|^(base_url[[:space:]]*=[[:space:]]*\").*(\"[[:space:]]*)$|\1http://127.0.0.1:${PORT_LB}/v1\2|g" "$RUNTIME_CFG"
 if [[ -n "$LLM_CHUNKING_ENABLED" ]]; then
   sed -i -E "s|^(chunking_enabled[[:space:]]*=[[:space:]]*).*$|\1${LLM_CHUNKING_ENABLED}|g" "$RUNTIME_CFG"
@@ -221,6 +230,7 @@ if [[ -n "$LLM_CHUNK_OVERLAP_CHARS" ]]; then
   sed -i -E "s|^(chunk_overlap_chars[[:space:]]*=[[:space:]]*).*$|\1${LLM_CHUNK_OVERLAP_CHARS}|g" "$RUNTIME_CFG"
 fi
 export PDF_EXTRACT_CONFIG="$RUNTIME_CFG"
+export PDF_EXTRACT_PROMPTS="$RUNTIME_PROMPTS"
 status_event "runtime_config_ready" "runtime config prepared"
 
 if [[ "$OCR_DUMP_COMPARE" == "1" ]]; then
@@ -755,6 +765,7 @@ fi
 
 echo "[4/4] Starten main_final.py (PDF extractie → Excel)..."
 echo "  PDF_EXTRACT_CONFIG=$PDF_EXTRACT_CONFIG"
+echo "  PDF_EXTRACT_PROMPTS=$PDF_EXTRACT_PROMPTS"
 export PIPELINE_ISSUES_FILE="${RUN_DIR}/pipeline_issues.json"
 status_event "extract_running" "starting main_final.py"
 python3 src/main_final.py "${RUN_ARGS[@]}"

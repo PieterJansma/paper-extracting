@@ -1,0 +1,1560 @@
+[task_overview]
+template_json = """
+{
+  "pid": "string|null",
+  "name": "string|null",
+  "local_name": "string|null",
+  "acronym": "string|null",
+  "type": ["string"],
+  "type_other": "string|null",
+  "cohort_type": "string|null",
+  "website": "string|null",
+  "description": "string|null",
+  "keywords": ["string"],
+  "internal_identifiers": [
+    {
+      "identifier": "string",
+      "type": "string|null",
+      "type_other": "string|null"
+    }
+  ],
+  "external_identifiers": [
+    {
+      "identifier": "string",
+      "type": "string|null",
+      "type_other": "string|null"
+    }
+  ],
+  "start_year": "integer|null",
+  "end_year": "integer|null",
+  "contact_email": "string|null",
+  "issued": "string|null",
+  "modified": "string|null"
+}
+"""
+
+instructions = """
+Extract exact resource-level values only (HRICore "General information"). Do NOT infer.
+
+SCOPE
+- Describe the RESOURCE as a whole (cohort/registry/biobank).
+- Do NOT extract subpopulations here.
+- Use ONLY information explicitly stated in the PDF.
+
+GLOBAL RULES
+- No placeholders ("Unknown", "N/A", "Not specified").
+- If not explicitly stated → null or [].
+- Empty strings are NOT allowed.
+- Do NOT reuse values across fields unless explicitly stated.
+
+--------------------------------------------------
+pid / name / local_name / acronym
+--------------------------------------------------
+- pid:
+  Only if an explicit persistent identifier is stated (e.g. registry ID, trial ID, DOI).
+  Do NOT use acronym as pid.
+
+- name:
+  Only if the text explicitly labels a resource name (e.g. "<name> study/cohort/registry").
+  Article title alone ≠ resource name.
+  If the candidate equals the full paper/article title and is not explicitly labeled as a resource name,
+  set name = null.
+
+- local_name:
+  Only if explicitly stated as a local or participant-facing name.
+
+- acronym:
+  Only if explicitly marked as acronym OR a single-token abbreviation (no spaces).
+
+--------------------------------------------------
+type (STRICT dropdown)
+--------------------------------------------------
+Allowed values for type (exact strings only):
+- "Biobank"
+- "Catalogue"
+- "Clinical trial"
+- "Cohort study"
+- "Databank"
+- "Network"
+- "Rare disease"
+- "Common data model"
+- "Data source"
+- "Disease specific"
+- "Health records"
+- "Registry"
+- "Other type"
+
+Rules:
+- Add a value ONLY if the paper explicitly uses that label.
+- Do NOT infer from study design.
+- If no allowed value is explicitly stated → [].
+- If the resource type does not match any allowed value:
+  → type = ["Other type"]
+  → fill type_other with the exact wording from the text.
+
+--------------------------------------------------
+type_other
+--------------------------------------------------
+- Fill ONLY if type includes "Other type".
+- Must contain verbatim wording from the paper describing the resource type.
+- If type does NOT include "Other type" → type_other = null.
+
+--------------------------------------------------
+cohort_type (ONLY if type includes "Cohort study")
+--------------------------------------------------
+Allowed values (exact strings only):
+- "Clinical cohort"
+- "Population cohort"
+- "Case-control"
+- "Case only"
+- "Birth cohort"
+- "Other type"
+
+Rules:
+- Fill ONLY if "Cohort study" ∈ type[].
+- Only choose a value if explicitly stated.
+- Do NOT map or guess.
+- If cohort_type = "Other type":
+  → append exact wording to description (verbatim).
+
+--------------------------------------------------
+website / description / keywords
+--------------------------------------------------
+- website:
+  Only if an explicit URL is present AND it is clearly the resource/study website.
+  Do NOT use journal/publisher/license/reference URLs (e.g., DOI links, Creative Commons links, citation URLs).
+
+- description:
+  Only if the paper explicitly describes the resource.
+  Do NOT summarize or paraphrase.
+
+- keywords:
+  Return up to 8 keywords that best capture the paper/resource for retrieval and matching to related work.
+  Prioritize distinctive, descriptive terms that are central to this paper (methods, population, condition, intervention, setting).
+  Prefer terms present in the paper wording; avoid overly generic tags (e.g., "study", "data", "health") unless specifically needed.
+  Balance specificity and discoverability: choose terms another researcher would realistically search for.
+  If no meaningful terms can be extracted -> [].
+
+--------------------------------------------------
+Identifiers (STRICT lists)
+--------------------------------------------------
+GENERAL:
+- Do NOT invent identifiers.
+- Return [] if no identifier value is explicitly present.
+
+EXTERNAL IDENTIFIERS
+Allowed values for external_identifiers.type:
+- "EUPAS number"
+- "METc number"
+- "ClinicalTrials.gov"
+- "NCT number"
+- "NTR number"
+- "ISRCTN number"
+- "EUDRACT number"
+
+Rules:
+- If identifier type matches one of the above → set type.
+- Do NOT map one registry type to another (e.g., NTR is NOT NCT).
+- Map IDs that start with "ISRCTN" to type "ISRCTN number" (NOT "NTR number").
+- Otherwise:
+  → type = null
+  → type_other = exact wording from the text.
+
+INTERNAL IDENTIFIERS
+Allowed values for internal_identifiers.type:
+- "UMCG register Utopia"
+- "UMCG PaNaMaID"
+
+Rules:
+- Same logic as external identifiers.
+- Do NOT guess based on formatting.
+
+--------------------------------------------------
+Dates / contact
+--------------------------------------------------
+- start_year:
+  Integer year ONLY if explicitly tied to start wording ("started in YYYY", "established in YYYY").
+
+- end_year:
+  Integer year ONLY if explicitly tied to end wording ("ended in YYYY", "from YYYY to YYYY").
+
+- contact_email:
+  Only if explicitly shown.
+
+- issued / modified:
+  Only if explicitly stated as resource metadata dates (NOT article publication date).
+"""
+
+# ---------- PASS B: Design & structure (Resources) ----------
+[task_design_structure]
+template_json = """
+{
+  "design": "string|null",
+  "design_description": "string|null",
+  "data_collection_type": "string|null"
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
+
+Extract ONLY explicit values from the PDF. Do NOT infer.
+
+SCOPE
+- Resources → "design and structure":
+  - design
+  - design_description
+  - data_collection_type
+- Ignore EVERYTHING else (subpopulations, population, eligibility, samples, collection events, follow-up schedules).
+- Do NOT output "design schematic" (file upload field).
+
+GLOBAL RULES
+- No placeholders ("Unknown", "N/A", "Not specified").
+- If not explicitly stated -> null.
+- Use ONLY the allowed dropdown values exactly as written below.
+
+--------------------------------------------------
+design (STRICT dropdown; single select)
+--------------------------------------------------
+Allowed values (exact strings only):
+- "Longitudinal"
+- "Cross-sectional"
+
+Rules:
+- Fill if either:
+  (A) the paper explicitly uses "longitudinal" or "cross-sectional", OR
+  (B) explicit structural evidence supports one label:
+      - Longitudinal: repeated measurements/events over time are explicitly described
+        (e.g., baseline plus follow-up timepoints such as 6/12/24 months; repeated questionnaires/visits).
+      - Cross-sectional: one-time measurement/snapshot is explicitly described with no planned follow-up.
+- Use study-design context only (title/abstract/methods/design paragraphs).
+  Ignore incidental technical uses (e.g., figure captions like "cross sectional image" in imaging descriptions).
+- Prefer explicit wording over inferred structure when both are present.
+- Do NOT map to Cross-sectional when explicit follow-up events are present.
+- If not explicit -> null.
+
+--------------------------------------------------
+design_description (free text)
+--------------------------------------------------
+- Fill ONLY if the paper explicitly provides a short description of the study design in words.
+- Prefer verbatim or near-verbatim wording (max 250 characters).
+- Do NOT write your own summary.
+- If not explicit -> null.
+
+--------------------------------------------------
+data_collection_type (STRICT dropdown; single select)
+--------------------------------------------------
+Allowed values (exact strings only):
+- "Retrospective"
+- "Prospective"
+
+Rules:
+- Fill if either:
+  (A) explicitly stated as retrospective/prospective, OR
+  (B) explicit procedural evidence supports one label:
+      - Prospective: participants are enrolled and then followed forward in time
+        with planned future measurements/events.
+      - Retrospective: existing historical records are analyzed for past periods
+        without prospective follow-up design.
+- If the paper explicitly says BOTH apply:
+  -> set data_collection_type = null (do NOT guess which is primary).
+- If evidence for both is mixed/ambiguous -> null.
+- If not explicit -> null.
+"""
+
+
+
+# ---------- PASS C: Subpopulations ----------
+[task_subpopulations]
+template_json = """
+{
+  "subpopulations": [
+    {
+      "pid": "string|null",
+      "description": "string",
+      "keywords": ["string"],
+      "number_of_participants": "integer|null",
+      "counts": [
+        {
+          "year": "integer|null",
+          "age_group": "string|null",
+          "gender": "string|null",
+          "n_unique_individuals": "integer|null"
+        }
+      ],
+      "inclusion_start": "integer|null",
+      "inclusion_end": "integer|null",
+      "age_groups": ["string"],
+      "age_min": "integer|null",
+      "age_max": "integer|null",
+      "main_medical_condition": ["string"],
+      "comorbidity": ["string"],
+      "countries": ["verbatim-string"],
+      "regions": ["verbatim-string"],
+      "inclusion_criteria": ["string"],
+      "other_inclusion_criteria": ["string"],
+      "exclusion_criteria": ["string"],
+      "other_exclusion_criteria": ["string"],
+      "issued": "string|null",
+      "modified": "string|null",
+      "theme": ["string"],
+      "access_rights": "string",
+      "applicable_legislation": ["string"]
+    }
+  ]
+}
+"""
+
+instructions = """
+Extract explicitly defined subpopulations only (arms/subcohorts/strata/case-control/derivation-validation). Do NOT infer.
+If none are explicitly defined -> {"subpopulations": []}.
+
+Rules:
+- Evidence threshold: only output a subpopulation when the paper explicitly frames a distinct subgroup
+  (e.g., "subpopulation", "arm", "group", "stratum", "intervention arm", "control arm", "derivation/validation cohort").
+- Do NOT create subpopulations from generic site lists, acknowledgements, or overall trial logistics.
+- pid: only if explicitly stated for the subpopulation; else null. Do NOT invent.
+- description (required): 1–3 sentences describing the subpopulation using paper wording; no inference.
+- keywords (required): 5–12 terms to improve findability; try NOT to reuse words from description; no generic filler.
+- number_of_participants: fill when a subgroup N is explicitly stated OR explicitly approximated
+  (e.g., "about", "around", "approximately", "circa", "~", "ca.").
+  If approximated, convert to the nearest integer and keep it as an estimate-derived value.
+  If no explicit or approximate N is given -> null.
+- counts: return [] unless the paper explicitly provides unique individual counts by year AND age group AND gender (no partials).
+- inclusion_start/inclusion_end: explicit calendar years for this subpopulation only; ongoing -> inclusion_end null.
+- age_groups: only if explicitly listed; else [].
+- age_min/age_max: integers only if explicit; “≥X” -> age_min=X, age_max=null.
+- main_medical_condition/comorbidity: list explicit disease groups/codes or named comorbidities only; no code inference.
+- countries/regions: only if explicitly tied to this subpopulation; normalize "The Netherlands"->"Netherlands".
+- inclusion/exclusion criteria: only if explicitly applied to this subpopulation (or explicitly stated “same as study criteria”).
+- issued/modified: only if explicit publish/last modified dates for the subpopulation data; else null.
+- theme (required): must include "Health". Allowed: "Health","Agriculture","Environment","Energy","Government and public sector".
+- access_rights (required): "Open access" if explicitly public; "Restricted access" if explicitly controlled; else default "Non public".
+  IMPORTANT: article license text (e.g., "Open access article", CC-BY) is NOT evidence for dataset access_rights.
+- applicable_legislation (required): include only explicitly named applicable laws/regulations for this subpopulation.
+  Do NOT auto-add "Data Governance Act" unless explicitly stated.
+No placeholders ("Unknown/N/A/Not specified"). Use null or [].
+"""
+
+# ---------- PASS D: Collection events (CollectionEvents) ----------
+[task_collection_events]
+template_json = """
+{
+  "collection_events": [
+    {
+      "name": "string",
+      "pid": "string|null",
+      "description": "string",
+      "subpopulations": ["string"],
+      "keywords": ["string"],
+      "start_date": "string|null",
+      "end_date": "string|null",
+      "age_groups": ["string"],
+      "number_of_participants": "integer|null",
+      "areas_of_information": ["string"],
+      "sample_categories": ["string"],
+      "data_categories": ["string"],
+      "data_categories_other": "string|null",
+      "standardized_tools": ["string"],
+      "standardized_tools_other": "string|null",
+      "core_variables": ["string"],
+      "issued": "string|null",
+      "modified": "string|null",
+      "theme": ["string"],
+      "access_rights": "string",
+      "applicable_legislation": ["string"]
+    }
+  ]
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
+
+Extract Collection Events (HRICore CollectionEvents). Do NOT infer.
+
+SCOPE
+- A "collection event" is a distinct data-collection moment/wave/round/visit (e.g., baseline, follow-up, questionnaire wave).
+- Extract ONLY events explicitly described in the paper.
+- If no explicit events are described -> {"collection_events": []}.
+
+GLOBAL RULES
+- No placeholders ("Unknown", "N/A", "Not specified"). Use null or [].
+- Do NOT invent events.
+- Use paper wording as much as possible (verbatim or near-verbatim).
+- Do NOT convert generic trial timelines into collection events unless those timepoints are explicitly data-collection events.
+
+--------------------------------------------------
+name (REQUIRED)
+--------------------------------------------------
+- Use explicit event labels from the paper (e.g., "baseline", "6-month follow-up", "T0", "visit 1").
+- If an event is clearly described but unnamed, you MAY create a minimal label using ONLY explicit timing wording (e.g., "Baseline", "Follow-up at 6 months").
+- If you cannot produce a label from explicit wording -> do not output that event.
+
+--------------------------------------------------
+pid
+--------------------------------------------------
+- Only if an explicit persistent identifier for the event is stated; else null.
+
+--------------------------------------------------
+description (REQUIRED)
+--------------------------------------------------
+- 1–3 sentences describing what is collected/done in this event, using paper wording.
+- No inference.
+
+--------------------------------------------------
+subpopulations
+--------------------------------------------------
+- List subpopulations targeted by THIS collection event ONLY if explicitly stated.
+- Do NOT infer.
+- If not explicit -> [].
+
+--------------------------------------------------
+keywords (REQUIRED)
+--------------------------------------------------
+- 5–12 terms to improve findability of THIS collection event.
+- Must be verbatim terms from the paper (no invented synonyms).
+- No generic filler.
+
+--------------------------------------------------
+start_date / end_date
+--------------------------------------------------
+- Fill ONLY if explicitly stated for this event (as written).
+- Ongoing -> end_date null.
+- Do NOT infer from recruitment periods or publication dates.
+
+--------------------------------------------------
+age_groups
+--------------------------------------------------
+- Only fill if the paper explicitly names age group categories or clearly restricts the event to such groups.
+- Do NOT infer from mean/median age.
+- If not explicit -> [].
+
+--------------------------------------------------
+number_of_participants
+--------------------------------------------------
+- Only if the paper explicitly gives the N for THIS event/wave.
+- Do NOT reuse total cohort size.
+- Else null.
+
+--------------------------------------------------
+areas_of_information (STRICT UI top-level categories)
+--------------------------------------------------
+Allowed values (exact strings only; top-level categories):
+- "Socio-demographic and economic characteristics"
+- "Lifestyle and behaviours"
+- "Birth, pregnancy and reproductive health history"
+- "Perception of health, quality of life, development and functional limitations"
+- "Symptoms and signs"
+- "Medication and supplements"
+- "Non-pharmacological interventions"
+- "Health and community care services utilization"
+- "Death"
+- "Physical measures and assessments"
+- "Laboratory measures"
+- "Cognition, personality and psychological measures and assessments"
+- "Life events, life plans, beliefs and values"
+- "Preschool, school and work life"
+- "Social environment and relationships"
+- "Physical environment"
+- "Administrative information"
+
+Rules:
+- Add a category ONLY if the paper explicitly states that this type of information was collected in THIS event
+  OR explicitly lists measures/variables that clearly fall under one of these categories.
+- Prefer top-level categories only; do NOT output subcategory labels.
+- Do NOT infer categories from general cohort descriptions.
+- If not explicit -> [].
+
+--------------------------------------------------
+sample_categories
+--------------------------------------------------
+- List biological sample types/categories for THIS event ONLY if explicitly stated.
+- If not explicitly stated -> [].
+
+--------------------------------------------------
+data_categories
+--------------------------------------------------
+Use ONLY these exact strings if explicitly supported by the paper:
+- "Biological samples"
+- "Survey data"
+- "Imaging data"
+- "Medical records"
+- "National registries"
+- "Genealogical records"
+- "Physiological/Biochemical measurements"
+- "Genomics"
+- "Transcriptomics"
+- "Proteomics"
+- "Metabolomics"
+- "Other"
+
+Rules:
+- Add items ONLY if explicitly stated for this event.
+- If "Other" is included -> fill data_categories_other with exact wording from the paper.
+- Otherwise data_categories_other = null.
+- If not explicit -> [].
+
+--------------------------------------------------
+standardized_tools / standardized_tools_other
+--------------------------------------------------
+- standardized_tools: list explicit questionnaire/instrument/tool names used in THIS event.
+- Do NOT invent.
+- standardized_tools_other must be null unless standardized_tools includes "Other".
+- If no explicit tools -> [] and standardized_tools_other = null.
+
+--------------------------------------------------
+core_variables
+--------------------------------------------------
+- List 10–20 variable names ONLY if the paper explicitly lists them for this event.
+- If not explicitly enumerated -> [] (do NOT guess).
+
+--------------------------------------------------
+issued / modified
+--------------------------------------------------
+- Only if explicitly stated for this collection event's data; else null.
+- Do NOT infer from article publication date.
+
+--------------------------------------------------
+theme
+--------------------------------------------------
+Allowed values:
+- "Health"
+- "Agriculture"
+- "Environment"
+- "Energy"
+- "Government and public sector"
+
+Rules:
+- Must include "Health" for health events. If nothing else explicit -> ["Health"].
+
+--------------------------------------------------
+access_rights
+--------------------------------------------------
+Allowed values:
+- "Open access"
+- "Restricted access"
+- "Non public"
+
+Rules:
+- "Open access" ONLY if data are explicitly publicly available.
+- "Restricted access" ONLY if explicitly stated controlled/restricted.
+- Otherwise default "Non public".
+- IMPORTANT: article-level "Open access" publication status is NOT evidence that event-level data are open.
+
+--------------------------------------------------
+applicable_legislation
+--------------------------------------------------
+- Include ONLY explicitly named laws/regulations applicable to data access/use for this event.
+- Do NOT auto-add "Data Governance Act".
+- Add other laws ONLY if explicitly named (e.g., GDPR/AVG).
+- Do NOT include ethics guidelines.
+"""
+
+
+# ---------- PASS E: Population (Resource-level) ----------
+[task_population]
+template_json = """
+{
+  "number_of_participants": "integer|null",
+  "number_of_participants_with_samples": "integer|null",
+  "countries": ["verbatim-string"],
+  "regions": ["verbatim-string"],
+  "population_age_groups": ["string"],
+  "age_min": "integer|null",
+  "age_max": "integer|null",
+  "inclusion_criteria": ["string"],
+  "other_inclusion_criteria": ["string"],
+  "exclusion_criteria": ["string"],
+  "other_exclusion_criteria": ["string"],
+  "population_disease": ["string"],
+  "population_oncology_topology": ["string"],
+  "population_oncology_morphology": ["string"]
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
+
+Extract ONLY RESOURCE-LEVEL population information (the overall cohort/registry population).
+Do NOT extract subpopulations/arms/strata here (those belong to PASS C).
+Do NOT extract collection waves/visits (those belong to PASS D).
+
+GLOBAL RULES
+- No placeholders ("Unknown", "N/A", "Not specified").
+- If not explicitly stated -> null or [].
+- Do NOT infer from typical cohort practice, tables of baseline characteristics, or assumptions.
+- Do NOT copy values from other passes unless explicitly stated in the PDF.
+- Empty strings are NOT allowed.
+
+--------------------------------------------------
+number_of_participants
+--------------------------------------------------
+Definition: total number of individuals for which data is collected (resource-level).
+Rules:
+- Use ONLY if the paper explicitly states a total cohort/registry N (e.g., "N=...", "included ... participants").
+- Do NOT reuse event-level N (baseline visit N, follow-up N).
+- If multiple totals exist (e.g., different timepoints), pick ONLY the one explicitly described as the overall cohort size;
+  otherwise return null.
+
+--------------------------------------------------
+number_of_participants_with_samples
+--------------------------------------------------
+Definition: number of individuals for which biological samples were collected (resource-level).
+Rules:
+- Only fill if BOTH:
+  (1) at least one biospecimen type is explicitly mentioned (e.g., blood, saliva, urine, tissue, DNA),
+  AND (2) the paper explicitly states how many individuals provided/had samples collected/stored.
+- Do NOT infer from "biobank" wording or from total N.
+- If not explicit -> null.
+
+--------------------------------------------------
+countries / regions
+--------------------------------------------------
+- countries:
+  Include ONLY countries explicitly stated as origin of data/samples for this resource.
+  Normalize "The Netherlands" -> "Netherlands".
+- regions:
+  Include ONLY explicitly stated geographical regions/provinces/cities relevant to where data/samples originate.
+  Use verbatim wording (no harmonization beyond obvious Netherlands normalization above).
+- If none explicit -> [].
+
+--------------------------------------------------
+population_age_groups (STRICT dropdown labels)
+--------------------------------------------------
+Allowed values (exact strings only):
+- "Prenatal"
+- "All ages"
+- "Infant (0-23 months)"
+- "Newborn (0-1 months)"
+- "Infants and toddlers (2-23 months)"
+- "Child (2-12 years)"
+- "Adolescent (13-17 years)"
+- "Adult (18+ years)"
+- "Young adult (18-24 years)"
+- "Adult (25-44 years)"
+- "Middle-aged (45-64 years)"
+- "Aged (65+ years)"
+- "Aged (65-79 years)"
+- "Aged (80+ years)"
+
+Rules:
+- Add a value ONLY if the paper explicitly indicates the population includes that age group category
+  (either by naming the category or by explicitly stating an age range that maps unambiguously to one of these labels).
+- Do NOT infer "Adult (18+ years)" just because mean age > 18 unless explicitly restricted.
+- If not explicit -> [].
+
+--------------------------------------------------
+age_min / age_max
+--------------------------------------------------
+- age_min:
+  Integer ONLY if explicitly stated as minimum age (e.g. "≥18 years", "aged 0–5", "older than 16").
+  For "≥X" -> age_min=X.
+- age_max:
+  Integer ONLY if explicitly stated as maximum age (e.g. "≤80 years", "aged 0–5", "under 18").
+  For "≤Y" -> age_max=Y.
+- If only "≥X" is given -> age_max=null.
+- If only "≤Y" is given -> age_min=null.
+- Do NOT infer from mean/median age or SD.
+- If not explicit -> null.
+
+--------------------------------------------------
+inclusion_criteria / exclusion_criteria (STRICT dropdown values)
+--------------------------------------------------
+These fields are UI checkbox categories, NOT free-text criteria.
+Only output items that are explicitly stated in the paper.
+
+Allowed values (exact strings only) for BOTH inclusion_criteria and exclusion_criteria:
+
+
+Rules:
+- Add a label ONLY if the paper explicitly states that kind of criterion is used.
+  Examples:
+  - age threshold -> "Age group inclusion criterion"
+  - only females/males -> "Sex inclusion criterion"
+  - pregnancy-related requirement OR pregnancy-based exclusion -> "Gravidity inclusion criterion"
+  - prior diagnosis / prior procedure / prior disease history exclusion -> "Health status inclusion criterion"
+  - explicit disease/symptom target population (e.g., CAD suspected patients, atypical angina, chest pain complaints)
+    -> "Defined population inclusion criterion"
+  - explicit requirement to be free of/with a specific condition at baseline
+    -> "Health status inclusion criterion"
+  - must live in country/region -> "Country of residence inclusion criteria"
+  - must be hospital patients -> "Hospital patient inclusion criterion"
+- Apply the same mapping logic to BOTH inclusion_criteria and exclusion_criteria.
+- Important: although labels include the word "inclusion", they are category names used for exclusion_criteria as well.
+- If an explicit exclusion is present and maps to one of these categories, include the mapped category in exclusion_criteria.
+- If multiple criterion types are explicitly present, include all matching labels (do not keep only one).
+- Do NOT infer from demographic descriptions.
+- If not explicit -> [].
+
+--------------------------------------------------
+other_inclusion_criteria / other_exclusion_criteria
+--------------------------------------------------
+Free-text lists (paper wording), only if explicit.
+Rules:
+- Include verbatim or near-verbatim short phrases/sentences from the paper that specify criteria
+  that are NOT captured by the checkbox labels above.
+- For explicit inclusion criteria, always include the concrete wording in other_inclusion_criteria,
+  even when a checkbox category is also mapped in inclusion_criteria.
+- For explicit exclusions, always copy the concrete wording into other_exclusion_criteria,
+  even when a checkbox category is also mapped in exclusion_criteria.
+- Do NOT invent or summarize.
+- If nothing explicit -> [].
+
+--------------------------------------------------
+population_disease
+--------------------------------------------------
+- List diseases/conditions explicitly stated as the target/defined study population (resource-level).
+- Use exact wording (include codes if provided).
+- If not explicit -> [].
+
+--------------------------------------------------
+population_oncology_topology / population_oncology_morphology
+--------------------------------------------------
+- Only fill if the paper explicitly mentions oncology topology/morphology classifications/codes (e.g., ICD-O terms/codes).
+- Do NOT infer oncology just because cancer is mentioned.
+- If not explicit -> [].
+"""
+# ---------- PASS X: Available data & samples (Datasets + Samplesets subtables) ----------
+# NOTE: These are SUBTABLES. There can be MULTIPLE entries.
+# Output arrays; do NOT assume there is only one dataset/sampleset.
+
+# ---------- PASS X1: Datasets (Datasets table) ----------
+[task_datasets]
+template_json = """
+{
+  "datasets": [
+    {
+      "name": "string",
+      "label": "string|null",
+      "dataset_type": ["string"],
+      "unit_of_observation": "string|null",
+      "keywords": ["string"],
+      "description": "string|null",
+      "number_of_rows": "integer|null",
+      "since_version": "string|null",
+      "until_version": "string|null"
+    }
+  ]
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Do NOT infer.
+
+SCOPE
+- Extract entries for the HRICore Datasets subtable (Available data & samples).
+- There may be multiple datasets -> return one object per dataset.
+- If no dataset is explicitly described -> {"datasets": []}.
+
+GLOBAL RULES
+- No placeholders ("Unknown", "N/A", "Not specified").
+- If not explicitly stated -> null or [].
+- Do NOT invent dataset names, types, versions, counts, or units.
+- Do NOT copy values from other passes unless explicitly stated in the PDF.
+
+----------------------------------------
+name (REQUIRED)
+----------------------------------------
+- Use an explicit dataset/table name ONLY if the PDF explicitly names it (e.g., “baseline dataset”, “harmonised dataset X”, “questionnaire dataset”).
+- If there is no formal dataset name, but the PDF explicitly mentions a concrete dataset phrase
+  containing "dataset"/"data set" (or a named registry dataset), you MAY use that explicit phrase as name.
+- If neither exists -> return {"datasets": []}.
+  (Do NOT create generic names like "Dataset 1".)
+
+----------------------------------------
+label
+----------------------------------------
+- Short human readable description ONLY if explicitly provided (e.g., a caption-like label).
+- Otherwise null. Do NOT write your own summary.
+
+----------------------------------------
+dataset_type (STRICT dropdown; multi-select)
+----------------------------------------
+Allowed values (exact strings only):
+- "Collected dataset"
+- "Harmonised dataset"
+- "Harmonisation schema"
+
+Rules:
+- Add a value ONLY if the PDF explicitly uses wording that maps directly to one of these.
+- If nothing explicit -> [].
+
+----------------------------------------
+unit_of_observation (single select)
+----------------------------------------
+- Fill ONLY if the PDF explicitly states the unit (e.g., patient, person, sample, prescription/event/observation).
+- Otherwise null.
+- Do NOT guess from context.
+
+----------------------------------------
+keywords
+----------------------------------------
+- Only if explicitly listed for the dataset OR explicitly stated as tags/topics.
+- Must be verbatim terms from the PDF.
+- Otherwise [].
+
+----------------------------------------
+description
+----------------------------------------
+- Only if explicitly described as the role/function of this dataset/table (verbatim or near-verbatim).
+- Otherwise null.
+
+----------------------------------------
+number_of_rows
+----------------------------------------
+- Only if the PDF explicitly gives the record count for THIS dataset/table.
+- Otherwise null.
+- Do NOT reuse cohort size as row count.
+
+----------------------------------------
+mapped_to / mapped_from
+----------------------------------------
+- IGNORE these: they are UI fields only fillable after save; do NOT output.
+
+----------------------------------------
+since_version / until_version
+----------------------------------------
+- Only if explicitly stated (as written) for THIS dataset.
+- Otherwise null.
+- Do NOT infer from paper publication year, software versions, or dates.
+"""
+
+
+# ---------- PASS X2: Samplesets (Samplesets table) ----------
+[task_samplesets]
+template_json = """
+{
+  "samplesets": [
+    {
+      "name": "string",
+      "sample_types": ["string"]
+    }
+  ]
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Do NOT infer.
+
+SCOPE
+- Extract entries for the HRICore Samplesets subtable (Available data & samples).
+- There may be multiple sample sets -> return one object per sampleset.
+- If no sample sets are explicitly described -> {"samplesets": []}.
+
+GLOBAL RULES
+- No placeholders ("Unknown", "N/A", "Not specified").
+- If not explicitly stated -> [].
+- Do NOT invent sample set names or sample types.
+
+----------------------------------------
+name (REQUIRED)
+----------------------------------------
+- Use an explicit sample set name ONLY if the PDF explicitly names it (e.g., “Blood samples”, “Biobank sampleset”, “DNA collection”).
+- If no formal sampleset name exists, but the PDF explicitly uses a grouping phrase
+  such as "biological samples", "biomaterials", or "biobank samples",
+  you MAY use that explicit phrase as name.
+- If nothing explicit exists -> return {"samplesets": []}.
+  (Do NOT create generic names like “Sampleset 1”.)
+
+----------------------------------------
+sample_types
+----------------------------------------
+- List biological sample types explicitly mentioned as being part of THIS sampleset (e.g., Blood, Serum, Plasma, Saliva, Urine, Tissue, DNA).
+- Use the exact wording from the PDF where possible.
+- If the PDF does not list sample types for the named sampleset -> [].
+"""
+
+
+# ---------- PASS X3: Areas of information (Resources field; optional helper) ----------
+# (This is the Resources -> "areas of information" multi-select you showed under Available data)
+[task_areas_of_information]
+template_json = """
+{
+  "areas_of_information": ["string"]
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Do NOT infer.
+
+SCOPE
+- Extract ONLY the high-level 'areas of information that were collected' if the PDF explicitly states them.
+- If not explicitly stated -> {"areas_of_information": []}.
+
+RULES
+- Use verbatim terms/categories IF the paper lists them.
+- If the paper only gives general statements like “clinical data were collected” without a categorized list -> [].
+"""
+
+# ---------- PASS Y: Linkage (Resources → linkage) ----------
+[task_linkage]
+template_json = """
+{
+  "prelinked": "boolean|null",
+  "linkage_options": "string|null",
+  "linkage_possibility": "boolean|null"
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Do NOT infer.
+
+SCOPE
+- Extract RESOURCE-LEVEL linkage information (HRICore → linkage tab).
+- This is NOT dataset-level and NOT subpopulation-level.
+- Use ONLY information explicitly stated in the PDF.
+
+GLOBAL RULES
+- No placeholders ("Unknown", "N/A", "Not specified").
+- If not explicitly stated -> null.
+- Do NOT assume linkage because registries/databases are mentioned.
+- Do NOT assume identifiers imply linkage.
+
+----------------------------------------
+prelinked
+----------------------------------------
+Question:
+- "Is the data from this data source linked to other data sources?"
+
+Rules:
+- true ONLY if the PDF explicitly states that the data ARE ALREADY LINKED
+  (e.g. “data were linked to registry X”, “pre-linked with hospital records”).
+- false ONLY if the PDF explicitly states data are NOT linked.
+- If linkage status is not explicitly stated -> null.
+
+----------------------------------------
+linkage_options
+----------------------------------------
+Definition:
+- Text field describing WHICH external data sources can be linked.
+
+Rules:
+- Fill ONLY if the PDF explicitly mentions linkable or linked external resources
+  (e.g. named registries, databases, administrative records).
+- Use short verbatim or near-verbatim wording.
+- Do NOT list variables or outcomes (e.g. mortality, survival).
+- If multiple sources are mentioned, combine into a single string separated by "; ".
+- If nothing explicit -> null.
+
+----------------------------------------
+linkage_possibility
+----------------------------------------
+Question:
+- "Can this data source be linked to other data sources?"
+
+Rules:
+- true ONLY if the PDF explicitly states that linkage IS POSSIBLE
+  (e.g. “can be linked”, “linkage is possible”, “allows linkage with…”).
+- false ONLY if the PDF explicitly states linkage is NOT possible.
+- If not explicitly stated -> null.
+
+----------------------------------------
+IMPORTANT DISTINCTIONS
+----------------------------------------
+- Mentioning a registry ≠ linkage.
+- Using external data for comparison ≠ linkage.
+- Shared governance/network membership ≠ linkage.
+- Presence of identifiers ≠ linkage unless explicitly stated.
+"""
+
+
+# ---------- PASS H: Information (Publications + Documentation + other info) ----------
+[task_information]
+template_json = """
+{
+    "publications": [
+        {
+            "doi": "string",
+            "title": "string",
+            "is_design_publication": "boolean|null",
+            "reference": "string|null"
+        }
+    ],
+    "funding_statement": "string|null",
+    "citation_requirements": "string|null",
+    "acknowledgements": "string|null",
+    "provenance_statement": "string|null",
+    "documentation": [
+        {
+            "name": "string",
+            "type": "string|null",
+            "description": "string|null",
+            "url": "string|null",
+            "file": "string|null"
+        }
+    ],
+    "supplementary_information": "string|null",
+    "theme": ["string"],
+    "applicable_legislation": ["string"]
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
+
+Extract ONLY RESOURCE-LEVEL information (UI chapter: information). Do NOT infer.
+Use ONLY information explicitly stated in the PDF.
+
+SCOPE
+- publications (Publications table)
+- funding_statement
+- citation_requirements
+- acknowledgements
+- provenance_statement
+- documentation (Documentation table)
+- supplementary_information
+- theme
+- applicable_legislation
+
+GLOBAL RULES
+- No placeholders ("Unknown", "N/A", "Not specified").
+- If not explicitly stated -> null or [].
+- Empty strings are NOT allowed.
+- Do NOT invent DOIs, titles, URLs, file names, or references.
+- Do NOT create publication entries from citations unless the DOI (or equivalent persistent identifier) is explicitly provided.
+- Resource metadata only: do NOT treat journal front-matter defaults as resource metadata
+  (e.g., "Open access article", generic publisher copyright text, article submission dates).
+
+--------------------------------------------------
+publications (table; Publications)
+--------------------------------------------------
+- Output one row per publication ABOUT this resource only if explicitly indicated.
+- If no explicit publications are provided -> [].
+- If the current paper itself is a cohort/profile/protocol/methods publication describing this resource
+  and the header provides DOI + title, include one publication row for this paper.
+
+Fields:
+- doi (REQUIRED):
+    Only if explicitly provided (DOI string or DOI URL).
+    Output canonical DOI string only (format starts with "10.").
+    If a DOI URL is provided, normalize to the DOI string (remove URL prefix).
+    Do NOT output non-DOI URLs (e.g., Creative Commons license links) in this field.
+    If only a citation without DOI is provided -> do NOT output a publication row.
+
+- title (REQUIRED):
+    Only if explicitly provided as a publication title.
+
+- is_design_publication (boolean|null):
+    true ONLY if explicitly stated as design/marker/design paper/publication describing design of the cohort.
+    false ONLY if explicitly stated as NOT design publication.
+    If not explicit -> null.
+
+- reference (string|null):
+    Only if an explicit formatted reference string is provided in the PDF.
+    Otherwise null. Do NOT generate references.
+
+--------------------------------------------------
+funding_statement / citation_requirements / acknowledgements / provenance_statement (free text)
+--------------------------------------------------
+- Fill ONLY if explicitly stated.
+- Prefer verbatim or near-verbatim text.
+- Do NOT summarise or paraphrase.
+- citation_requirements: fill ONLY when the paper explicitly states requirements for citing/acknowledging RESOURCE DATA reuse.
+  Do NOT use generic "To cite this article" text as data citation requirements.
+
+--------------------------------------------------
+documentation (table; Documentation)
+--------------------------------------------------
+- Output one row per explicitly named document for this resource (e.g., protocol, informed consent form, harmonisation protocol).
+- If no explicit documents are described -> [].
+
+Fields:
+- name (REQUIRED):
+    Use explicit document name/title ONLY if stated.
+    If a document is referenced generically (e.g., “study protocol”) without a name -> do NOT output a row.
+    Do NOT create pseudo-document names from generic phrases ("information brochure", "informed consent form")
+    unless the PDF explicitly presents them as named documents.
+
+- type (string|null):
+    Only if the PDF explicitly labels the documentation type (e.g., “Harmonisation protocol”, “Informed consent”).
+    Otherwise null.
+
+- description (string|null):
+    Only if explicitly described, otherwise null.
+
+- url (string|null):
+    Only if explicitly provided, otherwise null.
+
+- file (string|null):
+    Only if the PDF explicitly provides a file name/attachment label, otherwise null.
+    Do NOT invent local file names.
+
+--------------------------------------------------
+supplementary_information (free text)
+--------------------------------------------------
+- Fill ONLY if the PDF explicitly includes “supplementary information” or “other information” content relevant to disclosure.
+- Otherwise null.
+
+--------------------------------------------------
+theme (STRICT dropdown; multi-select)
+--------------------------------------------------
+Allowed values (exact strings only):
+- "Health"
+- "Agriculture"
+- "Environment"
+- "Energy"
+- "Government and public sector"
+
+Rules:
+- Add values ONLY if explicitly stated as themes/categories.
+- Do NOT infer "Health" unless explicitly stated in the PDF.
+NOTE: The UI sets a default, but extraction must not default. If not explicit -> [].
+
+--------------------------------------------------
+applicable_legislation (STRICT list)
+--------------------------------------------------
+Allowed values:
+- "Data Governance Act"
+
+Rules:
+- Add "Data Governance Act" ONLY if explicitly stated in the PDF as applicable/mandating legislation.
+- Otherwise -> [].
+NOTE: The UI may default this value, but extraction must not default.
+"""
+
+# ---------- PASS G: Access conditions (Resources chapter) ----------
+[task_access_conditions]
+template_json = """
+{
+    "informed_consent_type": "string|null",
+    "access_rights": "string|null",
+    "data_access_conditions": ["string"],
+    "data_use_conditions": ["string"],
+    "data_access_conditions_description": "string|null",
+    "data_access_fee": "boolean|null",
+    "release_type": "string|null",
+    "release_description": "string|null"
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
+
+Extract ONLY RESOURCE-LEVEL access conditions (UI chapter: access conditions). Do NOT infer.
+Use ONLY information explicitly stated in the PDF.
+
+GLOBAL RULES
+- No placeholders ("Unknown", "N/A", "Not specified").
+- If not explicitly stated -> null or [].
+- Empty strings are NOT allowed.
+- Do NOT infer access conditions from typical cohort practices, ethics statements, or general privacy language unless explicit.
+- Do NOT copy values from other passes unless explicitly stated in the PDF.
+
+--------------------------------------------------
+informed_consent_type (STRICT dropdown; single select)
+--------------------------------------------------
+Allowed values (exact strings only):
+- "Study specific consent"
+- "Broad consent"
+- "Passive/tacit consent"
+- "No consent"
+
+Rules:
+- Set ONLY if the PDF explicitly states the type of consent for the data resource.
+- If consent language is present but does not match one of the allowed values exactly -> null.
+- Do NOT infer "Broad consent" from general biobank language unless explicitly stated.
+
+--------------------------------------------------
+access_rights (STRICT dropdown; single select)
+--------------------------------------------------
+Allowed values (exact strings only):
+- "Open access"
+- "Restricted access"
+- "Non public"
+
+Rules:
+- "Open access" ONLY if explicitly stated data are publicly accessible without restrictions.
+- "Restricted access" ONLY if explicitly stated access requires approval/application/DAC/contract.
+- "Non public" ONLY if explicitly stated as not publicly accessible or closed.
+- Statements like "data available on/upon request" or "available from corresponding author on reasonable request"
+  count as "Restricted access".
+- If not explicitly stated -> null.
+NOTE: The UI may default to non-public, but extraction must not default; only extract explicit statements.
+- IMPORTANT: publication status text (e.g., "Open access article", CC-BY license for the paper) is NOT evidence
+  for resource data access_rights.
+
+--------------------------------------------------
+data_access_conditions (STRICT dropdown; multi-select)
+--------------------------------------------------
+Allowed values (exact strings only):
+- "no restriction"
+- "general research use"
+- "health or medical or biomedical research"
+- "disease specific research"
+
+Rules:
+- Add an item ONLY if explicitly stated.
+- If none are explicitly stated -> [].
+- Do NOT infer from the topic area of the cohort.
+
+--------------------------------------------------
+data_use_conditions (STRICT dropdown; multi-select)
+--------------------------------------------------
+Allowed values (exact strings only):
+- "research specific restrictions"
+- "no general methods research"
+- "genetic studies only"
+- "not for profit, non commercial use only"
+- "publication required"
+- "collaboration required"
+- "ethics approval required"
+- "geographical restriction"
+- "publication moratorium"
+- "time limit on use"
+- "user specific restriction"
+- "project specific restriction"
+- "institution specific restriction"
+- "return to database or resource"
+- "clinical care use"
+
+Rules:
+- Add an item ONLY if explicitly stated in the PDF as a condition/requirement/limitation.
+- If none are explicitly stated -> [].
+- Do NOT infer "ethics approval required" just because ethics approval is mentioned for running the study.
+    It must be explicitly stated as a requirement for DATA ACCESS or DATA USE by external users.
+
+--------------------------------------------------
+data_access_conditions_description (free text)
+--------------------------------------------------
+- Fill ONLY if the PDF explicitly describes access terms/conditions in text (e.g., “available upon request”, “via data access committee”, “requires MTA/DTA”).
+- Use short verbatim or near-verbatim wording (max ~400 characters).
+- If not explicit -> null.
+
+--------------------------------------------------
+data_access_fee (boolean)
+--------------------------------------------------
+Allowed values:
+- true
+- false
+- null
+
+Rules:
+- true ONLY if the PDF explicitly states a fee/cost/charge is required for access.
+- false ONLY if explicitly states no fee / free of charge.
+- If not explicit -> null.
+
+--------------------------------------------------
+release_type (STRICT dropdown; single select)
+--------------------------------------------------
+Allowed values (exact strings only):
+- "Continuous"
+- "Closed dataset"
+- "Annually"
+- "Periodically"
+- "Other release type"
+
+Rules:
+- Set ONLY if the PDF explicitly states the release cycle of the resource or dataset updates.
+- Do NOT infer release type from recruitment period or follow-up schedule.
+- If the release cycle is explicitly stated but does not match allowed values:
+    -> set "Other release type" and describe the exact wording in release_description.
+
+--------------------------------------------------
+release_description (free text)
+--------------------------------------------------
+- Fill ONLY if the PDF explicitly provides release/update cycle details OR if release_type is "Other release type".
+- Use the exact wording from the PDF where possible.
+- If not explicit -> null.
+"""
+
+# ---------- PASS F: Contributors (Organisations + Contacts + publisher/creator/contact point) ----------
+[task_contributors]
+template_json = """
+{
+    "organisations_involved": [
+        {
+            "id": "string",
+            "type": "string",
+            "name": "string|null",
+            "organisation": "string|null",
+            "other_organisation": "string|null",
+            "department": "string|null",
+            "website": "string|null",
+            "email": "string|null",
+            "logo": "string|null",
+            "role": ["string"],
+            "is_lead_organisation": "boolean|null"
+        }
+    ],
+    "publisher": "string|null",
+    "creator": ["string"],
+    "people_involved": [
+        {
+            "role": ["string"],
+            "role_description": "string|null",
+            "first_name": "string",
+            "last_name": "string",
+            "prefix": "string|null",
+            "initials": "string|null",
+            "title": "string|null",
+            "organisation": "string|null",
+            "email": "string|null",
+            "orcid": "string|null",
+            "homepage": "string|null",
+            "photo": "string|null",
+            "expertise": "string|null"
+        }
+    ],
+    "contact_point_first_name": "string|null",
+    "contact_point_last_name": "string|null",
+    "contact_point_email": "string|null"
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
+
+Extract ONLY contributor information for the RESOURCE (UI chapter: contributors). Do NOT infer.
+Use ONLY information explicitly stated in the PDF.
+
+SCOPE
+- Organisations involved (table)
+- publisher (single selection from organisations involved)
+- creator (multi selection from organisations involved)
+- People involved (contacts table)
+- contact point (single selection from people involved)
+
+GLOBAL RULES
+- No placeholders ("Unknown", "N/A", "Not specified").
+- If not explicitly stated -> null or [].
+- Empty strings are NOT allowed.
+- Do NOT invent organisations, people, emails, ORCIDs, roles, or websites.
+- Do NOT look up ROR IDs or external registries. Only extract what is written in the PDF.
+
+--------------------------------------------------
+organisations_involved (table; Organisations)
+--------------------------------------------------
+- Output one row per organisation/agent explicitly named as being involved in the resource
+    (e.g., coordinating centre, sponsor, institute, hospital, university, consortium partner).
+- If the PDF does not explicitly name any organisations -> [].
+
+Fields:
+- id (REQUIRED):
+    Use an explicit acronym/short identifier ONLY if stated in the PDF (e.g., "UMCG").
+    If no explicit acronym/identifier is present, you MAY use the organisation's explicit short name as id.
+    If you cannot produce an id from explicit wording -> do NOT output that row.
+
+- type (REQUIRED; STRICT dropdown):
+    Allowed values (exact strings only):
+    - "Individual"
+    - "Organisation"
+    Rules:
+    - Use "Organisation" for institutions/universities/hospitals/companies/consortia.
+    - Use "Individual" ONLY if the PDF explicitly lists an individual as an "agent"/contributor in the organisations list context.
+    - If unclear -> do NOT output that row.
+
+- name:
+    ONLY for type="Individual": full person name if explicitly stated, else null.
+    For type="Organisation": set name=null.
+
+- organisation / other_organisation / department:
+    ONLY for type="Organisation":
+    - organisation: organisation name if explicitly stated in the PDF (verbatim or near-verbatim).
+    - other_organisation: ONLY if the PDF explicitly indicates an alternative spelling/name/identifier for the organisation.
+    - department: ONLY if explicitly stated (e.g., "Department of ...").
+    If not explicit -> null.
+
+- website / email:
+    Only if explicitly shown in the PDF (URL/email). Otherwise null.
+
+- logo:
+    Only if explicitly provided in the PDF as a logo reference/file name (rare). Otherwise null.
+
+- role:
+    List contributor role(s) ONLY if explicitly stated (e.g., "sponsor", "coordinating centre", "data provider").
+    Use verbatim role terms from the PDF.
+    If no explicit role terms -> [].
+
+- is_lead_organisation (boolean|null):
+    true ONLY if explicitly stated as lead/coordinating/primary organisation.
+    false ONLY if explicitly stated as NOT lead.
+    Otherwise null.
+
+--------------------------------------------------
+publisher (single select from organisations_involved)
+--------------------------------------------------
+- Set publisher ONLY if the PDF explicitly states the publishing organisation of the resource.
+- Value must be the EXACT "id" of one of the organisations_involved rows.
+- If the publisher organisation is explicitly stated but missing from organisations_involved:
+    add it to organisations_involved AND set publisher to its id.
+- If not explicit -> null.
+
+--------------------------------------------------
+creator (multi select from organisations_involved)
+--------------------------------------------------
+- List organisations that explicitly created the resource (e.g., "developed by", "created by", "maintained by").
+- Each item must exactly match an organisations_involved.id.
+- If not explicit -> [].
+- If a creator organisation is explicitly stated but missing from organisations_involved:
+    add it to organisations_involved AND include its id in creator[].
+
+--------------------------------------------------
+people_involved (table; Contacts)
+--------------------------------------------------
+- Output one row per explicitly named person contributing to the resource
+    (e.g., principal investigator, coordinator, corresponding author, contact person).
+- Do NOT infer authorship lists as "people involved" unless the PDF explicitly ties them to the resource.
+
+Fields:
+- first_name / last_name (REQUIRED):
+    Only output a person if both are explicitly stated.
+
+- role:
+    List explicit role(s) (e.g., "Principal Investigator", "Primary contact").
+    Use verbatim wording where possible.
+    If no role explicitly tied to the person -> [].
+
+- role_description:
+    Only if explicitly described in the PDF, else null.
+
+- prefix / initials / title:
+    Only if explicitly stated, else null.
+
+- organisation:
+    Affiliated organisation ONLY if explicitly stated next to the person, else null.
+
+- email:
+    Only if explicitly shown, else null.
+
+- orcid:
+    Only if explicitly shown, else null.
+
+- homepage:
+    Only if explicitly shown (URL), else null.
+
+- photo:
+    Only if explicitly provided (rare), else null.
+
+- expertise:
+    Only if explicitly described, else null.
+
+--------------------------------------------------
+contact point (single select from people_involved)
+--------------------------------------------------
+- This is the primary contact point for the resource.
+- Fill contact_point_* ONLY if the PDF explicitly identifies a main contact person
+    (e.g., "contact:", "corresponding author:", "for information contact", "primary contact").
+- Values must match a person in people_involved (same first_name + last_name; email if available).
+- If not explicit -> set all contact_point_* fields to null.
+"""
+
+
+# ---------- PASS F1: Contributors (Organisations + publisher/creator) ----------
+[task_contributors_org]
+template_json = """
+{
+    "organisations_involved": [
+        {
+            "id": "string",
+            "type": "string",
+            "name": "string|null",
+            "organisation": "string|null",
+            "other_organisation": "string|null",
+            "department": "string|null",
+            "website": "string|null",
+            "email": "string|null",
+            "logo": "string|null",
+            "role": ["string"],
+            "is_lead_organisation": "boolean|null"
+        }
+    ],
+    "publisher": "string|null",
+    "creator": ["string"]
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
+
+Extract ONLY resource-level contributor organisations. Do NOT infer.
+
+SCOPE
+- organisations_involved
+- publisher
+- creator
+
+RULES
+- Use only explicit statements from the PDF.
+- No placeholders; use null or [] when missing.
+- Do NOT extract people/contact fields in this pass.
+- Exclude acknowledgement-only collaborator lists unless explicitly tied to contributor roles.
+- Do NOT treat author affiliation lists as organisations_involved unless the text explicitly links
+  those organisations to resource governance/management/sponsorship/coordination.
+
+organisations_involved
+- Output one row per explicitly named contributing organisation/agent.
+- id is required and must come from explicit wording (acronym/short name/clear identifier).
+- type must be exactly "Organisation" or "Individual".
+- role only when explicitly stated; otherwise [].
+- is_lead_organisation: true/false only if explicit; otherwise null.
+
+publisher
+- Only if explicitly stated.
+- Must equal an organisations_involved.id.
+
+creator
+- Only organisations explicitly stated as creator/developer/maintainer.
+- Each item must equal an organisations_involved.id.
+"""
+
+
+# ---------- PASS F2: Contributors (People + contact point) ----------
+[task_contributors_people]
+template_json = """
+{
+    "people_involved": [
+        {
+            "role": ["string"],
+            "role_description": "string|null",
+            "first_name": "string",
+            "last_name": "string",
+            "prefix": "string|null",
+            "initials": "string|null",
+            "title": "string|null",
+            "organisation": "string|null",
+            "email": "string|null",
+            "orcid": "string|null",
+            "homepage": "string|null",
+            "photo": "string|null",
+            "expertise": "string|null"
+        }
+    ],
+    "contact_point_first_name": "string|null",
+    "contact_point_last_name": "string|null",
+    "contact_point_email": "string|null"
+}
+"""
+
+instructions = """
+Return ONLY valid JSON matching the template. No extra text. Ensure all quotes are closed.
+
+Extract ONLY resource-level people and contact point information. Do NOT infer.
+
+SCOPE
+- people_involved
+- contact_point_first_name
+- contact_point_last_name
+- contact_point_email
+
+RULES
+- Use only explicit statements from the PDF.
+- No placeholders; use null or [] when missing.
+- Do NOT extract organisations/publisher/creator in this pass.
+- Do NOT treat full author lists as people_involved unless explicitly linked to contributor/contact roles.
+- Do NOT use article-level CRediT/contributorship role lists as people_involved for the RESOURCE
+  unless the person is explicitly identified as a resource contact/coordinator/PI for this resource.
+
+people_involved
+- Output one row per explicitly named person with a contributor/contact role.
+- first_name and last_name are required to include a row.
+- role only when explicit; else [].
+- email/orcid/homepage only if explicitly shown.
+- Prefer role evidence from resource-specific wording ("principal investigator", "study coordinator", "contact")
+  over generic publication authorship statements.
+
+contact point
+- Fill only when the PDF explicitly marks a primary contact/corresponding person.
+- Values must match a person in people_involved.
+- Otherwise set all contact_point_* fields to null.
+"""

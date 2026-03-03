@@ -22,6 +22,9 @@ from extract_pipeline import load_pdf_text, extract_fields, build_context_prefix
 # Helpers
 # ==============================================================================
 
+TASK_SECTION_PREFIX = "task_"
+DEFAULT_PROMPTS_FILE = "prompts.toml"
+
 def setup_logging(level: str = "INFO") -> None:
     logging.basicConfig(
         level=getattr(logging, level.upper(), logging.INFO),
@@ -29,9 +32,67 @@ def setup_logging(level: str = "INFO") -> None:
     )
 
 
-def load_config(path: str) -> Dict[str, Any]:
-    with open(path, "rb") as f:
-        return toml.load(f)
+def _load_toml_file(path: str) -> Dict[str, Any]:
+    try:
+        with open(path, "rb") as f:
+            data = toml.load(f)
+    except FileNotFoundError:
+        raise SystemExit(f"Config file not found: {path}")
+    except Exception as e:
+        raise SystemExit(f"Could not parse TOML file {path}: {e}")
+
+    if not isinstance(data, dict):
+        raise SystemExit(f"Invalid TOML root in {path}: expected table/dict at top-level.")
+    return data
+
+
+def _has_task_sections(cfg: Dict[str, Any]) -> bool:
+    return any(str(k).startswith(TASK_SECTION_PREFIX) for k in cfg.keys())
+
+
+def _merge_task_sections(target_cfg: Dict[str, Any], source_cfg: Dict[str, Any]) -> None:
+    for k, v in source_cfg.items():
+        if str(k).startswith(TASK_SECTION_PREFIX):
+            target_cfg[k] = v
+
+
+def _default_prompt_candidates(config_path: str) -> List[str]:
+    cfg_dir = os.path.dirname(os.path.abspath(config_path))
+    candidates = [
+        os.path.join(cfg_dir, DEFAULT_PROMPTS_FILE),
+        os.path.abspath(DEFAULT_PROMPTS_FILE),
+    ]
+    out: List[str] = []
+    seen = set()
+    for p in candidates:
+        ap = os.path.abspath(p)
+        if ap in seen:
+            continue
+        seen.add(ap)
+        out.append(ap)
+    return out
+
+
+def load_config(path: str, prompts_path: str | None = None) -> Dict[str, Any]:
+    cfg = _load_toml_file(path)
+
+    if prompts_path:
+        prompts_cfg = _load_toml_file(prompts_path)
+        _merge_task_sections(cfg, prompts_cfg)
+    elif not _has_task_sections(cfg):
+        for candidate in _default_prompt_candidates(path):
+            if not os.path.isfile(candidate):
+                continue
+            prompts_cfg = _load_toml_file(candidate)
+            _merge_task_sections(cfg, prompts_cfg)
+            break
+
+    if not _has_task_sections(cfg):
+        raise SystemExit(
+            "No task_* prompt sections found. Put prompts in config or provide prompts.toml "
+            "via PDF_EXTRACT_PROMPTS."
+        )
+    return cfg
 
 
 def stem(path: str) -> str:
@@ -682,7 +743,8 @@ def cli() -> None:
         selected_passes.extend(["D1", "D2"])
 
     cfg_path = os.environ.get("PDF_EXTRACT_CONFIG", "config.final.toml")
-    cfg = load_config(cfg_path)
+    prompts_path = (os.environ.get("PDF_EXTRACT_PROMPTS") or "").strip() or None
+    cfg = load_config(cfg_path, prompts_path=prompts_path)
 
     setup_logging(cfg.get("logging", {}).get("level", "INFO"))
     log = logging.getLogger("main_final")
