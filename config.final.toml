@@ -9,8 +9,8 @@ max_tokens = 8000
 timeout = 900
 temperature = 0.0
 chunking_enabled = false
-long_text_threshold_chars = 60000
-chunk_size_chars = 30000
+long_text_threshold_chars = 62000
+chunk_size_chars = 31000
 chunk_overlap_chars = 4000
 
 [pdf]
@@ -22,3 +22,4 @@ max_pages = 0
 # Override paths with:
 #   PDF_EXTRACT_CONFIG=/path/to/config.toml
 #   PDF_EXTRACT_PROMPTS=/path/to/prompts.toml
+
