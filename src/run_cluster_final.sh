@@ -65,6 +65,9 @@ OCR_VLM_MAIN_GPU="${OCR_VLM_MAIN_GPU:-0}"
 OCR_VLM_LLAMA_BIN="${OCR_VLM_LLAMA_BIN:-/groups/umcg-gcc/tmp02/users/umcg-pjansma/Repositories/llama.cpp-glmtest/build/bin/llama-server}"
 OCR_VLM_PREFETCH_MODE="${OCR_VLM_PREFETCH_MODE:-1}"
 OCR_PREFETCH_DIR="${OCR_PREFETCH_DIR:-${RUN_DIR}/ocr_prefetch}"
+# Strip trailing references/bibliography block from extracted paper text.
+# 1 = enabled (recommended for lower context usage), 0 = disabled.
+STRIP_REFERENCES="${STRIP_REFERENCES:-1}"
 
 # ------------------------------------------------------------------------------
 # CLI passthrough:
@@ -171,6 +174,7 @@ fi
 echo "[Run] RUN_ID=$RUN_ID"
 echo "[Run] RUN_DIR=$RUN_DIR"
 echo "[Run] Ports LB/GPU0/GPU1/OCR: $PORT_LB / $PORT_GPU0 / $PORT_GPU1 / $OCR_VLM_PORT"
+echo "[Run] STRIP_REFERENCES=$STRIP_REFERENCES"
 status_event "initializing" "run bootstrap started"
 
 if command -v module >/dev/null 2>&1; then
@@ -231,6 +235,7 @@ if [[ -n "$LLM_CHUNK_OVERLAP_CHARS" ]]; then
 fi
 export PDF_EXTRACT_CONFIG="$RUNTIME_CFG"
 export PDF_EXTRACT_PROMPTS="$RUNTIME_PROMPTS"
+export STRIP_REFERENCES
 status_event "runtime_config_ready" "runtime config prepared"
 
 if [[ "$OCR_DUMP_COMPARE" == "1" ]]; then

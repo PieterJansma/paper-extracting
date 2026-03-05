@@ -37,6 +37,10 @@ OCR_VLM_DEFAULT_MAX_TOKENS = 4000
 OCR_VLM_DEFAULT_IMAGE_MAX_SIDE = 1536
 OCR_VLM_DEFAULT_PAGE_RETRIES = 2
 OCR_COMPARE_DIFF_MAX_LINES = 120000
+REFERENCE_SECTION_HEADER_RE = re.compile(
+    r"(?im)^\s*(?:\d{1,2}(?:\.\d+)?\s*)?"
+    r"(?:references?|bibliography|works\s+cited|literature\s+cited|reference\s+list)\s*:?\s*$"
+)
 
 
 def _env_int(name: str, default: int) -> int:
@@ -47,6 +51,13 @@ def _env_int(name: str, default: int) -> int:
         return int(raw)
     except Exception:
         return default
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
 # ==============================================================================
@@ -114,7 +125,62 @@ def load_pdf_text(path: str, max_pages: Optional[int] = None) -> str:
             out_dir=compare_dir,
         )
 
+    if _env_bool("STRIP_REFERENCES", False):
+        text = _strip_references_section(text, pdf_path=path)
+
     return text
+
+
+def _strip_references_section(text: str, *, pdf_path: str = "") -> str:
+    content = text or ""
+    if not content.strip():
+        return content
+
+    n_chars = len(content)
+    cutoff: Optional[int] = None
+    for m in REFERENCE_SECTION_HEADER_RE.finditer(content):
+        pos = m.start()
+        # Guard against false positives in title/abstract.
+        if pos < int(0.35 * n_chars):
+            continue
+        tail = content[pos:]
+        if _looks_like_reference_tail(tail):
+            cutoff = pos
+            break
+
+    if cutoff is None:
+        return content
+
+    kept = content[:cutoff].rstrip()
+    if len(kept) < max(1000, int(0.2 * n_chars)):
+        return content
+
+    log.info(
+        "STRIP_REFERENCES=1: stripped trailing references for %s (%d -> %d chars).",
+        pdf_path or "<unknown>",
+        len(content),
+        len(kept),
+    )
+    return kept
+
+
+def _looks_like_reference_tail(tail: str) -> bool:
+    if len(tail) < 600:
+        return False
+
+    indicators = 0
+    if len(re.findall(r"\[\d{1,3}\]", tail)) >= 3:
+        indicators += 1
+    if len(re.findall(r"\(\d{4}[a-z]?\)", tail, flags=re.IGNORECASE)) >= 3:
+        indicators += 1
+    if len(re.findall(r"\b10\.\d{4,9}/\S+", tail, flags=re.IGNORECASE)) >= 1:
+        indicators += 1
+    if len(re.findall(r"\b(?:doi|vol\.?|pp\.?|et al\.)\b", tail, flags=re.IGNORECASE)) >= 4:
+        indicators += 1
+    if len(re.findall(r"\b\d{4}\b", tail)) >= 12:
+        indicators += 1
+
+    return indicators >= 2
 
 
 def _alnum_ratio(text: str) -> float:

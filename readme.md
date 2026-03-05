@@ -143,6 +143,14 @@ By default it uses prefetch mode (`OCR_VLM_PREFETCH_MODE=1`):
 - starts OCR server only for those weak PDFs to prefetch OCR text
 - stops OCR server
 - starts Qwen servers for extraction (no concurrent GPU contention)
+- `STRIP_REFERENCES=1` by default in `run_cluster_final.sh` to remove trailing
+  reference/bibliography sections and lower context usage
+
+Disable reference stripping if needed:
+
+```bash
+STRIP_REFERENCES=0 bash src/run_cluster_final.sh -p all --pdfs data/*.pdf -o final_all.xlsx
+```
 
 Override only when needed:
 
@@ -225,6 +233,7 @@ Long-paper tuning (optional, in `[llm]`):
   - fallback order is: normal pypdf -> pypdf layout mode -> OCR fallback
   - OCR fallback runs only when extracted text quality is still low (including under 3000 chars)
   - OCR fallback backend: vision OCR via OpenAI-compatible endpoint (for example GLM OCR)
+  - to keep full reference lists in context, set `STRIP_REFERENCES=0`
   - to enable vision OCR fallback, set env vars before running:
     - `OCR_VLM_BASE_URL` (for example `http://host:port/v1`)
     - `OCR_VLM_MODEL` (for example your GLM OCR model id)
