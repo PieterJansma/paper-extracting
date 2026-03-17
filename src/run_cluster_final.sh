@@ -250,6 +250,8 @@ fi
 pids=()
 LB_PID=""
 OCR_PID=""
+ACTIVE_BACKEND_PORTS=()
+ACTIVE_BACKEND_GPUS=()
 WEAK_PDFS_FILE="${LOG_DIR}/ocr_weak_pdfs.txt"
 OCR_PREFETCH_FAILED_FILE="${LOG_DIR}/ocr_prefetch_failed.txt"
 PDF_TARGETS=()
@@ -302,6 +304,46 @@ wait_health_ok() {
   done
 
   echo " ❌ TIMEOUT"
+  return 1
+}
+
+
+wait_health_soft() {
+  local port="$1"
+  local tries="${2:-90}"
+  echo -n "  ⏳ Probeert backend op poort $port gezond te krijgen"
+  for ((i=1; i<=tries; i++)); do
+    if curl -sS -m 5 "http://127.0.0.1:${port}/health" \
+      | tr -d '\n' \
+      | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"'; then
+      echo " ✅ READY"
+      return 0
+    fi
+    sleep 2
+    echo -n "."
+  done
+  echo " ⚠️  NIET READY"
+  return 1
+}
+
+register_backend_if_healthy() {
+  local gpu="$1"
+  local port="$2"
+  local log="$3"
+  if wait_health_soft "$port"; then
+    ACTIVE_BACKEND_GPUS+=("$gpu")
+    ACTIVE_BACKEND_PORTS+=("$port")
+    return 0
+  fi
+
+  echo
+  echo "⚠️  Backend GPU ${gpu} op poort ${port} niet healthy; fallback zonder deze backend."
+  status_event "warning" "backend gpu=${gpu} port=${port} unhealthy; excluding from pool"
+  if [[ -f "$log" ]]; then
+    echo "----- laatste regels uit $log -----"
+    tail -n 40 "$log" || true
+    echo "-----------------------------------"
+  fi
   return 1
 }
 
@@ -677,22 +719,35 @@ status_event "qwen_starting" "starting Qwen servers"
 start_server 0 "$MODEL_GPU0" "$PORT_GPU0" "$LOG_DIR/gpu0.log"
 start_server 1 "$MODEL_GPU1" "$PORT_GPU1" "$LOG_DIR/gpu1.log"
 
-echo "[2/4] Wachten tot modellen echt klaar zijn (health=ok)..."
-wait_health_ok "$PORT_GPU0" || exit 1
-wait_health_ok "$PORT_GPU1" || exit 1
+echo "[2/4] Wachten tot ten minste één model echt klaar is (health=ok)..."
+register_backend_if_healthy 0 "$PORT_GPU0" "$LOG_DIR/gpu0.log" || true
+register_backend_if_healthy 1 "$PORT_GPU1" "$LOG_DIR/gpu1.log" || true
 
-echo "[2b/4] Warmup (voorkomt 503 Loading model bij eerste zware prompt)..."
-warmup_chat "$PORT_GPU0"
-warmup_chat "$PORT_GPU1"
-status_event "qwen_ready" "Qwen servers healthy and warmed"
+if [[ ${#ACTIVE_BACKEND_PORTS[@]} -eq 0 ]]; then
+  echo "❌ ERROR: Geen enkele Qwen backend werd healthy."
+  status_event "failed" "no Qwen backends became healthy"
+  exit 1
+fi
+
+echo "[2b/4] Warmup (alleen voor gezonde backends)..."
+for port in "${ACTIVE_BACKEND_PORTS[@]}"; do
+  warmup_chat "$port"
+done
+status_event "qwen_ready" "healthy backends: ${ACTIVE_BACKEND_PORTS[*]}"
 
 echo "[3/4] Starten Load Balancer..."
 LB_SCRIPT="${RUN_DIR}/tcp_lb.py"
+BACKENDS_PY="$(printf "('127.0.0.1', %s), " "${ACTIVE_BACKEND_PORTS[@]}")"
+BACKENDS_PY="[${BACKENDS_PY%, }]"
+if [[ ${#ACTIVE_BACKEND_PORTS[@]} -eq 1 ]]; then
+  SINGLE_BACKEND_PORT="${ACTIVE_BACKEND_PORTS[0]}"
+  echo "[LB] Slechts één backend healthy; LB routeert alles naar poort ${SINGLE_BACKEND_PORT}."
+fi
 cat > "$LB_SCRIPT" <<EOF
 import socket, threading, select, itertools, time
 
 BIND_ADDR = ('0.0.0.0', $PORT_LB)
-BACKENDS = [('127.0.0.1', $PORT_GPU0), ('127.0.0.1', $PORT_GPU1)]
+BACKENDS = ${BACKENDS_PY}
 
 rr = itertools.cycle(BACKENDS)
 
