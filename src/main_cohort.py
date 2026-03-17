@@ -487,7 +487,7 @@ def cli() -> None:
         per_section_results: Dict[str, Dict[str, Any]] = {}
 
         for pass_code, pass_label, section_key in pass_defs:
-            if "all" not in selected_passes and pass_code.upper() not in selected_passes:
+            if "ALL" not in selected_passes and pass_code.upper() not in selected_passes:
                 continue
 
             result = _collect_pass_result(
