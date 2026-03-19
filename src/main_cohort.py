@@ -13,6 +13,8 @@ import pandas as pd
 from llm_client import OpenAICompatibleClient
 from extract_pipeline import load_pdf_text, build_context_prefix_messages
 
+from fix_molgenis_staging_types import fix_workbook
+
 from main_final import (
     setup_logging,
     load_config,
@@ -114,6 +116,27 @@ def _resource_ref(label: str, overview: Dict[str, Any] | None) -> str:
 
 def _blank_row(columns: List[str]) -> Dict[str, Any]:
     return {c: "" for c in columns}
+
+
+def _resolve_schema_xlsx(explicit_path: str | None = None) -> str | None:
+    candidates = [
+        explicit_path,
+        os.environ.get("MOLGENIS_SCHEMA_XLSX"),
+        os.path.join(os.getcwd(), "molgenis_UMCGCohortsStaging.xlsx"),
+        os.path.join(os.path.dirname(__file__), "molgenis_UMCGCohortsStaging.xlsx"),
+        "/mnt/data/molgenis_UMCGCohortsStaging.xlsx",
+    ]
+    seen: set[str] = set()
+    for candidate in candidates:
+        if not candidate:
+            continue
+        candidate = os.path.abspath(os.path.expanduser(str(candidate)))
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if os.path.exists(candidate):
+            return candidate
+    return None
 
 
 def _resource_row_from_sections(
@@ -342,6 +365,11 @@ def cli() -> None:
         "-o", "--output",
         default="final_result_cohort.xlsx",
         help="Output Excel filename.",
+    )
+    parser.add_argument(
+        "--schema-xlsx",
+        default=None,
+        help="Optional path to molgenis_UMCGCohortsStaging.xlsx for post-write datatype normalization.",
     )
     args = parser.parse_args()
     selected_passes = [p.upper() for p in args.passes]
@@ -808,6 +836,20 @@ def cli() -> None:
     with pd.ExcelWriter(args.output, engine=excel_engine) as writer:
         for sheet_name, frame in frames.items():
             frame.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    schema_xlsx = _resolve_schema_xlsx(args.schema_xlsx)
+    if schema_xlsx:
+        try:
+            fix_workbook(
+                input_path=args.output,
+                schema_path=schema_xlsx,
+                output_path=args.output,
+            )
+            log.info("Applied schema-based datatype normalization using %s", schema_xlsx)
+        except Exception as e:
+            log.warning("Could not normalize workbook datatypes with schema %s: %s", schema_xlsx, e)
+    else:
+        log.warning("No schema workbook found; skipping datatype normalization.")
 
     try:
         with open(issue_file, "w", encoding="utf-8") as f:
