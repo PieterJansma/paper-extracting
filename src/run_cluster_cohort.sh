@@ -795,6 +795,29 @@ else
   echo "  COUNTRY_ONTOLOGY_CSV=(not set; country mapping skipped)"
 fi
 
+if [[ -z "${REGION_ONTOLOGY_CSV:-}" ]]; then
+  for r in \
+    "${PWD}/Regions.csv" \
+    "${PWD}/data/ontologies/Regions.csv" \
+    "/Users/p.jansma/Downloads/Regions.csv"
+  do
+    if [[ -f "$r" ]]; then
+      export REGION_ONTOLOGY_CSV="$r"
+      break
+    fi
+  done
+fi
+if [[ -n "${REGION_ONTOLOGY_CSV:-}" ]]; then
+  echo "  REGION_ONTOLOGY_CSV=$REGION_ONTOLOGY_CSV"
+  if [[ -z "${REGION_MAPPING_LLM_FALLBACK:-}" ]]; then
+    export REGION_MAPPING_LLM_FALLBACK="1"
+  fi
+  echo "  REGION_MAPPING_LLM_FALLBACK=$REGION_MAPPING_LLM_FALLBACK"
+  status_event "regions_mapping_enabled" "region ontology mapping enabled"
+else
+  echo "  REGION_ONTOLOGY_CSV=(not set; region mapping skipped)"
+fi
+
 export PIPELINE_ISSUES_FILE="${RUN_DIR}/pipeline_issues.json"
 status_event "extract_running" "starting main_cohort.py"
 python3 src/main_cohort.py "${RUN_ARGS[@]}"

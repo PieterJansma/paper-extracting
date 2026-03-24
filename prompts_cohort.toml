@@ -71,17 +71,15 @@ type (STRICT dropdown)
 --------------------------------------------------
 Allowed values for type (exact strings only):
 - "Biobank"
-- "Catalogue"
+- "Preclinical study"
 - "Clinical trial"
 - "Cohort study"
-- "Databank"
-- "Network"
-- "Rare disease"
-- "Common data model"
-- "Data source"
-- "Disease specific"
 - "Health records"
 - "Registry"
+- "Reference data source"
+- "Common data model"
+- "Catalogue"
+- "Network"
 - "Other type"
 
 Rules:
@@ -384,7 +382,32 @@ Rules:
 - age_min/age_max: integers only if explicit; “≥X” -> age_min=X, age_max=null.
 - main_medical_condition/comorbidity: list explicit disease groups/codes or named comorbidities only; no code inference.
 - countries/regions: only if explicitly tied to this subpopulation; normalize "The Netherlands"->"Netherlands".
-- inclusion/exclusion criteria: only if explicitly applied to this subpopulation (or explicitly stated “same as study criteria”).
+- inclusion_criteria / exclusion_criteria (STRICT dropdown values):
+  These are checkbox categories, not free-text criteria.
+  Only output items that are explicitly stated for this subpopulation
+  (or explicitly stated as shared with study-level criteria).
+  Allowed values (exact strings only) for BOTH fields:
+  - "Age group inclusion criterion"
+  - "Age of majority inclusion criterion"
+  - "BMI range inclusion criterion"
+  - "Clinically relevant exposure inclusion criterion"
+  - "Clinically relevant lifestyle inclusion criterion"
+  - "Country of residence inclusion criteria"
+  - "Defined population inclusion criterion"
+  - "Ethnicity inclusion criterion"
+  - "Family status inclusion criterion"
+  - "Gravidity inclusion criterion"
+  - "Health status inclusion criterion"
+  - "Hospital patient inclusion criterion"
+  - "Sex inclusion criterion"
+  - "Use of medication inclusion criterion"
+  Rules:
+  - Apply same mapping logic to BOTH inclusion_criteria and exclusion_criteria.
+  - Although labels contain "inclusion", they are also used as exclusion categories.
+  - If explicit criterion text exists but no allowed category matches, keep category out and put text in `other_*_criteria`.
+  - If not explicit -> [].
+- other_inclusion_criteria / other_exclusion_criteria:
+  Keep explicit wording only (short phrases/sentences), no summaries, no inference.
 - issued/modified: only if explicit publish/last modified dates for the subpopulation data; else null.
 - theme (required): must include "Health". Allowed: "Health","Agriculture","Environment","Energy","Government and public sector".
 - access_rights (required; STRICT dropdown; single select)
@@ -761,7 +784,20 @@ These fields are UI checkbox categories, NOT free-text criteria.
 Only output items that are explicitly stated in the paper.
 
 Allowed values (exact strings only) for BOTH inclusion_criteria and exclusion_criteria:
-
+- "Age group inclusion criterion"
+- "Age of majority inclusion criterion"
+- "BMI range inclusion criterion"
+- "Clinically relevant exposure inclusion criterion"
+- "Clinically relevant lifestyle inclusion criterion"
+- "Country of residence inclusion criteria"
+- "Defined population inclusion criterion"
+- "Ethnicity inclusion criterion"
+- "Family status inclusion criterion"
+- "Gravidity inclusion criterion"
+- "Health status inclusion criterion"
+- "Hospital patient inclusion criterion"
+- "Sex inclusion criterion"
+- "Use of medication inclusion criterion"
 
 Rules:
 - Add a label ONLY if the paper explicitly states that kind of criterion is used.
@@ -1313,7 +1349,6 @@ Allowed values (exact strings only):
 - "no restriction"
 - "general research use"
 - "health or medical or biomedical research"
-- "disease specific research"
 
 Rules:
 - Add an item ONLY if explicitly stated.
