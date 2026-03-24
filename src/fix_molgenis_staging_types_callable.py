@@ -14,6 +14,212 @@ from openpyxl import load_workbook
 ARRAY_TYPES = {"ontology_array", "string_array", "ref_array"}
 PASSTHROUGH_TYPES = {"ref", "refback", "ontology", "text"}
 
+# Field-level ontology constraints (first rollout).
+ONTOLOGY_ALLOWED_VALUES: Dict[tuple[str, str], set[str]] = {
+    ("Agents", "type"): {"Individual", "Organisation"},
+    ("Resources", "access rights"): {"Open access", "Restricted access", "Non public"},
+    ("Resources", "design"): {"Longitudinal", "Cross-sectional"},
+    ("Resources", "informed consent type"): {
+        "Study specific consent",
+        "Broad consent",
+        "Passive/tacit consent",
+        "No consent",
+    },
+    ("Resources", "release type"): {
+        "Continuous",
+        "Closed dataset",
+        "Annually",
+        "Periodically",
+        "Other release type",
+    },
+    ("Collection events", "access rights"): {"Open access", "Restricted access", "Non public"},
+    ("Subpopulations", "access rights"): {"Open access", "Restricted access", "Non public"},
+    ("Contacts", "title"): {
+        "prof. dr.",
+        "dr.",
+        "ir.",
+        "dr. ir.",
+        "prof. dr. ir.",
+        "prof.",
+        "drs.",
+    },
+    ("Datasets", "unit of observation"): {
+        "Drug subscription",
+        "person",
+        "abortion",
+        "Patient",
+        "sample",
+        "discharge record",
+        "medicine dispensation",
+        "birth",
+        "event",
+        "observation",
+        "prescription",
+        "surgery",
+        "treatment",
+    },
+    ("Documentation", "type"): {
+        "Harmonisation protocol",
+        "Informed consent",
+        "Standard operating protocol",
+        "Conflicts of interest of investigators",
+        "Composition of steering group and observers",
+        "Signed code of conduct",
+        "Signed code of conduct checklist",
+        "Signed checklist for study protocols",
+        "Data characterisation results",
+        "Procedure of data extraction",
+        "Procedure of results generation",
+        "Results tables",
+        "Study report",
+        "Study, other information",
+        "Data source ETL specifications",
+        "Governance details",
+        "Protocol document",
+        "Data characterisation details",
+    },
+    ("External identifiers", "external identifier type"): {
+        "EUPAS number",
+        "METc number",
+        "Clinical Trials.gov",
+        "NCT number",
+        "EUDRACT number",
+    },
+    ("Internal identifiers", "internal identifier type"): {
+        "UMCG register Utopia",
+        "UMCG PaNaMaID",
+    },
+    ("Subpopulation counts", "age group"): {
+        "Prenatal",
+        "All ages",
+        "Infant (0-23 months)",
+        "Newborn (0-1 months)",
+        "Infants and toddlers (2-23 months)",
+        "Child (2-12 years)",
+        "Adolescent (13-17 years)",
+        "Adult (18+ years)",
+        "Young adult (18-24 years)",
+        "Adult (25-44 years)",
+        "Middle-aged (45-64 years)",
+        "Aged (65+ years)",
+        "Aged (65-79 years)",
+        "Aged (80+ years)",
+    },
+}
+
+ONTOLOGY_ARRAY_ALLOWED_VALUES: Dict[tuple[str, str], set[str]] = {
+    ("Contacts", "role"): {
+        "Principal Investigator",
+        "Primary contact",
+        "Project manager",
+        "Data manager",
+        "Alternative contact",
+        "Project leader",
+        "Participant",
+        "Public lead",
+        "EFPIA lead",
+        "Task leader",
+    },
+    ("Collection events", "theme"): {
+        "Health",
+        "Agriculture",
+        "Environment",
+        "Energy",
+        "Government and public sector",
+    },
+    ("Resources", "theme"): {
+        "Health",
+        "Agriculture",
+        "Environment",
+        "Energy",
+        "Government and public sector",
+    },
+    ("Subpopulations", "theme"): {
+        "Health",
+        "Agriculture",
+        "Environment",
+        "Energy",
+        "Government and public sector",
+    },
+    ("Collection events", "data categories"): {
+        "Biological samples",
+        "Survey data",
+        "Imaging data",
+        "Medical records",
+        "National registries",
+        "Genealogical records",
+        "Physiological/Biochemical measurements",
+        "Omics",
+        "Genomics",
+        "Epigenomics",
+        "Transcriptomics",
+        "Proteomics",
+        "Metabolomics",
+        "Metagenomics / Microbiome",
+        "Other",
+    },
+    ("Collection events", "applicable legislation"): {"Data Governance Act"},
+    ("Resources", "applicable legislation"): {"Data Governance Act"},
+    ("Subpopulations", "applicable legislation"): {"Data Governance Act"},
+    ("Collection events", "age groups"): {
+        "Prenatal",
+        "All ages",
+        "Infant (0-23 months)",
+        "Newborn (0-1 months)",
+        "Infants and toddlers (2-23 months)",
+        "Child (2-12 years)",
+        "Adolescent (13-17 years)",
+        "Adult (18+ years)",
+        "Young adult (18-24 years)",
+        "Adult (25-44 years)",
+        "Middle-aged (45-64 years)",
+        "Aged (65+ years)",
+        "Aged (65-79 years)",
+        "Aged (80+ years)",
+    },
+    ("Resources", "population age groups"): {
+        "Prenatal",
+        "All ages",
+        "Infant (0-23 months)",
+        "Newborn (0-1 months)",
+        "Infants and toddlers (2-23 months)",
+        "Child (2-12 years)",
+        "Adolescent (13-17 years)",
+        "Adult (18+ years)",
+        "Young adult (18-24 years)",
+        "Adult (25-44 years)",
+        "Middle-aged (45-64 years)",
+        "Aged (65+ years)",
+        "Aged (65-79 years)",
+        "Aged (80+ years)",
+    },
+    ("Subpopulations", "age groups"): {
+        "Prenatal",
+        "All ages",
+        "Infant (0-23 months)",
+        "Newborn (0-1 months)",
+        "Infants and toddlers (2-23 months)",
+        "Child (2-12 years)",
+        "Adolescent (13-17 years)",
+        "Adult (18+ years)",
+        "Young adult (18-24 years)",
+        "Adult (25-44 years)",
+        "Middle-aged (45-64 years)",
+        "Aged (65+ years)",
+        "Aged (65-79 years)",
+        "Aged (80+ years)",
+    },
+    ("Agents", "role"): {
+        "Data originator",
+        "Data holder",
+        "Data provider",
+        "Researcher",
+        "Surveillance",
+        "Data access provider",
+        "Other",
+    },
+}
+
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _DOMAIN_RE = re.compile(
     r"^(?:(?:https?://)|(?:www\.))"
@@ -146,10 +352,56 @@ def _parse_datetime(value: Any) -> datetime | None:
 
 
 # ---------- Coercers per schema type ----------
-def coerce_array(value: Any) -> Any:
-    items = parse_list_like(value)
-    if items is None:
+def _parse_array_items(value: Any) -> list[Any] | None:
+    if value is None:
+        return []
+    if isinstance(value, list):
         return value
+    if not isinstance(value, str):
+        return None
+
+    s = value.strip()
+    if not s:
+        return []
+
+    if s.startswith("[") and s.endswith("]"):
+        try:
+            data = json.loads(s)
+            if isinstance(data, list):
+                return data
+        except Exception:
+            pass
+        try:
+            data = ast.literal_eval(s)
+            if isinstance(data, list):
+                return data
+        except Exception:
+            pass
+
+    if "," in s:
+        return [part.strip() for part in s.split(",") if part.strip()]
+
+    return [s]
+
+
+def coerce_array(table: str, column: str, value: Any) -> Any:
+    raw_items = _parse_array_items(value)
+    if raw_items is None:
+        return value
+
+    items: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_items:
+        s = _extract_ontology_scalar(raw)
+        if not s or s in seen:
+            continue
+        seen.add(s)
+        items.append(s)
+
+    allowed = ONTOLOGY_ARRAY_ALLOWED_VALUES.get((table, column))
+    if allowed is not None:
+        items = [x for x in items if x in allowed]
+
     return ",".join(items)
 
 
@@ -273,10 +525,56 @@ def coerce_passthrough(value: Any) -> Any:
     return value
 
 
+def _extract_ontology_scalar(value: Any) -> str:
+    """
+    Accept common ontology payload variants and return a scalar value:
+    - "Organisation"
+    - {"name": "Organisation"}
+    - "{\"name\":\"Organisation\"}"
+    """
+    if value is None:
+        return ""
+
+    if isinstance(value, dict):
+        for key in ("name", "id", "label", "value"):
+            v = value.get(key)
+            s = _clean_string(v)
+            if s:
+                return s
+        return ""
+
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return ""
+        if s.startswith("{") and s.endswith("}"):
+            try:
+                parsed = json.loads(s)
+            except Exception:
+                return s
+            return _extract_ontology_scalar(parsed)
+        return s
+
+    return _clean_string(value)
+
+
+def coerce_ontology(table: str, column: str, value: Any) -> Any:
+    s = _extract_ontology_scalar(value)
+    if not s:
+        return ""
+
+    allowed = ONTOLOGY_ALLOWED_VALUES.get((table, column))
+    if allowed is None:
+        return s
+    if s in allowed:
+        return s
+    return ""
+
+
 # ---------- Main normalization ----------
 def normalize_value(table: str, column: str, col_type: Optional[str], value: Any) -> Any:
     if col_type in ARRAY_TYPES:
-        return coerce_array(value)
+        return coerce_array(table, column, value)
     if col_type == "heading":
         return coerce_heading(value)
     if col_type == "date":
@@ -297,6 +595,8 @@ def normalize_value(table: str, column: str, col_type: Optional[str], value: Any
         return coerce_bool(value)
     if col_type == "text":
         return coerce_passthrough_text(value)
+    if col_type == "ontology":
+        return coerce_ontology(table, column, value)
     if col_type in PASSTHROUGH_TYPES:
         return coerce_passthrough(value)
     return value

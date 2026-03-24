@@ -13,7 +13,7 @@ import pandas as pd
 from llm_client import OpenAICompatibleClient
 from extract_pipeline import load_pdf_text, build_context_prefix_messages
 
-from fix_molgenis_staging_types import fix_workbook
+from fix_molgenis_staging_types_callable import fix_workbook
 
 from main_final import (
     setup_logging,

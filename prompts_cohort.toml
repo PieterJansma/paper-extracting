@@ -146,16 +146,13 @@ EXTERNAL IDENTIFIERS
 Allowed values for external_identifiers.type:
 - "EUPAS number"
 - "METc number"
-- "ClinicalTrials.gov"
+- "Clinical Trials.gov"
 - "NCT number"
-- "NTR number"
-- "ISRCTN number"
 - "EUDRACT number"
 
 Rules:
 - If identifier type matches one of the above → set type.
-- Do NOT map one registry type to another (e.g., NTR is NOT NCT).
-- Map IDs that start with "ISRCTN" to type "ISRCTN number" (NOT "NTR number").
+- Do NOT map one registry type to another.
 - Otherwise:
   → type = null
   → type_other = exact wording from the text.
@@ -335,7 +332,25 @@ Rules:
   return [] if no explicit subpopulation count breakdown is given.
   Otherwise return one row per explicitly reported count row for this subpopulation.
   Target shape follows the cohort workbook:
-    - age_group: exact age-group wording if stated; otherwise null for overall counts.
+    - age_group (STRICT dropdown; single select):
+      Allowed values (exact strings only):
+      - "Prenatal"
+      - "All ages"
+      - "Infant (0-23 months)"
+      - "Newborn (0-1 months)"
+      - "Infants and toddlers (2-23 months)"
+      - "Child (2-12 years)"
+      - "Adolescent (13-17 years)"
+      - "Adult (18+ years)"
+      - "Young adult (18-24 years)"
+      - "Adult (25-44 years)"
+      - "Middle-aged (45-64 years)"
+      - "Aged (65+ years)"
+      - "Aged (65-79 years)"
+      - "Aged (80+ years)"
+      Rules:
+      - Set ONLY if explicitly stated and exactly matches one of the allowed values.
+      - Otherwise null (use null for overall counts without an explicit age-group label).
     - n_total: explicit total participant count for that row only.
     - n_female: explicit female count for that row only.
     - n_male: explicit male count for that row only.
@@ -347,17 +362,48 @@ Rules:
     - If the paper reports multiple rows (e.g., age bands), keep them all.
 
 - inclusion_start/inclusion_end: explicit calendar years for this subpopulation only; ongoing -> inclusion_end null.
-- age_groups: only if explicitly listed; else [].
+- age_groups (STRICT dropdown; multi-select):
+  Allowed values (exact strings only):
+  - "Prenatal"
+  - "All ages"
+  - "Infant (0-23 months)"
+  - "Newborn (0-1 months)"
+  - "Infants and toddlers (2-23 months)"
+  - "Child (2-12 years)"
+  - "Adolescent (13-17 years)"
+  - "Adult (18+ years)"
+  - "Young adult (18-24 years)"
+  - "Adult (25-44 years)"
+  - "Middle-aged (45-64 years)"
+  - "Aged (65+ years)"
+  - "Aged (65-79 years)"
+  - "Aged (80+ years)"
+  Rules:
+  - Add values ONLY if explicitly listed for this subpopulation or explicitly mappable from stated age ranges.
+  - If not explicit -> [].
 - age_min/age_max: integers only if explicit; “≥X” -> age_min=X, age_max=null.
 - main_medical_condition/comorbidity: list explicit disease groups/codes or named comorbidities only; no code inference.
 - countries/regions: only if explicitly tied to this subpopulation; normalize "The Netherlands"->"Netherlands".
 - inclusion/exclusion criteria: only if explicitly applied to this subpopulation (or explicitly stated “same as study criteria”).
 - issued/modified: only if explicit publish/last modified dates for the subpopulation data; else null.
 - theme (required): must include "Health". Allowed: "Health","Agriculture","Environment","Energy","Government and public sector".
-- access_rights (required): "Open access" if explicitly public; "Restricted access" if explicitly controlled; else default "Non public".
-  IMPORTANT: article license text (e.g., "Open access article", CC-BY) is NOT evidence for dataset access_rights.
-- applicable_legislation (required): include only explicitly named applicable laws/regulations for this subpopulation.
-  Do NOT auto-add "Data Governance Act" or other defaults.
+- access_rights (required; STRICT dropdown; single select)
+  Allowed values (exact strings only):
+  - "Open access"
+  - "Restricted access"
+  - "Non public"
+  Rules:
+  - "Open access" ONLY if explicitly public.
+  - "Restricted access" ONLY if explicitly controlled/restricted (including "available on request").
+  - Otherwise default "Non public".
+  - IMPORTANT: article license text (e.g., "Open access article", CC-BY) is NOT evidence for dataset access_rights.
+- applicable_legislation (required; STRICT list)
+  Allowed values (exact strings only):
+  - "Data Governance Act"
+  Rules:
+  - Add "Data Governance Act" ONLY if explicitly stated in the PDF as applicable/mandating legislation.
+  - Otherwise -> [].
+  - Do NOT auto-add defaults.
 """
 
 
@@ -450,9 +496,26 @@ start_date / end_date
 - Do NOT infer from recruitment periods or publication dates.
 
 --------------------------------------------------
-age_groups
+age_groups (STRICT dropdown; multi-select)
 --------------------------------------------------
-- Only fill if the paper explicitly names age group categories or clearly restricts the event to such groups.
+Allowed values (exact strings only):
+- "Prenatal"
+- "All ages"
+- "Infant (0-23 months)"
+- "Newborn (0-1 months)"
+- "Infants and toddlers (2-23 months)"
+- "Child (2-12 years)"
+- "Adolescent (13-17 years)"
+- "Adult (18+ years)"
+- "Young adult (18-24 years)"
+- "Adult (25-44 years)"
+- "Middle-aged (45-64 years)"
+- "Aged (65+ years)"
+- "Aged (65-79 years)"
+- "Aged (80+ years)"
+
+Rules:
+- Add values ONLY if explicitly named for this event or explicitly mappable from event-specific age ranges.
 - Do NOT infer from mean/median age.
 - If not explicit -> [].
 
@@ -501,7 +564,7 @@ sample_categories
 --------------------------------------------------
 data_categories
 --------------------------------------------------
-Use ONLY these exact strings if explicitly supported by the paper:
+Allowed values (exact strings only):
 - "Biological samples"
 - "Survey data"
 - "Imaging data"
@@ -509,10 +572,13 @@ Use ONLY these exact strings if explicitly supported by the paper:
 - "National registries"
 - "Genealogical records"
 - "Physiological/Biochemical measurements"
+- "Omics"
 - "Genomics"
+- "Epigenomics"
 - "Transcriptomics"
 - "Proteomics"
 - "Metabolomics"
+- "Metagenomics / Microbiome"
 - "Other"
 
 Rules:
@@ -542,9 +608,9 @@ issued / modified
 - Do NOT infer from article publication date.
 
 --------------------------------------------------
-theme
+theme (STRICT dropdown; multi-select)
 --------------------------------------------------
-Allowed values:
+Allowed values (exact strings only):
 - "Health"
 - "Agriculture"
 - "Environment"
@@ -555,9 +621,9 @@ Rules:
 - Must include "Health" for health events. If nothing else explicit -> ["Health"].
 
 --------------------------------------------------
-access_rights
+access_rights (STRICT dropdown; single select)
 --------------------------------------------------
-Allowed values:
+Allowed values (exact strings only):
 - "Open access"
 - "Restricted access"
 - "Non public"
@@ -569,11 +635,15 @@ Rules:
 - IMPORTANT: article-level "Open access" publication status is NOT evidence that event-level data are open.
 
 --------------------------------------------------
-applicable_legislation
+applicable_legislation (STRICT list)
 --------------------------------------------------
-- Include ONLY explicitly named laws/regulations applicable to data access/use for this event.
-- Do NOT auto-add "Data Governance Act".
-- Add other laws ONLY if explicitly named (e.g., GDPR/AVG).
+Allowed values (exact strings only):
+- "Data Governance Act"
+
+Rules:
+- Add "Data Governance Act" ONLY if explicitly named as applicable to this event.
+- Otherwise -> [].
+- Do NOT auto-add defaults.
 - Do NOT include ethics guidelines.
 """
 
@@ -807,10 +877,26 @@ Rules:
 - If nothing explicit -> [].
 
 ----------------------------------------
-unit_of_observation (single select)
+unit_of_observation (STRICT dropdown; single select)
 ----------------------------------------
-- Fill ONLY if the PDF explicitly states the unit (e.g., patient, person, sample, prescription/event/observation).
-- Otherwise null.
+Allowed values (exact strings only):
+- "Drug subscription"
+- "person"
+- "abortion"
+- "Patient"
+- "sample"
+- "discharge record"
+- "medicine dispensation"
+- "birth"
+- "event"
+- "observation"
+- "prescription"
+- "surgery"
+- "treatment"
+
+Rules:
+- Set ONLY if the PDF explicitly states a matching unit.
+- If wording is present but does not match one of the allowed values exactly -> null.
 - Do NOT guess from context.
 
 ----------------------------------------
@@ -1092,9 +1178,29 @@ Fields:
     Do NOT create pseudo-document names from generic phrases ("information brochure", "informed consent form")
     unless the PDF explicitly presents them as named documents.
 
-- type (string|null):
-    Only if the PDF explicitly labels the documentation type (e.g., “Harmonisation protocol”, “Informed consent”).
-    Otherwise null.
+- type (STRICT dropdown; single select):
+    Allowed values (exact strings only):
+    - "Harmonisation protocol"
+    - "Informed consent"
+    - "Standard operating protocol"
+    - "Conflicts of interest of investigators"
+    - "Composition of steering group and observers"
+    - "Signed code of conduct"
+    - "Signed code of conduct checklist"
+    - "Signed checklist for study protocols"
+    - "Data characterisation results"
+    - "Procedure of data extraction"
+    - "Procedure of results generation"
+    - "Results tables"
+    - "Study report"
+    - "Study, other information"
+    - "Data source ETL specifications"
+    - "Governance details"
+    - "Protocol document"
+    - "Data characterisation details"
+    Rules:
+    - Set ONLY if the PDF explicitly labels the documentation type and it exactly matches one allowed value.
+    - Otherwise null.
 
 - description (string|null):
     Only if explicitly described, otherwise null.
@@ -1387,10 +1493,19 @@ Fields:
 - logo:
     Only if explicitly provided in the PDF as a logo reference/file name (rare). Otherwise null.
 
-- role:
-    List contributor role(s) ONLY if explicitly stated (e.g., "sponsor", "coordinating centre", "data provider").
-    Use verbatim role terms from the PDF.
-    If no explicit role terms -> [].
+- role (STRICT dropdown; multi-select):
+    Allowed values (exact strings only):
+    - "Data originator"
+    - "Data holder"
+    - "Data provider"
+    - "Researcher"
+    - "Surveillance"
+    - "Data access provider"
+    - "Other"
+    Rules:
+    - Add role(s) ONLY if explicitly stated and exactly matching one of the allowed values.
+    - If explicit wording does not match allowed values, include "Other" only when the wording clearly indicates an organisation contribution role.
+    - If no explicit role terms -> [].
 
 - is_lead_organisation (boolean|null):
     true ONLY if explicitly stated as lead/coordinating/primary organisation.
@@ -1427,15 +1542,40 @@ Fields:
     Only output a person if both are explicitly stated.
 
 - role:
-    List explicit role(s) (e.g., "Principal Investigator", "Primary contact").
-    Use verbatim wording where possible.
-    If no role explicitly tied to the person -> [].
+    STRICT dropdown; multi-select.
+    Allowed values (exact strings only):
+    - "Principal Investigator"
+    - "Primary contact"
+    - "Project manager"
+    - "Data manager"
+    - "Alternative contact"
+    - "Project leader"
+    - "Participant"
+    - "Public lead"
+    - "EFPIA lead"
+    - "Task leader"
+    Rules:
+    - Add role(s) ONLY if explicitly stated and exactly matching one of the allowed values.
+    - If no role explicitly tied to the person -> [].
 
 - role_description:
     Only if explicitly described in the PDF, else null.
 
-- prefix / initials / title:
+- prefix / initials:
     Only if explicitly stated, else null.
+
+- title (STRICT dropdown; single select):
+    Allowed values (exact strings only):
+    - "prof. dr."
+    - "dr."
+    - "ir."
+    - "dr. ir."
+    - "prof. dr. ir."
+    - "prof."
+    - "drs."
+    Rules:
+    - Set ONLY if explicitly stated and exactly matches one of the allowed values.
+    - Otherwise null.
 
 - organisation:
     Affiliated organisation ONLY if explicitly stated next to the person, else null.
@@ -1512,7 +1652,9 @@ organisations_involved
 - Output one row per explicitly named contributing organisation/agent.
 - id is required and must come from explicit wording (acronym/short name/clear identifier).
 - type must be exactly "Organisation" or "Individual".
-- role only when explicitly stated; otherwise [].
+- role (STRICT dropdown; multi-select), allowed values:
+  "Data originator", "Data holder", "Data provider", "Researcher", "Surveillance", "Data access provider", "Other".
+  Add items only when explicitly stated; otherwise [].
 - is_lead_organisation: true/false only if explicit; otherwise null.
 
 publisher
@@ -1576,6 +1718,9 @@ people_involved
 - first_name and last_name are required to include a row.
 - role only when explicit; else [].
 - email/orcid/homepage only if explicitly shown.
+- title (STRICT dropdown; single select), if present, must be exactly one of:
+  "prof. dr.", "dr.", "ir.", "dr. ir.", "prof. dr. ir.", "prof.", "drs.".
+  If no exact match -> null.
 - Prefer role evidence from resource-specific wording ("principal investigator", "study coordinator", "contact")
   over generic publication authorship statements.
 
