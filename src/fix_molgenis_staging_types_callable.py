@@ -32,6 +32,14 @@ ONTOLOGY_ALLOWED_VALUES: Dict[tuple[str, str], set[str]] = {
         "Periodically",
         "Other release type",
     },
+    ("Resources", "cohort type"): {
+        "Clinical cohort",
+        "Population cohort",
+        "Case-control",
+        "Case only",
+        "Birth cohort",
+        "Other type",
+    },
     ("Collection events", "access rights"): {"Open access", "Restricted access", "Non public"},
     ("Subpopulations", "access rights"): {"Open access", "Restricted access", "Non public"},
     ("Contacts", "title"): {
@@ -108,6 +116,11 @@ ONTOLOGY_ALLOWED_VALUES: Dict[tuple[str, str], set[str]] = {
 }
 
 ONTOLOGY_ARRAY_ALLOWED_VALUES: Dict[tuple[str, str], set[str]] = {
+    ("Datasets", "dataset type"): {
+        "Collected dataset",
+        "Harmonised dataset",
+        "Harmonisation schema",
+    },
     ("Contacts", "role"): {
         "Principal Investigator",
         "Primary contact",

@@ -771,6 +771,30 @@ fi
 echo "[4/4] Starten main_cohort.py (PDF extractie → Excel)..."
 echo "  PDF_EXTRACT_CONFIG=$PDF_EXTRACT_CONFIG"
 echo "  PDF_EXTRACT_PROMPTS=$PDF_EXTRACT_PROMPTS"
+
+if [[ -z "${COUNTRY_ONTOLOGY_CSV:-}" ]]; then
+  for c in \
+    "${PWD}/Countries.csv" \
+    "${PWD}/data/ontologies/Countries.csv" \
+    "/Users/p.jansma/Downloads/Countries.csv"
+  do
+    if [[ -f "$c" ]]; then
+      export COUNTRY_ONTOLOGY_CSV="$c"
+      break
+    fi
+  done
+fi
+if [[ -n "${COUNTRY_ONTOLOGY_CSV:-}" ]]; then
+  echo "  COUNTRY_ONTOLOGY_CSV=$COUNTRY_ONTOLOGY_CSV"
+  if [[ -z "${COUNTRY_MAPPING_LLM_FALLBACK:-}" ]]; then
+    export COUNTRY_MAPPING_LLM_FALLBACK="1"
+  fi
+  echo "  COUNTRY_MAPPING_LLM_FALLBACK=$COUNTRY_MAPPING_LLM_FALLBACK"
+  status_event "countries_mapping_enabled" "country ontology mapping enabled"
+else
+  echo "  COUNTRY_ONTOLOGY_CSV=(not set; country mapping skipped)"
+fi
+
 export PIPELINE_ISSUES_FILE="${RUN_DIR}/pipeline_issues.json"
 status_event "extract_running" "starting main_cohort.py"
 python3 src/main_cohort.py "${RUN_ARGS[@]}"
