@@ -69,6 +69,12 @@ OCR_PREFETCH_DIR="${OCR_PREFETCH_DIR:-${RUN_DIR}/ocr_prefetch}"
 # 1 = enabled (recommended for lower context usage), 0 = disabled.
 STRIP_REFERENCES="${STRIP_REFERENCES:-1}"
 
+# Auto-fetch latest ontology/model CSV files from molgenis-emx2.
+AUTO_FETCH_EMX2_ONTOLOGIES="${AUTO_FETCH_EMX2_ONTOLOGIES:-1}"
+MOLGENIS_EMX2_REPO="${MOLGENIS_EMX2_REPO:-molgenis/molgenis-emx2}"
+MOLGENIS_EMX2_REF="${MOLGENIS_EMX2_REF:-main}"
+EMX2_CACHE_DIR="${EMX2_CACHE_DIR:-${RUN_DIR}/emx2_cache}"
+
 # ------------------------------------------------------------------------------
 # CLI passthrough:
 # - run without args => defaults to main_cohort.py -p all -o final_result.xlsx
@@ -147,6 +153,49 @@ event = {
 with open(status_log, "a", encoding="utf-8") as f:
     f.write(json.dumps(event, ensure_ascii=True) + "\n")
 PY
+}
+
+fetch_emx2_csv() {
+  local rel_path="$1"
+  local target_var="$2"
+  local current_val="${!target_var:-}"
+
+  if [[ -n "$current_val" && -f "$current_val" ]]; then
+    return 0
+  fi
+  if [[ "$AUTO_FETCH_EMX2_ONTOLOGIES" != "1" ]]; then
+    return 0
+  fi
+  if ! command -v curl >/dev/null 2>&1; then
+    return 0
+  fi
+
+  mkdir -p "$EMX2_CACHE_DIR"
+  local safe_name
+  safe_name="$(echo "$rel_path" | tr '/ ' '__')"
+  local out_file="${EMX2_CACHE_DIR}/${safe_name}"
+  local tmp_file="${out_file}.tmp"
+  local refs=("$MOLGENIS_EMX2_REF" "main" "master")
+  local seen="|"
+  local ref
+  for ref in "${refs[@]}"; do
+    [[ -z "$ref" ]] && continue
+    if [[ "$seen" == *"|${ref}|"* ]]; then
+      continue
+    fi
+    seen="${seen}${ref}|"
+    local url="https://raw.githubusercontent.com/${MOLGENIS_EMX2_REPO}/${ref}/${rel_path}"
+    if curl -fsSL "$url" -o "$tmp_file"; then
+      mv "$tmp_file" "$out_file"
+      export "$target_var=$out_file"
+      echo "  ${target_var}=${out_file} (fetched ${ref}:${rel_path})"
+      status_event "ontology_fetched" "${target_var} fetched from ${ref}:${rel_path}"
+      return 0
+    fi
+  done
+
+  rm -f "$tmp_file" 2>/dev/null || true
+  return 0
 }
 
 if [[ "$AUTO_PORTS" == "1" ]]; then
@@ -771,6 +820,14 @@ fi
 echo "[4/4] Starten main_cohort.py (PDF extractie → Excel)..."
 echo "  PDF_EXTRACT_CONFIG=$PDF_EXTRACT_CONFIG"
 echo "  PDF_EXTRACT_PROMPTS=$PDF_EXTRACT_PROMPTS"
+echo "  AUTO_FETCH_EMX2_ONTOLOGIES=$AUTO_FETCH_EMX2_ONTOLOGIES"
+
+# Attempt to fetch latest ontology/model sources from molgenis-emx2.
+fetch_emx2_csv "data/_ontologies/Countries.csv" COUNTRY_ONTOLOGY_CSV
+fetch_emx2_csv "data/_ontologies/Regions.csv" REGION_ONTOLOGY_CSV
+fetch_emx2_csv "data/_ontologies/Resources.csv" REF_RESOURCES_CSV
+fetch_emx2_csv "data/_ontologies/Organisations.csv" REF_ORGANISATIONS_CSV
+fetch_emx2_csv "data/_models/shared/Subpopulations.csv" REF_SUBPOPULATIONS_CSV
 
 if [[ -z "${COUNTRY_ONTOLOGY_CSV:-}" ]]; then
   for c in \
@@ -816,6 +873,16 @@ if [[ -n "${REGION_ONTOLOGY_CSV:-}" ]]; then
   status_event "regions_mapping_enabled" "region ontology mapping enabled"
 else
   echo "  REGION_ONTOLOGY_CSV=(not set; region mapping skipped)"
+fi
+
+if [[ -n "${REF_RESOURCES_CSV:-}" ]]; then
+  echo "  REF_RESOURCES_CSV=$REF_RESOURCES_CSV"
+fi
+if [[ -n "${REF_ORGANISATIONS_CSV:-}" ]]; then
+  echo "  REF_ORGANISATIONS_CSV=$REF_ORGANISATIONS_CSV"
+fi
+if [[ -n "${REF_SUBPOPULATIONS_CSV:-}" ]]; then
+  echo "  REF_SUBPOPULATIONS_CSV=$REF_SUBPOPULATIONS_CSV"
 fi
 
 export PIPELINE_ISSUES_FILE="${RUN_DIR}/pipeline_issues.json"
