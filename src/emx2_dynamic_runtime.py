@@ -468,6 +468,29 @@ def write_json(path: str | Path, payload: Any) -> None:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
 
+def write_task_prompts_toml(cfg: Dict[str, Any], path: str | Path) -> None:
+    out_path = Path(path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    lines: List[str] = []
+    for section_name in sorted(k for k in cfg.keys() if str(k).startswith("task_")):
+        section = cfg.get(section_name)
+        if not isinstance(section, dict):
+            continue
+        lines.append(f"[{section_name}]")
+        for key, value in section.items():
+            if isinstance(value, bool):
+                rendered = "true" if value else "false"
+            elif isinstance(value, (int, float)) and not isinstance(value, bool):
+                rendered = str(value)
+            else:
+                rendered = json.dumps("" if value is None else str(value), ensure_ascii=False)
+            lines.append(f"{key} = {rendered}")
+        lines.append("")
+
+    out_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build schema-driven EMX2 runtime metadata.")
     sub = parser.add_subparsers(dest="cmd", required=True)

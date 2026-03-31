@@ -19,6 +19,7 @@ from emx2_dynamic_runtime import (
     apply_dynamic_constraints_to_config,
     build_runtime_registry,
     write_json,
+    write_task_prompts_toml,
 )
 from fix_molgenis_staging_types_callable import fix_workbook
 from fix_molgenis_staging_types_dynamic import fix_workbook_dynamic
@@ -591,6 +592,13 @@ def cli() -> None:
             dynamic_registry = None
             dynamic_prompt_summary = {}
             log.warning("Could not build dynamic EMX2 runtime; falling back to legacy prompt/validation: %s", e)
+
+    if dynamic_runtime_enabled:
+        try:
+            write_task_prompts_toml(cfg, f"{args.output}.dynamic_prompts.toml")
+            log.info("Wrote dynamic prompts TOML: %s.dynamic_prompts.toml", args.output)
+        except Exception as e:
+            log.warning("Could not write dynamic prompts TOML: %s", e)
 
     llm_cfg = cfg["llm"]
     pdf_cfg = cfg["pdf"]
