@@ -121,6 +121,19 @@ def _blank_row(columns: List[str]) -> Dict[str, Any]:
     return {c: "" for c in columns}
 
 
+def _serialize_bool_default_false(value: Any) -> str:
+    if _is_empty_value(value):
+        return "false"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    s = str(value).strip().lower()
+    if s in {"true", "1", "yes", "y"}:
+        return "true"
+    if s in {"false", "0", "no", "n"}:
+        return "false"
+    return "false"
+
+
 def _resolve_schema_xlsx(explicit_path: str | None = None) -> str | None:
     candidates = [
         explicit_path,
@@ -340,6 +353,7 @@ def _iter_subpopulation_count_rows(
             })
             if any(str(row[k]).strip() for k in ("age group", "N total", "N female", "N male")):
                 out.append(row)
+        _apply_subpopulation_age_group_defaults(out, label, pdf_path, subpop_name, issues)
         return out
 
     # Backward compatibility with old {year, age_group, gender, n_unique_individuals} shape
@@ -383,7 +397,50 @@ def _iter_subpopulation_count_rows(
         if any(str(row[k]).strip() for k in ("age group", "N total", "N female", "N male")):
             out.append(row)
 
+    _apply_subpopulation_age_group_defaults(out, label, pdf_path, subpop_name, issues)
     return out
+
+
+def _apply_subpopulation_age_group_defaults(
+    rows: List[Dict[str, Any]],
+    label: str,
+    pdf_path: str,
+    subpop_name: str,
+    issues: List[Dict[str, Any]],
+) -> None:
+    non_empty = [
+        r for r in rows
+        if any(str(r.get(k, "")).strip() for k in ("age group", "N total", "N female", "N male"))
+    ]
+    if not non_empty:
+        return
+    missing = [r for r in non_empty if not str(r.get("age group", "")).strip()]
+    if not missing:
+        return
+    if len(missing) == len(non_empty):
+        for r in missing:
+            r["age group"] = "All ages"
+        issues.append({
+            "paper": label,
+            "pdf_path": pdf_path,
+            "severity": "info",
+            "kind": "subpopulation_count_age_group_defaulted",
+            "message": (
+                f"Subpopulation counts for '{subpop_name}' had no explicit age group; "
+                "defaulted to 'All ages' for overall counts."
+            ),
+        })
+    else:
+        issues.append({
+            "paper": label,
+            "pdf_path": pdf_path,
+            "severity": "warning",
+            "kind": "subpopulation_count_missing_age_group",
+            "message": (
+                f"Subpopulation counts for '{subpop_name}' included rows without an explicit age group; "
+                "left empty for those rows."
+            ),
+        })
 
 
 def cli() -> None:
@@ -801,12 +858,16 @@ def cli() -> None:
         for item in people:
             if not isinstance(item, dict):
                 continue
+            consent_raw = item.get("statement_of_consent_personal_data")
+            if consent_raw is None:
+                consent_raw = item.get("statement of consent personal data")
             row = _blank_row(COHORT_SHEETS["Contacts"])
             row.update({
                 "resource": resource_ref,
                 "role": _serialize_value(item.get("role")),
                 "first name": _serialize_value(item.get("first_name")),
                 "last name": _serialize_value(item.get("last_name")),
+                "statement of consent personal data": _serialize_bool_default_false(consent_raw),
                 "prefix": _serialize_value(item.get("prefix")),
                 "initials": _serialize_value(item.get("initials")),
                 "title": _serialize_value(item.get("title")),

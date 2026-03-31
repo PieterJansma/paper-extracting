@@ -1,0 +1,5252 @@
+{
+  "alspac": [
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "description",
+      "value": "The Avon Longitudinal Study of Parents and Children (ALSPAC) is a transgenerational prospective observational study investigating influences on health and development across the life course. It considers multiple genetic"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "description",
+      "value": "social and other environmental exposures in relation to a similarly diverse range of health"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "design description",
+      "value": "The Avon Longitudinal Study of Parents and Children (ALSPAC) is a transgenerational prospective observational study investigating influences on health and development across the life course."
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "number of participants",
+      "value": "15247"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "number of participants with samples",
+      "value": "11343.0"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "countries",
+      "value": "United Kingdom of Great Britain and Northern Ireland (the)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "population age groups",
+      "value": "Infant (0-23 months)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "population age groups",
+      "value": "Child (2-12 years)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "population age groups",
+      "value": "Adolescent (13-17 years)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "population age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "inclusion criteria",
+      "value": "Age group inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "inclusion criteria",
+      "value": "Country of residence inclusion criteria"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "inclusion criteria",
+      "value": "Gravidity inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "other inclusion criteria",
+      "value": "Pregnant women residents in the three Health Districts of the old administrative county of Avon"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "other inclusion criteria",
+      "value": "Estimated delivery date between 1 April 1991 and 31 December 1992"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "exclusion criteria",
+      "value": "Gravidity inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "other exclusion criteria",
+      "value": "Pregnant women originally resident in Avon but migrating out of the catchment area prior to delivery unless they had completed the questionnaire scheduled for the third trimester of pregnancy"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "linkage options",
+      "value": "ONS (deaths and cancer registrations); National Pupil Database; General Practice Research Database"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "access rights",
+      "value": "Restricted access"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "data access conditions",
+      "value": "general research use"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "data use conditions",
+      "value": "collaboration required"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "data access conditions description",
+      "value": "The vast majority of requests are approved as the system only checks availability of data and whether a cost will need to be charged (in most cases <£1000) to cover the staff resources required to put together a data set for collaborators."
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "funding statement",
+      "value": "the Wellcome Trust and the University of Bristol currently provide core funding support for ALSPAC (WT092731). Data collection is funded from a wide range of sources"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "funding statement",
+      "value": "which are detailed on the ALSPAC website: http://www.bristol.ac.uk/alspac/participants/ethics/funding/. AB is funded by the Wellcome Trust (WT086118/Z/08/Z) and the MRC/Wellcome Trust strategic support. AF is funded by an MRC Research Fellowship (G0701594). DAL"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "funding statement",
+      "value": "AF and GDS work in a Centre that receives funding from the MRC (G0600705)."
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "acknowledgements",
+      "value": "We are extremely grateful to all the families who took part in this study"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "acknowledgements",
+      "value": "the midwives for their help in recruiting them"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "acknowledgements",
+      "value": "which includes interviewers"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "acknowledgements",
+      "value": "computer and laboratory technicians"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "acknowledgements",
+      "value": "volunteers"
+    },
+    {
+      "sheet": "Resources",
+      "row": 2,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Agents",
+      "row": 2,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 2,
+      "column": "role",
+      "value": "Data originator"
+    },
+    {
+      "sheet": "Agents",
+      "row": 2,
+      "column": "role",
+      "value": "Data holder"
+    },
+    {
+      "sheet": "Agents",
+      "row": 2,
+      "column": "role",
+      "value": "Data provider"
+    },
+    {
+      "sheet": "Agents",
+      "row": 3,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 3,
+      "column": "role",
+      "value": "Data originator"
+    },
+    {
+      "sheet": "Agents",
+      "row": 3,
+      "column": "role",
+      "value": "Data holder"
+    },
+    {
+      "sheet": "Agents",
+      "row": 3,
+      "column": "role",
+      "value": "Data provider"
+    },
+    {
+      "sheet": "Agents",
+      "row": 4,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 4,
+      "column": "role",
+      "value": "Data originator"
+    },
+    {
+      "sheet": "Agents",
+      "row": 4,
+      "column": "role",
+      "value": "Data holder"
+    },
+    {
+      "sheet": "Agents",
+      "row": 4,
+      "column": "role",
+      "value": "Data provider"
+    },
+    {
+      "sheet": "Publications",
+      "row": 2,
+      "column": "doi",
+      "value": "https://doi.org/10.1093/ije/dys064"
+    },
+    {
+      "sheet": "Publications",
+      "row": 2,
+      "column": "title",
+      "value": "Cohort Profile: The ‘Children of the 90s’—the index offspring of the Avon Longitudinal Study of Parents and Children"
+    },
+    {
+      "sheet": "Documentation",
+      "row": 2,
+      "column": "type",
+      "value": "Governance details"
+    },
+    {
+      "sheet": "Documentation",
+      "row": 2,
+      "column": "url",
+      "value": "http://www.bristol.ac.uk/alspac/documents/alspac-policy.pdf"
+    },
+    {
+      "sheet": "Documentation",
+      "row": 3,
+      "column": "url",
+      "value": "http://www.bristol.ac.uk/alspac/documents/genotypes-feb-2010.pdf"
+    }
+  ],
+  "coevorden": [
+    {
+      "sheet": "Resources",
+      "row": 3,
+      "column": "cohort type",
+      "value": "Population cohort"
+    },
+    {
+      "sheet": "Resources",
+      "row": 3,
+      "column": "description",
+      "value": "This study explored the occurrence of concomitant pelvic floor symptoms in community-dwelling males and females using validated questionnaires on lower urinary tract symptoms"
+    },
+    {
+      "sheet": "Resources",
+      "row": 3,
+      "column": "keywords",
+      "value": "community-dwelling"
+    },
+    {
+      "sheet": "Resources",
+      "row": 3,
+      "column": "design",
+      "value": "Cross-sectional"
+    },
+    {
+      "sheet": "Resources",
+      "row": 3,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 3,
+      "column": "population age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 3,
+      "column": "inclusion criteria",
+      "value": "Age group inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 3,
+      "column": "inclusion criteria",
+      "value": "Sex inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 3,
+      "column": "other inclusion criteria",
+      "value": "community-dwelling males and females aged 16 years or older"
+    },
+    {
+      "sheet": "Resources",
+      "row": 3,
+      "column": "exclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 3,
+      "column": "other exclusion criteria",
+      "value": "terminal illness, cognitive impairment (e.g., dementia) or current psychological condition precluding informed consent"
+    },
+    {
+      "sheet": "Resources",
+      "row": 3,
+      "column": "contact point",
+      "value": "Grietje Knol-de Vries"
+    },
+    {
+      "sheet": "Resources",
+      "row": 3,
+      "column": "access rights",
+      "value": "Restricted access"
+    },
+    {
+      "sheet": "Resources",
+      "row": 3,
+      "column": "data access conditions description",
+      "value": "The data that support the findings of this study are available from the corresponding author upon reasonable request."
+    },
+    {
+      "sheet": "Resources",
+      "row": 3,
+      "column": "funding statement",
+      "value": "This study was funded by ZonMw (Gender and Health 849200004)."
+    },
+    {
+      "sheet": "Resources",
+      "row": 3,
+      "column": "acknowledgements",
+      "value": "The authors would like to thank Henriëtte Westers for her assistance in data collection. Dr Robert Sykes (www.doctored.org.uk) provided editorial services for the final drafts of this manuscript."
+    },
+    {
+      "sheet": "Resources",
+      "row": 3,
+      "column": "provenance statement",
+      "value": "The study was approved by the local medical ethical committee (University Medical Center Groningen: METc2018/601). All participants provided written informed consent."
+    },
+    {
+      "sheet": "Resources",
+      "row": 3,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "External identifiers",
+      "row": 2,
+      "column": "external identifier type",
+      "value": "METc number"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 2,
+      "column": "description",
+      "value": "Participants completed validated questionnaires on lower urinary tract symptoms (LUTS)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 2,
+      "column": "description",
+      "value": "and pelvic organ prolapse. Medical general practitioner records were also examined."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 2,
+      "column": "keywords",
+      "value": "community-dwelling"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 2,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 2,
+      "column": "number of participants",
+      "value": "1405.0"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 2,
+      "column": "areas of information",
+      "value": "Symptoms and signs"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 2,
+      "column": "areas of information",
+      "value": "Health and community care services utilization"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 2,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 2,
+      "column": "standardized tools",
+      "value": "ICIQ-male LUTS"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 2,
+      "column": "standardized tools",
+      "value": "ICIQ-female LUTS"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 2,
+      "column": "standardized tools",
+      "value": "Groningen Defecation and Fecal Continence questionnaire"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 2,
+      "column": "standardized tools",
+      "value": "POP/Incontinence Sexual Questionnaire"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 2,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 2,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Agents",
+      "row": 5,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 5,
+      "column": "department",
+      "value": "Department of General Practice and Elderly Care Medicine"
+    },
+    {
+      "sheet": "Agents",
+      "row": 6,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 6,
+      "column": "department",
+      "value": "Department of Obstetrics and Gynecology"
+    },
+    {
+      "sheet": "Agents",
+      "row": 7,
+      "column": "id",
+      "value": "MUMC"
+    },
+    {
+      "sheet": "Agents",
+      "row": 7,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 7,
+      "column": "name",
+      "value": "Maastricht University Medical Center"
+    },
+    {
+      "sheet": "Agents",
+      "row": 7,
+      "column": "organisation",
+      "value": "Maastricht University"
+    },
+    {
+      "sheet": "Agents",
+      "row": 8,
+      "column": "id",
+      "value": "PraktijkDeHuisarts"
+    },
+    {
+      "sheet": "Agents",
+      "row": 8,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 9,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 9,
+      "column": "name",
+      "value": "Patient Organization Foundation Bekkenbodem4All (Pelvicfloor4All)"
+    },
+    {
+      "sheet": "Agents",
+      "row": 10,
+      "column": "id",
+      "value": "NetherlandsSocietyOfCardiology"
+    },
+    {
+      "sheet": "Agents",
+      "row": 10,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Contacts",
+      "row": 3,
+      "column": "last name",
+      "value": "Knol-de Vries"
+    },
+    {
+      "sheet": "Contacts",
+      "row": 3,
+      "column": "title",
+      "value": "dr."
+    },
+    {
+      "sheet": "Contacts",
+      "row": 3,
+      "column": "orcid",
+      "value": "http://orcid.org/0000-0002-7833-5260"
+    },
+    {
+      "sheet": "Contacts",
+      "row": 4,
+      "column": "title",
+      "value": "dr."
+    },
+    {
+      "sheet": "Contacts",
+      "row": 4,
+      "column": "orcid",
+      "value": "http://orcid.org/0000-0001-7145-6185"
+    },
+    {
+      "sheet": "Publications",
+      "row": 3,
+      "column": "doi",
+      "value": "https://doi.org/10.1002/nau.25020"
+    },
+    {
+      "sheet": "Publications",
+      "row": 3,
+      "column": "title",
+      "value": "Exploring concomitant pelvic floor symptoms in community‐dwelling females and males"
+    }
+  ],
+  "concrete": [
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "website",
+      "value": "https://www.concrete-project.nl"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "description",
+      "value": "The CONCRETE study aims to determine whether direct GP access to CT CCS leads to earlier and more cost-effective diagnosis and treatment of CAD in patients with atypical AP or non-specific thoracic complaints"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "keywords",
+      "value": "cost-effectiveness"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "contact email",
+      "value": "r.vliegenthart@umcg.nl"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "design",
+      "value": "Longitudinal"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "design description",
+      "value": "CONCRETE is a pragmatic multicentre study with a cluster-randomised design. This type of design is increasingly used in primary care for the evaluation of healthcare interventions."
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "population age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "inclusion criteria",
+      "value": "Age group inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "inclusion criteria",
+      "value": "Defined population inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "other inclusion criteria",
+      "value": "Men of 40 years and older, and women of  45 years and older"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "other inclusion criteria",
+      "value": "Chest discomfort, either atypical AP or non-specific thoracic complaints"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "exclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "access rights",
+      "value": "Restricted access"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "data use conditions",
+      "value": "not for profit"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "data use conditions",
+      "value": "non commercial use only"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "data access conditions description",
+      "value": "after completion of the trial. Procedures and criteria for sharing of the data will be designed."
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "funding statement",
+      "value": "The CONCRETE study is funded by Dutch Heart Foundation"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "funding statement",
+      "value": "www. hartstichting.nl"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "funding statement",
+      "value": "grant number CVON2017- 14."
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "acknowledgements",
+      "value": "The authors are grateful to the participating multicentre general practitioner (GP) organisations: ‘HuisartsenOrganisatie Oost- Gelderland’ (Dr R van Bruggen)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "acknowledgements",
+      "value": "Meditta (Dr Dennis Muris)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "acknowledgements",
+      "value": "‘Huisartsen Cooperatie Deventer en Omstreken’ (Dr Madeleine Bruins Slot) and ‘Stichting De Pool eerstelijnszorg’ (Dr Siert Woltjers)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "acknowledgements",
+      "value": "Dr Fabrice Martens) and University Medical Center Groningen. The authors are also grateful to all participating GPs and nurse practitioners of participating GP offices. The authors would also like to thank the cardiovascular patients involved in the design of the patient information and questionnaires"
+    },
+    {
+      "sheet": "Resources",
+      "row": 4,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 2,
+      "column": "description",
+      "value": "This arm involves direct access of general practitioners (GPs) to CT coronary calcium scoring (CCS) for the diagnosis and exclusion of coronary artery disease (CAD) in patients with atypical angina pectoris (AP) and non-specific thoracic complaints."
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 2,
+      "column": "keywords",
+      "value": "non-specific thoracic complaints"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 2,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 2,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 2,
+      "column": "inclusion criteria",
+      "value": "Age of majority inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 2,
+      "column": "inclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 2,
+      "column": "other inclusion criteria",
+      "value": "Men of 40 years and older, and women of  45 years and older"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 2,
+      "column": "exclusion criteria",
+      "value": "Use of medication inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 2,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 3,
+      "column": "description",
+      "value": "This arm involves the routine standard of care as determined by the Dutch College of General Practitioners (NHG) Standard for Stable AP"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 3,
+      "column": "description",
+      "value": "where patients with atypical AP or non-specific thoracic complaints are referred to the outpatient cardiology clinic for evaluation."
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 3,
+      "column": "keywords",
+      "value": "non-specific thoracic complaints"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 3,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 3,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 3,
+      "column": "inclusion criteria",
+      "value": "Age of majority inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 3,
+      "column": "inclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 3,
+      "column": "other inclusion criteria",
+      "value": "Men of 40 years and older, and women of  45 years and older"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 3,
+      "column": "exclusion criteria",
+      "value": "Use of medication inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 3,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "External identifiers",
+      "row": 3,
+      "column": "external identifier type",
+      "value": "Clinical Trials.gov"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 3,
+      "column": "description",
+      "value": "Eligibility screening by GPs and informed consent."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 3,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 3,
+      "column": "areas of information",
+      "value": "Socio-demographic and economic characteristics"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 3,
+      "column": "areas of information",
+      "value": "Lifestyle and behaviours"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 3,
+      "column": "areas of information",
+      "value": "Symptoms and signs"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 3,
+      "column": "areas of information",
+      "value": "Medication and supplements"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 3,
+      "column": "areas of information",
+      "value": "Health and community care services utilization"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 3,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 3,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 3,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 4,
+      "column": "description",
+      "value": "Quality of life and heart-related quality of life questionnaires."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 4,
+      "column": "keywords",
+      "value": "heart-related quality of life"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 4,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 4,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 4,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 4,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 4,
+      "column": "standardized tools",
+      "value": "EQ-5D-5L"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 4,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 4,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 5,
+      "column": "description",
+      "value": "Quality of life and heart-related quality of life questionnaires."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 5,
+      "column": "keywords",
+      "value": "heart-related quality of life"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 5,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 5,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 5,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 5,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 5,
+      "column": "standardized tools",
+      "value": "EQ-5D-5L"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 5,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 5,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 6,
+      "column": "description",
+      "value": "Quality of life and heart-related quality of life questionnaires."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 6,
+      "column": "keywords",
+      "value": "heart-related quality of life"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 6,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 6,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 6,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 6,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 6,
+      "column": "standardized tools",
+      "value": "EQ-5D-5L"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 6,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 6,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Agents",
+      "row": 14,
+      "column": "id",
+      "value": "University of Twente"
+    },
+    {
+      "sheet": "Agents",
+      "row": 14,
+      "column": "name",
+      "value": "University of Twente"
+    },
+    {
+      "sheet": "Contacts",
+      "row": 7,
+      "column": "email",
+      "value": "r.vliegenthart@umcg.nl"
+    },
+    {
+      "sheet": "Publications",
+      "row": 4,
+      "column": "doi",
+      "value": "https://doi.org/10.1136/bmjopen-2021-055123"
+    },
+    {
+      "sheet": "Publications",
+      "row": 4,
+      "column": "title",
+      "value": "Coronary calcium scoring as first- line test to detect and exclude coronary artery disease in patients presenting to the general practitioner with stable chest pain: protocol of the cluster- randomised CONCRETE trial"
+    }
+  ],
+  "lifelinenext": [
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "website",
+      "value": "https://www.Lifelines.nl"
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "description",
+      "value": "Lifelines NEXT is a prospective birth cohort designed to study the effects of intrinsic and extrinsic determinants on health and disease in a four-generation design"
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "description",
+      "value": "a three-generation population-based cohort study."
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "design description",
+      "value": "Lifelines NEXT is an observational prospective birth cohort with a transgenerational design of up to four generations."
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "population age groups",
+      "value": "Newborn (0-1 months)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "population age groups",
+      "value": "Infant (0-23 months)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "population age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "inclusion criteria",
+      "value": "Gravidity inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "inclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "other inclusion criteria",
+      "value": "Partners of pregnant women"
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "contact point",
+      "value": "Willemijn Warmink-Perdijk"
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "linkage options",
+      "value": "Dutch Perinatal Data Register; Perined; electronic files of the regional youth and family centers"
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "access rights",
+      "value": "Restricted access"
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "data use conditions",
+      "value": "collaboration required"
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "data access conditions description",
+      "value": "available upon request"
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "release type",
+      "value": "Other release type"
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "funding statement",
+      "value": "The data collection of the core study was funded by a grant from the UMCG Hereditary Metabolic Diseases Fund. A grant from the Ubbo Emmius Foundation funded the additional data collection on lung function. Funding for the Newborn project including inclusion of fathers was provided by the European Union"
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "funding statement",
+      "value": "the provinces of Friesland and Groningen and the municipality of Groningen. Furthermore Philips provided continuous measurement devices for this add-on initiative. The data from those wearables are available for analyses. AZ is supported by a VIDI Grant [016.178.056] from the Netherlands Organization for Scientific Research [NWO] and a European Research Council [ERC] starting Grant [ERC-715772]."
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "acknowledgements",
+      "value": "We are grateful for the participation of all the mothers"
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "acknowledgements",
+      "value": "fathers and children in Lifelines NEXT. We also thank the whole Lifelines NEXT team for their ongoing effort to build this important cohort. Furthermore we also want to thank all maternity care providers for their efforts to recruit participants and collect materials during childbirth. We thank Kate McIntyre for carefully reading the manuscript."
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "provenance statement",
+      "value": "The Lifelines NEXT study was approved by the ethics committee of the University Medical Center Groningen"
+    },
+    {
+      "sheet": "Resources",
+      "row": 5,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "External identifiers",
+      "row": 4,
+      "column": "external identifier type",
+      "value": "METc number"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "description",
+      "value": "Data collection starts at 12 weeks of gestation. Research nurses visit participants four times to perform tests and collect (bio)materials."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "areas of information",
+      "value": "Socio-demographic and economic characteristics"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "areas of information",
+      "value": "Lifestyle and behaviours"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "areas of information",
+      "value": "pregnancy and reproductive health history"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "areas of information",
+      "value": "Physical measures and assessments"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "areas of information",
+      "value": "Laboratory measures"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "areas of information",
+      "value": "Cognition"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "areas of information",
+      "value": "personality and psychological measures and assessments"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "areas of information",
+      "value": "life plans"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "areas of information",
+      "value": "beliefs and values"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "areas of information",
+      "value": "Social environment and relationships"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "areas of information",
+      "value": "Physical environment"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "data categories",
+      "value": "Biological samples"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "data categories",
+      "value": "Physiological/Biochemical measurements"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "data categories",
+      "value": "Epigenomics"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "data categories",
+      "value": "Metagenomics / Microbiome"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 7,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 8,
+      "column": "description",
+      "value": "the maternity care provider collects a vaginal swab"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 8,
+      "column": "description",
+      "value": "and blood from the mother. Umbilical cord blood and placental tissue are collected according to standardized protocols."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 8,
+      "column": "age groups",
+      "value": "Newborn (0-1 months)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 8,
+      "column": "areas of information",
+      "value": "pregnancy and reproductive health history"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 8,
+      "column": "areas of information",
+      "value": "Physical measures and assessments"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 8,
+      "column": "areas of information",
+      "value": "Laboratory measures"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 8,
+      "column": "data categories",
+      "value": "Biological samples"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 8,
+      "column": "data categories",
+      "value": "Physiological/Biochemical measurements"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 8,
+      "column": "data categories",
+      "value": "Epigenomics"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 8,
+      "column": "data categories",
+      "value": "Metagenomics / Microbiome"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 8,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 8,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 9,
+      "column": "name",
+      "value": "Follow-up at 12 months"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 9,
+      "column": "description",
+      "value": "At 12 months"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 9,
+      "column": "description",
+      "value": "venous blood is sampled at the pediatrics outpatient clinic at the University Medical Center Groningen (UMCG)."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 9,
+      "column": "keywords",
+      "value": "12 months"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 9,
+      "column": "age groups",
+      "value": "Infant (0-23 months)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 9,
+      "column": "areas of information",
+      "value": "Physical measures and assessments"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 9,
+      "column": "areas of information",
+      "value": "Laboratory measures"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 9,
+      "column": "data categories",
+      "value": "Biological samples"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 9,
+      "column": "data categories",
+      "value": "Physiological/Biochemical measurements"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 9,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 9,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Agents",
+      "row": 17,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 17,
+      "column": "role",
+      "value": "Data originator"
+    },
+    {
+      "sheet": "Agents",
+      "row": 17,
+      "column": "role",
+      "value": "Data holder"
+    },
+    {
+      "sheet": "Agents",
+      "row": 18,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 18,
+      "column": "role",
+      "value": "Data provider"
+    },
+    {
+      "sheet": "Agents",
+      "row": 19,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 19,
+      "column": "role",
+      "value": "Data provider"
+    },
+    {
+      "sheet": "Contacts",
+      "row": 9,
+      "column": "last name",
+      "value": "Warmink-Perdijk"
+    },
+    {
+      "sheet": "Publications",
+      "row": 5,
+      "column": "title",
+      "value": "Lifelines NEXT: a prospective birth cohort adding the next generation to the three-generation Lifelines cohort study"
+    }
+  ],
+  "lofit": [
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "id",
+      "value": "ISRCTN13046877"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "pid",
+      "value": "ISRCTN13046877"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "website",
+      "value": "https://www.lofitleefstijloket.nl"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "description",
+      "value": "The LOFIT study aims to evaluate an in-hospital Lifestyle Front Office (LFO) that provides guidance on lifestyle management in collaboration with community-based lifestyle initiatives for patients under treatment in secondary or tertiary care compared to usual care."
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "keywords",
+      "value": "Health Risk Profile"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "keywords",
+      "value": "Community-based referral"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "keywords",
+      "value": "Healthcare integration"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "keywords",
+      "value": "Patient self-management"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "keywords",
+      "value": "Secondary and tertiary care"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "issued",
+      "value": "2022-10-12 00:00:00"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "design",
+      "value": "Longitudinal"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "population age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "inclusion criteria",
+      "value": "Age group inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "inclusion criteria",
+      "value": "BMI range inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "inclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "other inclusion criteria",
+      "value": "(cardio)vascular disease, hypertension, high cholesterol, diabetes mellitus I and II"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "other inclusion criteria",
+      "value": "osteoporosis, total knee or hip prosthesis"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "exclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "other exclusion criteria",
+      "value": "cognitively unable to comply with a healthy lifestyle intervention referral or to complete study measurements"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "other exclusion criteria",
+      "value": "not able to communicate in the Dutch or English language"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "contact point",
+      "value": "Marlinde van Dijk"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "informed consent type",
+      "value": "Study specific consent"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "access rights",
+      "value": "Restricted access"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "data access conditions description",
+      "value": "available upon reasonable request from the corresponding authors (MvD"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "funding statement",
+      "value": "This study is funded by The Netherlands Organization for Health Research and Development (ZonMw) under grant agreement no. 555003208. The funders will not have any role in data collection"
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "funding statement",
+      "value": "interpretation of the data or decision to submit results."
+    },
+    {
+      "sheet": "Resources",
+      "row": 6,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 4,
+      "column": "description",
+      "value": "Patients randomized to the intervention group will participate in a face-to-face motivational interviewing (MI) coaching session with a lifestyle broker and be referred to suitable community-based lifestyle initiatives."
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 4,
+      "column": "main medical condition",
+      "value": "high cholesterol"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 4,
+      "column": "main medical condition",
+      "value": "osteoporosis"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 4,
+      "column": "main medical condition",
+      "value": "total knee or hip prosthesis"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 4,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 4,
+      "column": "inclusion criteria",
+      "value": "Age group inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 4,
+      "column": "inclusion criteria",
+      "value": "BMI range inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 4,
+      "column": "inclusion criteria",
+      "value": "Clinically relevant exposure inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 4,
+      "column": "inclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 4,
+      "column": "other inclusion criteria",
+      "value": "Not pregnant"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 4,
+      "column": "other inclusion criteria",
+      "value": "Cognitively able to comply with a healthy lifestyle intervention referral"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 4,
+      "column": "other inclusion criteria",
+      "value": "Able to communicate in Dutch or English"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 4,
+      "column": "other exclusion criteria",
+      "value": "Cognitively unable to comply with a healthy lifestyle intervention referral"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 4,
+      "column": "other exclusion criteria",
+      "value": "Not able to communicate in Dutch or English"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 4,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 5,
+      "column": "description",
+      "value": "Patients randomized to the usual care control group will receive care as usual from their healthcare professional(s)."
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 5,
+      "column": "main medical condition",
+      "value": "high cholesterol"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 5,
+      "column": "main medical condition",
+      "value": "osteoporosis"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 5,
+      "column": "main medical condition",
+      "value": "total knee or hip prosthesis"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 5,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 5,
+      "column": "inclusion criteria",
+      "value": "Age group inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 5,
+      "column": "inclusion criteria",
+      "value": "BMI range inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 5,
+      "column": "inclusion criteria",
+      "value": "Clinically relevant exposure inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 5,
+      "column": "inclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 5,
+      "column": "other inclusion criteria",
+      "value": "Not pregnant"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 5,
+      "column": "other inclusion criteria",
+      "value": "Cognitively able to comply with a healthy lifestyle intervention referral"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 5,
+      "column": "other inclusion criteria",
+      "value": "Able to communicate in Dutch or English"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 5,
+      "column": "other exclusion criteria",
+      "value": "Cognitively unable to comply with a healthy lifestyle intervention referral"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 5,
+      "column": "other exclusion criteria",
+      "value": "Not able to communicate in Dutch or English"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 5,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 6,
+      "column": "description",
+      "value": "The intervention arm of the LOFIT study involves patients receiving guidance on lifestyle management in collaboration with community-based lifestyle initiatives compared to usual care."
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 6,
+      "column": "keywords",
+      "value": "secondary care"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 6,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 6,
+      "column": "issued",
+      "value": "2022-10-12 00:00:00"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 6,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 6,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 7,
+      "column": "name",
+      "value": "usual care arm"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 7,
+      "column": "description",
+      "value": "The usual care arm of the LOFIT study involves patients receiving usual care without additional lifestyle management guidance from community-based initiatives."
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 7,
+      "column": "keywords",
+      "value": "comparison arm"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 7,
+      "column": "keywords",
+      "value": "secondary care"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 7,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 7,
+      "column": "issued",
+      "value": "2022-10-12 00:00:00"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 7,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 7,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "External identifiers",
+      "row": 5,
+      "column": "identifier",
+      "value": "ISRCTN13046877"
+    },
+    {
+      "sheet": "External identifiers",
+      "row": 5,
+      "column": "external identifier type",
+      "value": "Clinical Trials.gov"
+    },
+    {
+      "sheet": "External identifiers",
+      "row": 6,
+      "column": "external identifier type",
+      "value": "NCT number"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 10,
+      "column": "description",
+      "value": "Data collection at baseline includes anthropometric measurements"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 10,
+      "column": "description",
+      "value": "and self-reported lifestyle and health-related quality of life measures."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 10,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 10,
+      "column": "areas of information",
+      "value": "Physical measures and assessments"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 10,
+      "column": "areas of information",
+      "value": "Laboratory measures"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 10,
+      "column": "areas of information",
+      "value": "Lifestyle and behaviours"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 10,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 10,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 10,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 10,
+      "column": "data categories",
+      "value": "Physiological/Biochemical measurements"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 10,
+      "column": "standardized tools",
+      "value": "Serum fasting insulin"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 10,
+      "column": "standardized tools",
+      "value": "HOOS-PS /KOOS-PS"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 10,
+      "column": "core variables",
+      "value": "serum fasting insulin"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 10,
+      "column": "core variables",
+      "value": "general self-efficacy"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 10,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 10,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 11,
+      "column": "name",
+      "value": "3 months follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 11,
+      "column": "description",
+      "value": "Data collection at 3 months follow-up includes health-related quality of life measures and process evaluation measures."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 11,
+      "column": "keywords",
+      "value": "3 months follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 11,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 11,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 11,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 11,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 11,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 11,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 12,
+      "column": "name",
+      "value": "6 months follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 12,
+      "column": "description",
+      "value": "Data collection at 6 months follow-up includes health-related quality of life measures."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 12,
+      "column": "keywords",
+      "value": "6 months follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 12,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 12,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 12,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 12,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 12,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 12,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 13,
+      "column": "name",
+      "value": "9 months follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 13,
+      "column": "description",
+      "value": "Data collection at 9 months follow-up includes health-related quality of life measures."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 13,
+      "column": "keywords",
+      "value": "9 months follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 13,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 13,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 13,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 13,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 13,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 13,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 14,
+      "column": "description",
+      "value": "Data collection at 12 months follow-up includes anthropometric measurements"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 14,
+      "column": "description",
+      "value": "and self-reported lifestyle and health-related quality of life measures."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 14,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 14,
+      "column": "areas of information",
+      "value": "Physical measures and assessments"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 14,
+      "column": "areas of information",
+      "value": "Laboratory measures"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 14,
+      "column": "areas of information",
+      "value": "Lifestyle and behaviours"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 14,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 14,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 14,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 14,
+      "column": "data categories",
+      "value": "Physiological/Biochemical measurements"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 14,
+      "column": "standardized tools",
+      "value": "Serum fasting insulin"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 14,
+      "column": "standardized tools",
+      "value": "HOOS-PS /KOOS-PS"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 14,
+      "column": "core variables",
+      "value": "serum fasting insulin"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 14,
+      "column": "core variables",
+      "value": "general self-efficacy"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 14,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 14,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "description",
+      "value": "participants will be asked about demographic characteristics"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "description",
+      "value": "and data on comorbidity will be retrieved from electronic patient files. Health literacy and ASA physical status classification will also be assessed."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "keywords",
+      "value": "ASA classification"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "areas of information",
+      "value": "Socio-demographic and economic characteristics"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "areas of information",
+      "value": "Birth"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "areas of information",
+      "value": "pregnancy and reproductive health history"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "areas of information",
+      "value": "Health and community care services utilization"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "areas of information",
+      "value": "Physical measures and assessments"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "areas of information",
+      "value": "Cognition"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "areas of information",
+      "value": "personality and psychological measures and assessments"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "standardized tools",
+      "value": "International Physical Activity Questionnaire – Short Form (IPAQ-SF)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "standardized tools",
+      "value": "Dutch Food Frequency questionnaire (FFQ)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "standardized tools",
+      "value": "Fagerström Test for Nicotine Dependence (FTND)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "standardized tools",
+      "value": "General Self-Efficacy scale (GSE)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "standardized tools",
+      "value": "stages of change questionnaire"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "standardized tools",
+      "value": "Knee injury and Osteoarthritis Outcome Score Physical Function Short Form (KOOS-PS)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "standardized tools",
+      "value": "Hip disability and Osteoarthritis Outcome Score Physical Function Short Form (HOOS-PS)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "standardized tools",
+      "value": "Set of Brief Screening Questions (SBSQ)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 15,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 16,
+      "column": "name",
+      "value": "3-month follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 16,
+      "column": "description",
+      "value": "participants will be asked about their referral from the lifestyle broker and"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 16,
+      "column": "description",
+      "value": "if applicable"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 16,
+      "column": "description",
+      "value": "their experiences with the (community-based) initiative they were referred to."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 16,
+      "column": "keywords",
+      "value": "3-month"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 16,
+      "column": "areas of information",
+      "value": "Health and community care services utilization"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 16,
+      "column": "areas of information",
+      "value": "Social environment and relationships"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 16,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 16,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 16,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "name",
+      "value": "6-month follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "description",
+      "value": "At 6 months"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "description",
+      "value": "anthropometric measures will be carried out"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "description",
+      "value": "including body height"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "description",
+      "value": "and resting blood pressure. Self-reported health behaviors and psychological measures will also be assessed."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "keywords",
+      "value": "6-month"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "keywords",
+      "value": "health behaviors"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "areas of information",
+      "value": "Physical measures and assessments"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "areas of information",
+      "value": "Lifestyle and behaviours"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "areas of information",
+      "value": "Cognition"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "areas of information",
+      "value": "personality and psychological measures and assessments"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "data categories",
+      "value": "Physiological/Biochemical measurements"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "standardized tools",
+      "value": "activPAL™ micro"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "standardized tools",
+      "value": "International Physical Activity Questionnaire – Short Form (IPAQ-SF)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "standardized tools",
+      "value": "Dutch Food Frequency questionnaire (FFQ)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "standardized tools",
+      "value": "Fagerström Test for Nicotine Dependence (FTND)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "standardized tools",
+      "value": "General Self-Efficacy scale (GSE)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "standardized tools",
+      "value": "stages of change questionnaire"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "standardized tools",
+      "value": "Knee injury and Osteoarthritis Outcome Score Physical Function Short Form (KOOS-PS)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "standardized tools",
+      "value": "Hip disability and Osteoarthritis Outcome Score Physical Function Short Form (HOOS-PS)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "standardized tools",
+      "value": "Set of Brief Screening Questions (SBSQ)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 17,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 18,
+      "column": "name",
+      "value": "9-month follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 18,
+      "column": "description",
+      "value": "At 9 months"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 18,
+      "column": "description",
+      "value": "participants will be asked about their experiences with the LFO and the care pathway"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 18,
+      "column": "description",
+      "value": "dose received in terms of contact with the LFO"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 18,
+      "column": "description",
+      "value": "perceived effect of the program"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 18,
+      "column": "keywords",
+      "value": "9-month"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 18,
+      "column": "areas of information",
+      "value": "Health and community care services utilization"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 18,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 18,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 18,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 18,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 18,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 19,
+      "column": "name",
+      "value": "12-month follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 19,
+      "column": "description",
+      "value": "participants will be asked about their experiences with the LFO and the care pathway"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 19,
+      "column": "description",
+      "value": "dose received in terms of contact with the LFO"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 19,
+      "column": "description",
+      "value": "perceived effect of the program"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 19,
+      "column": "description",
+      "value": "and support. Process evaluation interviews will also be conducted."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 19,
+      "column": "keywords",
+      "value": "12-month"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 19,
+      "column": "areas of information",
+      "value": "Health and community care services utilization"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 19,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 19,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 19,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 19,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 19,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Agents",
+      "row": 20,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 21,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 22,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 23,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 23,
+      "column": "role",
+      "value": "Data provider"
+    },
+    {
+      "sheet": "Agents",
+      "row": 24,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 24,
+      "column": "name",
+      "value": "The Netherlands Organization for Health Research and Development"
+    },
+    {
+      "sheet": "Agents",
+      "row": 24,
+      "column": "role",
+      "value": "Data provider"
+    },
+    {
+      "sheet": "Agents",
+      "row": 25,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 26,
+      "column": "id",
+      "value": "AHA"
+    },
+    {
+      "sheet": "Agents",
+      "row": 26,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 27,
+      "column": "id",
+      "value": "WHF"
+    },
+    {
+      "sheet": "Agents",
+      "row": 27,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 28,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 29,
+      "column": "id",
+      "value": "IASO"
+    },
+    {
+      "sheet": "Agents",
+      "row": 29,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 29,
+      "column": "name",
+      "value": "International Association for the Study of Obesity"
+    },
+    {
+      "sheet": "Agents",
+      "row": 30,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 30,
+      "column": "website",
+      "value": "https://www.nhg.org/"
+    },
+    {
+      "sheet": "Publications",
+      "row": 6,
+      "column": "title",
+      "value": "LOFIT (Lifestyle front Office For Integrating lifestyle medicine in the Treatment of patients): a novel care model towards community-based options for lifestyle change—study protocol"
+    }
+  ],
+  "normtip": [
+    {
+      "sheet": "Resources",
+      "row": 7,
+      "column": "name",
+      "value": "normtip"
+    },
+    {
+      "sheet": "Resources",
+      "row": 7,
+      "column": "type",
+      "value": "Cohort study"
+    },
+    {
+      "sheet": "Resources",
+      "row": 7,
+      "column": "design",
+      "value": "Cross-sectional"
+    },
+    {
+      "sheet": "Resources",
+      "row": 7,
+      "column": "data collection type",
+      "value": "Prospective"
+    },
+    {
+      "sheet": "Resources",
+      "row": 7,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 7,
+      "column": "population age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 7,
+      "column": "inclusion criteria",
+      "value": "Age group inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 7,
+      "column": "inclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 7,
+      "column": "other inclusion criteria",
+      "value": "normal spirometry"
+    },
+    {
+      "sheet": "Resources",
+      "row": 7,
+      "column": "exclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 7,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Resources",
+      "row": 7,
+      "column": "funding statement",
+      "value": "This study was funded by the Royal Netherlands Academy of Arts and Sciences and the Stichting Astmabestrijding (Dutch Foundation Against Asthma)."
+    },
+    {
+      "sheet": "Resources",
+      "row": 7,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 8,
+      "column": "description",
+      "value": "Healthy current-smokers included in the study with normal spirometry"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 8,
+      "column": "keywords",
+      "value": "normal spirometry"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 8,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 8,
+      "column": "inclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 8,
+      "column": "other inclusion criteria",
+      "value": "normal spirometry"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 8,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 8,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 9,
+      "column": "description",
+      "value": "Healthy never-smokers included in the study with normal spirometry"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 9,
+      "column": "keywords",
+      "value": "normal spirometry"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 9,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 9,
+      "column": "inclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 9,
+      "column": "other inclusion criteria",
+      "value": "normal spirometry"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 9,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 9,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "External identifiers",
+      "row": 7,
+      "column": "external identifier type",
+      "value": "Clinical Trials.gov"
+    },
+    {
+      "sheet": "Agents",
+      "row": 31,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 31,
+      "column": "role",
+      "value": "Researcher"
+    },
+    {
+      "sheet": "Agents",
+      "row": 32,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 32,
+      "column": "role",
+      "value": "Researcher"
+    },
+    {
+      "sheet": "Publications",
+      "row": 7,
+      "column": "doi",
+      "value": "https://doi.org/10.1186/s12890-017-0363-0"
+    },
+    {
+      "sheet": "Publications",
+      "row": 7,
+      "column": "title",
+      "value": "Airway wall thickness on HRCT scans decreases with age and increases with smoking"
+    }
+  ],
+  "oncolifes": [
+    {
+      "sheet": "Resources",
+      "row": 8,
+      "column": "website",
+      "value": "http://www.oncolifes.nl"
+    },
+    {
+      "sheet": "Resources",
+      "row": 8,
+      "column": "description",
+      "value": "The OncoLifeS data-biobank for oncology links routine clinical data with preserved biological specimens and quality of life assessments."
+    },
+    {
+      "sheet": "Resources",
+      "row": 8,
+      "column": "design description",
+      "value": "The OncoLifeS data-biobank includes longitudinal quality of life data that will allow patient perspectives to be incorporated in research."
+    },
+    {
+      "sheet": "Resources",
+      "row": 8,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 8,
+      "column": "population age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 8,
+      "column": "inclusion criteria",
+      "value": "Age group inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 8,
+      "column": "inclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 8,
+      "column": "other inclusion criteria",
+      "value": "adult patients (age > 18 years) diagnosed with cancer or with a genetically increased risk of cancer"
+    },
+    {
+      "sheet": "Resources",
+      "row": 8,
+      "column": "contact point",
+      "value": "Gertruida de Bock"
+    },
+    {
+      "sheet": "Resources",
+      "row": 8,
+      "column": "linkage options",
+      "value": "municipal registration; Central Bureau for Statistics; the Netherlands Comprehensive Cancer Center; the nationwide registry of histo- and cytopathology in the Netherlands; LifeLines"
+    },
+    {
+      "sheet": "Resources",
+      "row": 8,
+      "column": "informed consent type",
+      "value": "Study specific consent"
+    },
+    {
+      "sheet": "Resources",
+      "row": 8,
+      "column": "access rights",
+      "value": "Restricted access"
+    },
+    {
+      "sheet": "Resources",
+      "row": 8,
+      "column": "data access conditions",
+      "value": "general research use"
+    },
+    {
+      "sheet": "Resources",
+      "row": 8,
+      "column": "data use conditions",
+      "value": "ethics approval required"
+    },
+    {
+      "sheet": "Resources",
+      "row": 8,
+      "column": "release type",
+      "value": "Continuous"
+    },
+    {
+      "sheet": "Resources",
+      "row": 8,
+      "column": "funding statement",
+      "value": "with the ongoing costs of data collection and biological specimen storage covered by each participating clinical department. External parties will also be asked to cover our expenses and running costs when accessing."
+    },
+    {
+      "sheet": "Resources",
+      "row": 8,
+      "column": "acknowledgements",
+      "value": "we thank Dr Robert Sykes (http://www.doctored.org.uk) for providing editorial services in the final drafts of this manuscript."
+    },
+    {
+      "sheet": "Resources",
+      "row": 8,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "External identifiers",
+      "row": 8,
+      "column": "external identifier type other",
+      "value": "Dutch Trial Register number"
+    },
+    {
+      "sheet": "Internal identifiers",
+      "row": 2,
+      "column": "internal identifier type other",
+      "value": "METc number"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 20,
+      "column": "description",
+      "value": "Baseline data are collected from the hospital’s electronic health care record system (Epic"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 20,
+      "column": "description",
+      "value": "WI). Data concerning tumor stage (TNM staging is according to the International Classification of Diseases for Oncology) and cancer treatment is confirmed by the different participating multidisciplinary tumor working groups."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 20,
+      "column": "keywords",
+      "value": "electronic health record"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 20,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 20,
+      "column": "areas of information",
+      "value": "Socio-demographic and economic characteristics"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 20,
+      "column": "areas of information",
+      "value": "Lifestyle and behaviours"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 20,
+      "column": "areas of information",
+      "value": "Symptoms and signs"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 20,
+      "column": "areas of information",
+      "value": "Medication and supplements"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 20,
+      "column": "areas of information",
+      "value": "Health and community care services utilization"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 20,
+      "column": "areas of information",
+      "value": "Physical measures and assessments"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 20,
+      "column": "areas of information",
+      "value": "Laboratory measures"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 20,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 20,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 21,
+      "column": "name",
+      "value": "Follow-up at 6 months"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 21,
+      "column": "description",
+      "value": "and 24 months after the start of treatment."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 21,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 21,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 21,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 21,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 21,
+      "column": "standardized tools",
+      "value": "European Organisation for Research and Treatment of Cancer Quality of Life Questionnaire (EORTC QLQ-30)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 21,
+      "column": "standardized tools",
+      "value": "Cancer Quality of Life EORTC Head and Neck module (EORTC QLQ-35)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 21,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 21,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 22,
+      "column": "name",
+      "value": "Follow-up at 12 months"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 22,
+      "column": "description",
+      "value": "and 24 months after the start of treatment."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 22,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 22,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 22,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 22,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 22,
+      "column": "standardized tools",
+      "value": "European Organisation for Research and Treatment of Cancer Quality of Life Questionnaire (EORTC QLQ-30)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 22,
+      "column": "standardized tools",
+      "value": "Cancer Quality of Life EORTC Head and Neck module (EORTC QLQ-35)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 22,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 22,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 23,
+      "column": "name",
+      "value": "Follow-up at 18 months"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 23,
+      "column": "description",
+      "value": "and 24 months after the start of treatment."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 23,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 23,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 23,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 23,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 23,
+      "column": "standardized tools",
+      "value": "European Organisation for Research and Treatment of Cancer Quality of Life Questionnaire (EORTC QLQ-30)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 23,
+      "column": "standardized tools",
+      "value": "Cancer Quality of Life EORTC Head and Neck module (EORTC QLQ-35)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 23,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 23,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 24,
+      "column": "name",
+      "value": "Follow-up at 24 months"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 24,
+      "column": "description",
+      "value": "and 24 months after the start of treatment."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 24,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 24,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 24,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 24,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 24,
+      "column": "standardized tools",
+      "value": "European Organisation for Research and Treatment of Cancer Quality of Life Questionnaire (EORTC QLQ-30)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 24,
+      "column": "standardized tools",
+      "value": "Cancer Quality of Life EORTC Head and Neck module (EORTC QLQ-35)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 24,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 24,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Agents",
+      "row": 33,
+      "column": "role",
+      "value": "Data originator"
+    },
+    {
+      "sheet": "Agents",
+      "row": 33,
+      "column": "role",
+      "value": "Data holder"
+    },
+    {
+      "sheet": "Agents",
+      "row": 33,
+      "column": "role",
+      "value": "Data provider"
+    },
+    {
+      "sheet": "Publications",
+      "row": 8,
+      "column": "title",
+      "value": "The OncoLifeS data-biobank for oncology: a comprehensive repository of clinical data"
+    },
+    {
+      "sheet": "Publications",
+      "row": 8,
+      "column": "title",
+      "value": "and the patient’s perspective"
+    }
+  ],
+  "test_myself": [
+    {
+      "sheet": "Resources",
+      "row": 9,
+      "column": "name",
+      "value": "test_myself"
+    },
+    {
+      "sheet": "Resources",
+      "row": 9,
+      "column": "type",
+      "value": "Clinical trial"
+    },
+    {
+      "sheet": "Resources",
+      "row": 9,
+      "column": "design description",
+      "value": "This study is designed as a pragmatic multicenter randomized controlled superiority trial with 2 parallel groups and a 1:1 allocation ratio."
+    },
+    {
+      "sheet": "Resources",
+      "row": 9,
+      "column": "data collection type",
+      "value": "Prospective"
+    },
+    {
+      "sheet": "Resources",
+      "row": 9,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 9,
+      "column": "population age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 9,
+      "column": "inclusion criteria",
+      "value": "Age group inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 9,
+      "column": "inclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 9,
+      "column": "other inclusion criteria",
+      "value": "Adequate command of the Dutch language, no major cognitive or visual impairment"
+    },
+    {
+      "sheet": "Resources",
+      "row": 9,
+      "column": "exclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 9,
+      "column": "other exclusion criteria",
+      "value": "Likelihood of posttraumatic stress disorder, severe anxiety disorder, or severe depressive disorder"
+    },
+    {
+      "sheet": "Resources",
+      "row": 9,
+      "column": "other exclusion criteria",
+      "value": "Pregnancy"
+    },
+    {
+      "sheet": "Resources",
+      "row": 9,
+      "column": "other exclusion criteria",
+      "value": "Engaged in a legal procedure concerning disability-related financial benefits"
+    },
+    {
+      "sheet": "Resources",
+      "row": 9,
+      "column": "other exclusion criteria",
+      "value": "Not in possession of an email account and a personal computer, laptop, or tablet with internet connection"
+    },
+    {
+      "sheet": "Resources",
+      "row": 9,
+      "column": "funding statement",
+      "value": "This study was financially supported by a grant from ZonMW (project ID 636310005). This funder had no role in the study design and will not have any role during its execution"
+    },
+    {
+      "sheet": "Resources",
+      "row": 9,
+      "column": "acknowledgements",
+      "value": "and software developers who contributed to the development of Grip self-help"
+    },
+    {
+      "sheet": "Resources",
+      "row": 9,
+      "column": "acknowledgements",
+      "value": "with special thanks to Yanda van Rood (University of Leiden) and Karlein Schreurs (University of Twente) for writing part of the self-help exercises."
+    },
+    {
+      "sheet": "Resources",
+      "row": 9,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 10,
+      "column": "name",
+      "value": "intervention group"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 10,
+      "column": "description",
+      "value": "Participants in the intervention group will receive a Web-based self-help intervention called Grip self-help in addition to care-as-usual."
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 10,
+      "column": "keywords",
+      "value": "Web-based intervention"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 10,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 10,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 10,
+      "column": "inclusion criteria",
+      "value": "Age of majority inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 10,
+      "column": "inclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 10,
+      "column": "exclusion criteria",
+      "value": "Use of medication inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 10,
+      "column": "exclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 10,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 10,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 11,
+      "column": "description",
+      "value": "Participants in the control group will receive care-as-usual during the study period."
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 11,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 11,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 11,
+      "column": "inclusion criteria",
+      "value": "Age of majority inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 11,
+      "column": "inclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 11,
+      "column": "exclusion criteria",
+      "value": "Use of medication inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 11,
+      "column": "exclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 11,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 11,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "External identifiers",
+      "row": 9,
+      "column": "external identifier type",
+      "value": "Clinical Trials.gov"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 25,
+      "column": "description",
+      "value": "Participants fill out a set of Web-based questionnaires concerning potential perpetuating factors: unhelpful cognitions"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 25,
+      "column": "keywords",
+      "value": "intervention"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 25,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 25,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 25,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 25,
+      "column": "areas of information",
+      "value": "Symptoms and signs"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 25,
+      "column": "areas of information",
+      "value": "Non-pharmacological interventions"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 25,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 25,
+      "column": "standardized tools",
+      "value": "Self-Efficacy Scale"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 25,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 25,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 26,
+      "column": "description",
+      "value": "Completion of the last self-help exercise is considered end of treatment. Participants fill out questionnaires on physical and mental health-related quality of life"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 26,
+      "column": "description",
+      "value": "productivity loss"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 26,
+      "column": "description",
+      "value": "patient satisfaction"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 26,
+      "column": "description",
+      "value": "and self-efficacy."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 26,
+      "column": "keywords",
+      "value": "intervention"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 26,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 26,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 26,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 26,
+      "column": "areas of information",
+      "value": "Symptoms and signs"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 26,
+      "column": "areas of information",
+      "value": "Health and community care services utilization"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 26,
+      "column": "areas of information",
+      "value": "Non-pharmacological interventions"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 26,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 26,
+      "column": "standardized tools",
+      "value": "Self-Efficacy Scale"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 26,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 26,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 27,
+      "column": "name",
+      "value": "16 weeks follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 27,
+      "column": "description",
+      "value": "Participants fill out questionnaires on physical and mental health-related quality of life"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 27,
+      "column": "description",
+      "value": "productivity loss"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 27,
+      "column": "description",
+      "value": "patient satisfaction"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 27,
+      "column": "description",
+      "value": "and self-efficacy."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 27,
+      "column": "keywords",
+      "value": "16 weeks follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 27,
+      "column": "keywords",
+      "value": "intervention"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 27,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 27,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 27,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 27,
+      "column": "areas of information",
+      "value": "Symptoms and signs"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 27,
+      "column": "areas of information",
+      "value": "Health and community care services utilization"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 27,
+      "column": "areas of information",
+      "value": "Non-pharmacological interventions"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 27,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 27,
+      "column": "standardized tools",
+      "value": "Self-Efficacy Scale"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 27,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 27,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 28,
+      "column": "name",
+      "value": "26 weeks follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 28,
+      "column": "description",
+      "value": "Participants fill out questionnaires on physical and mental health-related quality of life"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 28,
+      "column": "description",
+      "value": "productivity loss"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 28,
+      "column": "description",
+      "value": "patient satisfaction"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 28,
+      "column": "description",
+      "value": "and self-efficacy."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 28,
+      "column": "keywords",
+      "value": "26 weeks follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 28,
+      "column": "keywords",
+      "value": "intervention"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 28,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 28,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 28,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 28,
+      "column": "areas of information",
+      "value": "Symptoms and signs"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 28,
+      "column": "areas of information",
+      "value": "Health and community care services utilization"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 28,
+      "column": "areas of information",
+      "value": "Non-pharmacological interventions"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 28,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 28,
+      "column": "standardized tools",
+      "value": "Self-Efficacy Scale"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 28,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 28,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 29,
+      "column": "name",
+      "value": "52 weeks follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 29,
+      "column": "description",
+      "value": "Participants fill out questionnaires on physical and mental health-related quality of life"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 29,
+      "column": "description",
+      "value": "productivity loss"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 29,
+      "column": "description",
+      "value": "patient satisfaction"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 29,
+      "column": "description",
+      "value": "and self-efficacy."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 29,
+      "column": "keywords",
+      "value": "52 weeks follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 29,
+      "column": "keywords",
+      "value": "intervention"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 29,
+      "column": "age groups",
+      "value": "Adult (18+ years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 29,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 29,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 29,
+      "column": "areas of information",
+      "value": "Symptoms and signs"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 29,
+      "column": "areas of information",
+      "value": "Health and community care services utilization"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 29,
+      "column": "areas of information",
+      "value": "Non-pharmacological interventions"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 29,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 29,
+      "column": "standardized tools",
+      "value": "Self-Efficacy Scale"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 29,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 29,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Agents",
+      "row": 34,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 35,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 35,
+      "column": "role",
+      "value": "Data provider"
+    },
+    {
+      "sheet": "Contacts",
+      "row": 15,
+      "column": "title",
+      "value": "dr."
+    },
+    {
+      "sheet": "Publications",
+      "row": 9,
+      "column": "doi",
+      "value": "https://doi.org/10.2196/13738"
+    },
+    {
+      "sheet": "Publications",
+      "row": 9,
+      "column": "title",
+      "value": "Protocol for a Randomized Controlled Trial Assessing the Effectiveness of Grip Self-Help in General Practice"
+    }
+  ],
+  "test_zelfhy": [
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "description",
+      "value": "A pragmatic randomised controlled trial designed to determine the (cost) effectiveness of home-based guided hypnotherapy plus care as usual (CAU) compared with CAU alone for children with functional abdominal pain (FAP) or irritable bowel syndrome (IBS) in primary care."
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "keywords",
+      "value": "cost effectiveness"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "contact email",
+      "value": "g.a.holtman@umcg.nl"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "design",
+      "value": "Longitudinal"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "design description",
+      "value": "A pragmatic randomised controlled trial designed to determine the (cost) effectiveness of home-based guided hypnotherapy plus CAU compared with CAU alone for children with FAP or IBS in primary care."
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "population age groups",
+      "value": "Child (2-12 years)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "population age groups",
+      "value": "Adolescent (13-17 years)"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "inclusion criteria",
+      "value": "Age group inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "inclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "other inclusion criteria",
+      "value": "GP-diagnosed FAP or IBS"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "exclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "other exclusion criteria",
+      "value": "concomitant organic gastrointestinal disease"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "other exclusion criteria",
+      "value": "abdominal symptoms treated by a paediatrician"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "contact point",
+      "value": "G Holtman"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "informed consent type",
+      "value": "Study specific consent"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "access rights",
+      "value": "Restricted access"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "data use conditions",
+      "value": "not for profit"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "data use conditions",
+      "value": "non commercial use only"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "data access conditions description",
+      "value": "Parents provide information on both medical and non-medical costs using adapted versions of the iMTA Productivity Cost Questionnaire and iMTA Medical Consumption Questionnaire."
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "funding statement",
+      "value": "This work is supported by the Netherlands Organisation for Health Research and Development"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "acknowledgements",
+      "value": "The authors want to thank the Child and Hospital Foundation (Stichting Kind en Ziekenhuis) for helping with the grant proposal"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "acknowledgements",
+      "value": "we thank them for testing the user interface of the website. We also thank Michiel de Boer for performing treatment allocation and providing suggestions concerning the statistical analyses. Finally"
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "acknowledgements",
+      "value": "we thank Dr Robert Sykes (www.doctored.org.uk) for providing editorial services."
+    },
+    {
+      "sheet": "Resources",
+      "row": 10,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 12,
+      "column": "description",
+      "value": "Children aged 7–17 years with functional abdominal pain (FAP) or irritable bowel syndrome (IBS) who receive care as usual (CAU) plus 3 months of home-based guided hypnotherapy via a website."
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 12,
+      "column": "age groups",
+      "value": "Child (2-12 years)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 12,
+      "column": "age groups",
+      "value": "Adolescent (13-17 years)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 12,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 12,
+      "column": "inclusion criteria",
+      "value": "Age group inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 12,
+      "column": "inclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 12,
+      "column": "other exclusion criteria",
+      "value": "concomitant organic gastrointestinal disease"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 12,
+      "column": "other exclusion criteria",
+      "value": "abdominal symptoms treated by a paediatrician"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 12,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 13,
+      "column": "description",
+      "value": "Children aged 7–17 years with functional abdominal pain (FAP) or irritable bowel syndrome (IBS) who receive care as usual (CAU) by their general practitioner."
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 13,
+      "column": "age groups",
+      "value": "Child (2-12 years)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 13,
+      "column": "age groups",
+      "value": "Adolescent (13-17 years)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 13,
+      "column": "countries",
+      "value": "Netherlands (the)"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 13,
+      "column": "inclusion criteria",
+      "value": "Age group inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 13,
+      "column": "inclusion criteria",
+      "value": "Health status inclusion criterion"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 13,
+      "column": "other exclusion criteria",
+      "value": "concomitant organic gastrointestinal disease"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 13,
+      "column": "other exclusion criteria",
+      "value": "abdominal symptoms treated by a paediatrician"
+    },
+    {
+      "sheet": "Subpopulations",
+      "row": 13,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "External identifiers",
+      "row": 10,
+      "column": "external identifier type",
+      "value": "NCT number"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 30,
+      "column": "description",
+      "value": "Baseline data collection includes demographic data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 30,
+      "column": "description",
+      "value": "and treatment expectations."
+    },
+    {
+      "sheet": "Collection events",
+      "row": 30,
+      "column": "keywords",
+      "value": "pain severity"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 30,
+      "column": "age groups",
+      "value": "Child (2-12 years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 30,
+      "column": "age groups",
+      "value": "Adolescent (13-17 years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 30,
+      "column": "areas of information",
+      "value": "Socio-demographic and economic characteristics"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 30,
+      "column": "areas of information",
+      "value": "Symptoms and signs"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 30,
+      "column": "areas of information",
+      "value": "Non-pharmacological interventions"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 30,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 30,
+      "column": "standardized tools",
+      "value": "NRS-11"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 30,
+      "column": "standardized tools",
+      "value": "RCADS-25"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 30,
+      "column": "standardized tools",
+      "value": "KIDSCREEN-52"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 30,
+      "column": "standardized tools",
+      "value": "EQ-5D-Y"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 30,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 30,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "name",
+      "value": "3-month follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "description",
+      "value": "Follow-up at 3 months includes assessment of adequate pain relief"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "keywords",
+      "value": "3-month follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "keywords",
+      "value": "pain severity"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "age groups",
+      "value": "Child (2-12 years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "age groups",
+      "value": "Adolescent (13-17 years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "areas of information",
+      "value": "Symptoms and signs"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "areas of information",
+      "value": "Non-pharmacological interventions"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "areas of information",
+      "value": "Health and community care services utilization"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "areas of information",
+      "value": "Cognition"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "areas of information",
+      "value": "personality and psychological measures and assessments"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "areas of information",
+      "value": "Preschool"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "areas of information",
+      "value": "school and work life"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "areas of information",
+      "value": "Physical environment"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "areas of information",
+      "value": "Administrative information"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "standardized tools",
+      "value": "NRS-11"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "standardized tools",
+      "value": "RCADS-25"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "standardized tools",
+      "value": "KIDSCREEN-52"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "standardized tools",
+      "value": "EQ-5D-Y"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 31,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "name",
+      "value": "6-month follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "description",
+      "value": "Follow-up at 6 months includes assessment of adequate pain relief"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "keywords",
+      "value": "6-month follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "keywords",
+      "value": "pain severity"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "age groups",
+      "value": "Child (2-12 years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "age groups",
+      "value": "Adolescent (13-17 years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "areas of information",
+      "value": "Symptoms and signs"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "areas of information",
+      "value": "Non-pharmacological interventions"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "areas of information",
+      "value": "Health and community care services utilization"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "areas of information",
+      "value": "Cognition"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "areas of information",
+      "value": "personality and psychological measures and assessments"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "areas of information",
+      "value": "Preschool"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "areas of information",
+      "value": "school and work life"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "areas of information",
+      "value": "Physical environment"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "areas of information",
+      "value": "Administrative information"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "standardized tools",
+      "value": "NRS-11"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "standardized tools",
+      "value": "RCADS-25"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "standardized tools",
+      "value": "KIDSCREEN-52"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "standardized tools",
+      "value": "EQ-5D-Y"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 32,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "name",
+      "value": "12-month follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "description",
+      "value": "Follow-up at 12 months includes assessment of adequate pain relief"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "keywords",
+      "value": "12-month follow-up"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "keywords",
+      "value": "pain severity"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "age groups",
+      "value": "Child (2-12 years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "age groups",
+      "value": "Adolescent (13-17 years)"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "areas of information",
+      "value": "Symptoms and signs"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "areas of information",
+      "value": "Perception of health"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "areas of information",
+      "value": "development and functional limitations"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "areas of information",
+      "value": "Non-pharmacological interventions"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "areas of information",
+      "value": "Health and community care services utilization"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "areas of information",
+      "value": "Cognition"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "areas of information",
+      "value": "personality and psychological measures and assessments"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "areas of information",
+      "value": "Preschool"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "areas of information",
+      "value": "school and work life"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "areas of information",
+      "value": "Physical environment"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "areas of information",
+      "value": "Administrative information"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "data categories",
+      "value": "Survey data"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "standardized tools",
+      "value": "NRS-11"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "standardized tools",
+      "value": "RCADS-25"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "standardized tools",
+      "value": "KIDSCREEN-52"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "standardized tools",
+      "value": "EQ-5D-Y"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "access rights",
+      "value": "Non public"
+    },
+    {
+      "sheet": "Collection events",
+      "row": 33,
+      "column": "applicable legislation",
+      "value": "Data Governance Act"
+    },
+    {
+      "sheet": "Agents",
+      "row": 36,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 37,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 38,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Agents",
+      "row": 39,
+      "column": "id",
+      "value": "SintAntonius"
+    },
+    {
+      "sheet": "Agents",
+      "row": 39,
+      "column": "type",
+      "value": "Organisation"
+    },
+    {
+      "sheet": "Contacts",
+      "row": 16,
+      "column": "title",
+      "value": "dr."
+    },
+    {
+      "sheet": "Contacts",
+      "row": 16,
+      "column": "email",
+      "value": "g.a.holtman@umcg.nl"
+    },
+    {
+      "sheet": "Publications",
+      "row": 10,
+      "column": "doi",
+      "value": "https://doi.org/10.1136/bmjopen-2022-069653"
+    },
+    {
+      "sheet": "Publications",
+      "row": 10,
+      "column": "title",
+      "value": "Home- based guided hypnotherapy for children with functional abdominal pain and irritable bowel syndrome in primary care: study protocol for a randomised controlled trial"
+    }
+  ]
+}

@@ -522,6 +522,18 @@ def _parse_array_items(value: Any) -> list[Any] | None:
         except Exception:
             pass
 
+    # CSV-style parsing to preserve commas inside quoted values.
+    try:
+        import csv
+        from io import StringIO
+
+        reader = csv.reader(StringIO(s), skipinitialspace=True)
+        row = next(reader, None)
+        if row is not None and len(row) > 1:
+            return [part for part in row]
+    except Exception:
+        pass
+
     if "," in s:
         return [part.strip() for part in s.split(",") if part.strip()]
 
