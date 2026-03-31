@@ -37,6 +37,12 @@ from main_final import (
 )
 
 
+AGENT_BASE_COLUMNS: List[str] = [
+    "resource", "id", "type", "name", "organisation", "other organisation", "department", "website",
+    "email", "logo", "role",
+]
+
+
 COHORT_SHEETS: Dict[str, List[str]] = {
     "Resources": [
         "overview", "hricore", "id", "pid", "name", "acronym", "type", "cohort type", "website",
@@ -75,17 +81,8 @@ COHORT_SHEETS: Dict[str, List[str]] = {
         "sample categories", "standardized tools", "standardized tools other", "core variables", "issued",
         "modified", "theme", "access rights", "applicable legislation",
     ],
-    "Datasets": [
-        "resource", "name", "label", "dataset type", "unit of observation", "keywords", "description",
-        "number of rows", "since version", "until version",
-    ],
-    "Agents": [
-        "resource", "id", "type", "name", "organisation", "other organisation", "department", "website",
-        "email", "logo", "role",
-    ],
-    "Organisations": [
-        "is lead organisation",
-    ],
+    "Agents": AGENT_BASE_COLUMNS,
+    "Organisations": AGENT_BASE_COLUMNS + ["is lead organisation"],
     "Contacts": [
         "resource", "role", "first name", "last name", "statement of consent personal data", "prefix",
         "initials", "title", "organisation", "email", "orcid", "homepage", "photo", "expertise",
@@ -119,6 +116,28 @@ def _resource_ref(label: str, overview: Dict[str, Any] | None) -> str:
 
 def _blank_row(columns: List[str]) -> Dict[str, Any]:
     return {c: "" for c in columns}
+
+
+def _is_organisation_contributor(item: Dict[str, Any]) -> bool:
+    return str(item.get("type") or "").strip().lower() != "individual"
+
+
+def _build_agent_base_row(resource_ref: str, item: Dict[str, Any]) -> Dict[str, Any]:
+    row = _blank_row(AGENT_BASE_COLUMNS)
+    row.update({
+        "resource": resource_ref,
+        "id": _serialize_value(item.get("id")),
+        "type": _serialize_value(item.get("type")),
+        "name": _serialize_value(item.get("name")),
+        "organisation": _serialize_value(item.get("organisation")),
+        "other organisation": _serialize_value(item.get("other_organisation")),
+        "department": _serialize_value(item.get("department")),
+        "website": _serialize_value(item.get("website")),
+        "email": _serialize_value(item.get("email")),
+        "logo": _serialize_value(item.get("logo")),
+        "role": _serialize_value(item.get("role")),
+    })
+    return row
 
 
 def _serialize_bool_default_false(value: Any) -> str:
@@ -238,7 +257,11 @@ def _resource_row_from_sections(
     event_names = [str(ev.get("name") or "").strip() for ev in collection_events if str(ev.get("name") or "").strip()]
     orgs = contributors.get("organisations_involved", []) or []
     people = contributors.get("people_involved", []) or []
-    org_ids = [str(o.get("id") or "").strip() for o in orgs if str(o.get("id") or "").strip()]
+    org_ids = [
+        str(o.get("id") or "").strip()
+        for o in orgs
+        if _is_organisation_contributor(o) and str(o.get("id") or "").strip()
+    ]
     people_names = [_display_person_name(p) for p in people if _display_person_name(p)]
 
     contact_parts = [
@@ -449,7 +472,7 @@ def cli() -> None:
         "-p", "--passes",
         nargs="+",
         default=["all"],
-        help="Specify passes: A, B, C, D/D1/D2, E, F/F1/F2, G, H, X1, X2, X3, Y or 'all'.",
+        help="Specify passes: A, B, C, D/D1/D2, E, F/F1/F2, G, H, X2, X3, Y or 'all'.",
     )
     parser.add_argument(
         "--pdfs",
@@ -531,7 +554,6 @@ def cli() -> None:
     else:
         pass_defs.append(("F", "PASS F: Contributors", "task_contributors"))
     pass_defs.extend([
-        ("X1", "PASS X1: Datasets", "task_datasets"),
         ("X2", "PASS X2: Samplesets", "task_samplesets"),
         ("X3", "PASS X3: Areas of information", "task_areas_of_information"),
         ("Y", "PASS Y: Linkage", "task_linkage"),
@@ -547,7 +569,6 @@ def cli() -> None:
     list_sections = {
         "task_subpopulations": "subpopulations",
         "task_collection_events": "collection_events",
-        "task_datasets": "datasets",
         "task_samplesets": "samplesets",
     }
     list_section_orders: Dict[str, List[str]] = {}
@@ -573,7 +594,6 @@ def cli() -> None:
     external_identifier_rows: List[Dict[str, Any]] = []
     internal_identifier_rows: List[Dict[str, Any]] = []
     collection_event_rows: List[Dict[str, Any]] = []
-    dataset_rows: List[Dict[str, Any]] = []
     agent_rows: List[Dict[str, Any]] = []
     organisation_extension_rows: List[Dict[str, Any]] = []
     contact_rows: List[Dict[str, Any]] = []
@@ -809,25 +829,6 @@ def cli() -> None:
             })
             collection_event_rows.append(row)
 
-        datasets = (per_section_results.get("task_datasets", {}) or {}).get("datasets", []) or []
-        for item in datasets:
-            if not isinstance(item, dict):
-                continue
-            row = _blank_row(COHORT_SHEETS["Datasets"])
-            row.update({
-                "resource": resource_ref,
-                "name": _serialize_value(item.get("name")),
-                "label": _serialize_value(item.get("label")),
-                "dataset type": _serialize_value(item.get("dataset_type")),
-                "unit of observation": _serialize_value(item.get("unit_of_observation")),
-                "keywords": _serialize_value(item.get("keywords")),
-                "description": _serialize_value(item.get("description")),
-                "number of rows": _serialize_value(item.get("number_of_rows")),
-                "since version": _serialize_value(item.get("since_version")),
-                "until version": _serialize_value(item.get("until_version")),
-            })
-            dataset_rows.append(row)
-
         contributors = per_section_results.get("task_contributors", {}) or {}
         organisations = contributors.get("organisations_involved", []) or []
         people = contributors.get("people_involved", []) or []
@@ -835,25 +836,14 @@ def cli() -> None:
         for item in organisations:
             if not isinstance(item, dict):
                 continue
-            agent_row = _blank_row(COHORT_SHEETS["Agents"])
-            agent_row.update({
-                "resource": resource_ref,
-                "id": _serialize_value(item.get("id")),
-                "type": _serialize_value(item.get("type")),
-                "name": _serialize_value(item.get("name")),
-                "organisation": _serialize_value(item.get("organisation")),
-                "other organisation": _serialize_value(item.get("other_organisation")),
-                "department": _serialize_value(item.get("department")),
-                "website": _serialize_value(item.get("website")),
-                "email": _serialize_value(item.get("email")),
-                "logo": _serialize_value(item.get("logo")),
-                "role": _serialize_value(item.get("role")),
-            })
-            agent_rows.append(agent_row)
-
-            org_row = _blank_row(COHORT_SHEETS["Organisations"])
-            org_row["is lead organisation"] = _serialize_value(item.get("is_lead_organisation"))
-            organisation_extension_rows.append(org_row)
+            base_row = _build_agent_base_row(resource_ref, item)
+            if _is_organisation_contributor(item):
+                org_row = _blank_row(COHORT_SHEETS["Organisations"])
+                org_row.update(base_row)
+                org_row["is lead organisation"] = _serialize_value(item.get("is_lead_organisation"))
+                organisation_extension_rows.append(org_row)
+            else:
+                agent_rows.append(base_row)
 
         for item in people:
             if not isinstance(item, dict):
@@ -931,7 +921,6 @@ def cli() -> None:
         "External identifiers": pd.DataFrame(external_identifier_rows, columns=COHORT_SHEETS["External identifiers"]),
         "Internal identifiers": pd.DataFrame(internal_identifier_rows, columns=COHORT_SHEETS["Internal identifiers"]),
         "Collection events": pd.DataFrame(collection_event_rows, columns=COHORT_SHEETS["Collection events"]),
-        "Datasets": pd.DataFrame(dataset_rows, columns=COHORT_SHEETS["Datasets"]),
         "Agents": pd.DataFrame(agent_rows, columns=COHORT_SHEETS["Agents"]),
         "Organisations": pd.DataFrame(organisation_extension_rows, columns=COHORT_SHEETS["Organisations"]),
         "Contacts": pd.DataFrame(contact_rows, columns=COHORT_SHEETS["Contacts"]),

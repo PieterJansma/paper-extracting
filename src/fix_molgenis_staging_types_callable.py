@@ -13,11 +13,16 @@ from openpyxl import load_workbook
 # Explicitly cover every column type present in the UMCG staging schema.
 ARRAY_TYPES = {"ontology_array", "string_array", "ref_array"}
 PASSTHROUGH_TYPES = {"ref", "refback", "ontology", "text"}
+INHERITED_TABLE_SCHEMAS: Dict[str, str] = {
+    "Organisations": "Agents",
+}
 
 REF_FIELD_TARGETS: Dict[tuple[str, str], str] = {
     ("Agents", "organisation"): "Organisations",
     ("Agents", "resource"): "Resources",
     ("Collection events", "resource"): "Resources",
+    ("Organisations", "organisation"): "Organisations",
+    ("Organisations", "resource"): "Resources",
     ("Contacts", "organisation"): "Organisations",
     ("Contacts", "resource"): "Resources",
     ("Datasets", "resource"): "Resources",
@@ -40,6 +45,7 @@ REF_ARRAY_FIELD_TARGETS: Dict[tuple[str, str], str] = {
 # Field-level ontology constraints (first rollout).
 ONTOLOGY_ALLOWED_VALUES: Dict[tuple[str, str], set[str]] = {
     ("Agents", "type"): {"Individual", "Organisation"},
+    ("Organisations", "type"): {"Individual", "Organisation"},
     ("Resources", "access rights"): {"Open access", "Restricted access", "Non public"},
     ("Resources", "design"): {"Longitudinal", "Cross-sectional"},
     ("Resources", "informed consent type"): {
@@ -354,6 +360,15 @@ ONTOLOGY_ARRAY_ALLOWED_VALUES: Dict[tuple[str, str], set[str]] = {
         "Data access provider",
         "Other",
     },
+    ("Organisations", "role"): {
+        "Data originator",
+        "Data holder",
+        "Data provider",
+        "Researcher",
+        "Surveillance",
+        "Data access provider",
+        "Other",
+    },
 }
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -389,6 +404,13 @@ def read_schema(schema_path: str, profile: str = "UMCGCohortsStaging") -> Dict[s
         if profiles and profile not in str(profiles):
             continue
         schema.setdefault(str(table), {})[str(col)] = None if col_type is None else str(col_type)
+
+    for child_table, parent_table in INHERITED_TABLE_SCHEMAS.items():
+        if child_table not in schema or parent_table not in schema:
+            continue
+        merged = dict(schema[parent_table])
+        merged.update(schema[child_table])
+        schema[child_table] = merged
     return schema
 
 
@@ -748,7 +770,7 @@ def _build_ref_index(wb: Any) -> Dict[str, Dict[str, str]]:
             continue
         ws = wb[table]
         hdr = _sheet_header_index(ws)
-        for col in ("id", "pid", "name", "acronym", "label", "code", "identifier", "email"):
+        for col in ("id", "pid", "name", "acronym", "label", "code", "identifier", "email", "organisation", "other organisation"):
             for v in _sheet_column_values(ws, hdr, col):
                 candidates[table].add(v)
 
@@ -769,6 +791,7 @@ def _build_ref_index(wb: Any) -> Dict[str, Dict[str, str]]:
         type_col = hdr_agents.get("type")
         id_col = hdr_agents.get("id")
         name_col = hdr_agents.get("name")
+        organisation_col = hdr_agents.get("organisation")
         if type_col:
             for row_idx in range(2, ws_agents.max_row + 1):
                 typ = _clean_string(ws_agents.cell(row=row_idx, column=type_col).value)
@@ -782,6 +805,10 @@ def _build_ref_index(wb: Any) -> Dict[str, Dict[str, str]]:
                     name_val = _clean_string(ws_agents.cell(row=row_idx, column=name_col).value)
                     if name_val:
                         candidates["Organisations"].add(name_val)
+                if organisation_col:
+                    organisation_val = _clean_string(ws_agents.cell(row=row_idx, column=organisation_col).value)
+                    if organisation_val:
+                        candidates["Organisations"].add(organisation_val)
 
     ref_index: Dict[str, Dict[str, str]] = {}
     for table, vals in candidates.items():

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import json
 from pathlib import Path
@@ -13,6 +15,10 @@ from openpyxl.utils import get_column_letter
 # Expected cohort structure
 # -----------------------------
 
+INHERITED_TABLES = {
+    "Organisations": "Agents",
+}
+
 def load_model_structure(model_path: Path) -> Dict[str, List[str]]:
     model_df = pd.read_excel(model_path, dtype="object")
     required = {"tableName", "columnName"}
@@ -24,6 +30,15 @@ def load_model_structure(model_path: Path) -> Dict[str, List[str]]:
     for table_name in model_df["tableName"].dropna().unique().tolist():
         cols = model_df.loc[model_df["tableName"] == table_name, "columnName"].dropna().tolist()
         tables[str(table_name)] = [str(c) for c in cols]
+
+    for child_table, parent_table in INHERITED_TABLES.items():
+        if child_table not in tables or parent_table not in tables:
+            continue
+        merged = list(tables[parent_table])
+        for col in tables[child_table]:
+            if col not in merged:
+                merged.append(col)
+        tables[child_table] = merged
     return tables
 
 
@@ -36,7 +51,7 @@ SHEET_MAP = {
     "subpopulations": "Subpopulations",
     "collection_events": "Collection events",
     "datasets": "Datasets",
-    "organisations": "Agents",      # current extractor sheet fits Agents best
+    "organisations": "Organisations",
     "people": "Contacts",
     "publications": "Publications",
     "documentation": "Documentation",
@@ -175,6 +190,17 @@ COLUMN_MAP = {
         "organisation.role": "role",
     },
     "Organisations": {
+        "paper": "resource",
+        "organisation.id": "id",
+        "organisation.type": "type",
+        "organisation.name": "name",
+        "organisation.organisation": "organisation",
+        "organisation.other_organisation": "other organisation",
+        "organisation.department": "department",
+        "organisation.website": "website",
+        "organisation.email": "email",
+        "organisation.logo": "logo",
+        "organisation.role": "role",
         "organisation.is_lead_organisation": "is lead organisation",
     },
     "Contacts": {
