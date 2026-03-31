@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import ast
+import csv
+import difflib
 import json
 import re
 from datetime import date, datetime
@@ -18,10 +20,8 @@ INHERITED_TABLE_SCHEMAS: Dict[str, str] = {
 }
 
 REF_FIELD_TARGETS: Dict[tuple[str, str], str] = {
-    ("Agents", "organisation"): "Organisations",
     ("Agents", "resource"): "Resources",
     ("Collection events", "resource"): "Resources",
-    ("Organisations", "organisation"): "Organisations",
     ("Organisations", "resource"): "Resources",
     ("Contacts", "organisation"): "Organisations",
     ("Contacts", "resource"): "Resources",
@@ -663,14 +663,11 @@ def coerce_hyperlink(table: str, column: str, value: Any) -> Any:
     if not s:
         return ""
 
-    # DOI column may come in as a bare DOI.
+    # DOI column should stay as the bare DOI string, not a resolver URL.
     if table == "Publications" and column == "doi":
-        if s.startswith("10."):
-            return f"https://doi.org/{s}"
-        if s.startswith("doi.org/"):
-            return f"https://{s}"
-        if s.startswith("http://doi.org/") or s.startswith("https://doi.org/"):
-            return s
+        s = re.sub(r"^(?:https?://)?(?:dx\.)?doi\.org/", "", s, flags=re.IGNORECASE)
+        s = re.sub(r"^doi:\s*", "", s, flags=re.IGNORECASE)
+        return s.rstrip(".,;:)")
 
     # User rule: hyperlinks should be a real site, starting with http or www.
     if _DOMAIN_RE.match(s):
@@ -756,6 +753,157 @@ def _sheet_column_values(ws: Any, header_index: Dict[str, int], column_name: str
     return out
 
 
+def _normalize_csv_header(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", "", _clean_string(value).lower())
+
+
+def _load_external_organisations_index(csv_path: str | Path | None) -> Dict[str, Any]:
+    if not csv_path:
+        return {}
+    path = Path(csv_path)
+    if not path.exists():
+        return {}
+
+    exact: Dict[str, str] = {}
+    exact_multi: set[str] = set()
+    norm: Dict[str, str] = {}
+    norm_multi: set[str] = set()
+
+    with path.open("r", encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        if not reader.fieldnames:
+            return {}
+        header_map = {
+            _normalize_csv_header(field_name): field_name
+            for field_name in reader.fieldnames
+            if _clean_string(field_name)
+        }
+        name_field = header_map.get("name")
+        if not name_field:
+            return {}
+
+        token_fields = [
+            header_map.get("name"),
+            header_map.get("label"),
+            header_map.get("acronym"),
+            header_map.get("code"),
+            header_map.get("ontologytermuri"),
+        ]
+
+        for row in reader:
+            canonical = _clean_string(row.get(name_field))
+            if not canonical:
+                continue
+
+            tokens: set[str] = {canonical}
+            for field_name in token_fields:
+                if not field_name:
+                    continue
+                token = _clean_string(row.get(field_name))
+                if token:
+                    tokens.add(token)
+
+            for token in tokens:
+                if token in exact and exact[token] != canonical:
+                    exact_multi.add(token)
+                else:
+                    exact[token] = canonical
+
+                normalized = _normalize_ref_token(token)
+                if not normalized:
+                    continue
+                if normalized in norm and norm[normalized] != canonical:
+                    norm_multi.add(normalized)
+                else:
+                    norm[normalized] = canonical
+
+    for token in exact_multi:
+        exact.pop(token, None)
+    for token in norm_multi:
+        norm.pop(token, None)
+
+    return {
+        "exact": exact,
+        "norm": norm,
+    }
+
+
+def _match_external_organisation(external_index: Dict[str, Any], raw_value: Any) -> str:
+    raw = _clean_string(raw_value)
+    if not raw or not external_index:
+        return ""
+
+    exact = external_index.get("exact", {})
+    if raw in exact:
+        return exact[raw]
+
+    normalized = _normalize_ref_token(raw)
+    norm = external_index.get("norm", {})
+    if normalized and normalized in norm:
+        return norm[normalized]
+
+    if not normalized:
+        return ""
+
+    score_pairs = [
+        (token, difflib.SequenceMatcher(None, normalized, token).ratio())
+        for token in norm.keys()
+    ]
+    score_pairs.sort(key=lambda item: item[1], reverse=True)
+    best_token, best_score = score_pairs[0] if score_pairs else ("", 0.0)
+    second_score = score_pairs[1][1] if len(score_pairs) > 1 else 0.0
+    if best_score >= 0.96 and (best_score - second_score) >= 0.02:
+        return norm.get(best_token, "")
+    return ""
+
+
+def _normalize_external_organisation_refs(wb: Any, external_index: Dict[str, Any]) -> None:
+    if not external_index:
+        return
+
+    for sheet_name in ("Agents", "Organisations"):
+        if sheet_name not in wb.sheetnames:
+            continue
+        ws = wb[sheet_name]
+        hdr = _sheet_header_index(ws)
+        organisation_col = hdr.get("organisation")
+        other_col = hdr.get("other organisation")
+        type_col = hdr.get("type")
+        name_col = hdr.get("name")
+        id_col = hdr.get("id")
+        if not organisation_col:
+            continue
+
+        for row_idx in range(2, ws.max_row + 1):
+            typ = _clean_string(ws.cell(row=row_idx, column=type_col).value) if type_col else ""
+            if sheet_name == "Agents" and typ != "Organisation":
+                continue
+            if sheet_name == "Organisations" and typ and typ != "Organisation":
+                continue
+
+            raw_organisation = _clean_string(ws.cell(row=row_idx, column=organisation_col).value)
+            raw_other = _clean_string(ws.cell(row=row_idx, column=other_col).value) if other_col else ""
+            raw_name = _clean_string(ws.cell(row=row_idx, column=name_col).value) if name_col else ""
+            raw_id = _clean_string(ws.cell(row=row_idx, column=id_col).value) if id_col else ""
+
+            mapped = ""
+            for candidate in (raw_organisation, raw_name, raw_other, raw_id):
+                mapped = _match_external_organisation(external_index, candidate)
+                if mapped:
+                    break
+
+            if mapped:
+                ws.cell(row=row_idx, column=organisation_col).value = mapped
+                if other_col:
+                    ws.cell(row=row_idx, column=other_col).value = ""
+                continue
+
+            fallback = raw_organisation or raw_name or raw_other or raw_id
+            ws.cell(row=row_idx, column=organisation_col).value = ""
+            if other_col and fallback and not raw_other:
+                ws.cell(row=row_idx, column=other_col).value = fallback
+
+
 def _build_ref_index(wb: Any) -> Dict[str, Dict[str, str]]:
     """
     Build match indices per target table:
@@ -829,6 +977,7 @@ def _build_ref_index(wb: Any) -> Dict[str, Dict[str, str]]:
         ref_index[table] = {"__size__": str(len(vals))}
         ref_index[table].update({f"e:{k}": v for k, v in by_exact.items()})
         ref_index[table].update({f"n:{k}": v for k, v in by_norm.items()})
+
     return ref_index
 
 
@@ -860,7 +1009,6 @@ def _resolve_ref_token(target_idx: Dict[str, str], token: str) -> str:
         if mapped:
             return mapped
     return ""
-
 
 def coerce_ref_array(table: str, column: str, value: Any, ref_index: Dict[str, Dict[str, str]] | None) -> Any:
     raw_items = _parse_array_items(value)
@@ -992,6 +1140,7 @@ def fix_workbook(
     schema_path: str | Path = "/mnt/data/molgenis_UMCGCohortsStaging.xlsx",
     output_path: str | Path | None = None,
     profile: str = "UMCGCohortsStaging",
+    ref_organisations_csv: str | Path | None = None,
 ) -> Path:
     input_path = Path(input_path)
     output_path = Path(output_path) if output_path else input_path.with_name(input_path.stem + "_fixed.xlsx")
@@ -1019,6 +1168,11 @@ def fix_workbook(
             for row_idx in range(2, ws.max_row + 1):
                 cell = ws.cell(row=row_idx, column=col_idx)
                 cell.value = normalize_value(sheet_name, column_name, col_type, cell.value)
+
+    _normalize_external_organisation_refs(
+        wb,
+        _load_external_organisations_index(ref_organisations_csv),
+    )
 
     # Pass 2: validate/normalize refs against current workbook values.
     ref_index = _build_ref_index(wb)
@@ -1056,6 +1210,7 @@ def main() -> None:
     parser.add_argument("-s", "--schema", default="/mnt/data/molgenis_UMCGCohortsStaging.xlsx", help="Schema workbook")
     parser.add_argument("-o", "--output", default=None, help="Output workbook path")
     parser.add_argument("--profile", default="UMCGCohortsStaging", help="Profile name in schema workbook")
+    parser.add_argument("--ref-organisations-csv", default=None, help="Optional Organisations.csv ontology file")
     args = parser.parse_args()
 
     output_path = fix_workbook(
@@ -1063,6 +1218,7 @@ def main() -> None:
         schema_path=args.schema,
         output_path=args.output,
         profile=args.profile,
+        ref_organisations_csv=args.ref_organisations_csv,
     )
     print(output_path)
 

@@ -110,12 +110,29 @@ def _resource_ref(label: str, overview: Dict[str, Any] | None) -> str:
     for key in ("pid", "name", "acronym"):
         val = ov.get(key)
         if not _is_empty_value(val):
+            if key == "pid":
+                s = str(val).strip()
+                s = re.sub(r"^(?:https?://)?(?:dx\.)?doi\.org/", "", s, flags=re.IGNORECASE)
+                s = re.sub(r"^doi:\s*", "", s, flags=re.IGNORECASE)
+                return s.rstrip(".,;:)")
             return str(val)
     return label
 
 
 def _blank_row(columns: List[str]) -> Dict[str, Any]:
     return {c: "" for c in columns}
+
+
+def _normalize_identifier_value(value: Any) -> str:
+    s = str(value or "").strip()
+    if not s:
+        return ""
+    normalized = re.sub(r"^(?:https?://)?(?:dx\.)?doi\.org/", "", s, flags=re.IGNORECASE)
+    normalized = re.sub(r"^doi:\s*", "", normalized, flags=re.IGNORECASE)
+    normalized = normalized.rstrip(".,;:)")
+    if re.fullmatch(r"10\.\d{4,9}/[-._;()/:A-Za-z0-9]+", normalized):
+        return normalized
+    return s
 
 
 def _is_organisation_contributor(item: Dict[str, Any]) -> bool:
@@ -216,6 +233,28 @@ def _resolve_regions_csv(explicit_path: str | None = None) -> str | None:
     return None
 
 
+def _resolve_ref_organisations_csv(explicit_path: str | None = None) -> str | None:
+    candidates = [
+        explicit_path,
+        os.environ.get("REF_ORGANISATIONS_CSV"),
+        os.path.join(os.getcwd(), "Organisations.csv"),
+        os.path.join(os.getcwd(), "data", "_ontologies", "Organisations.csv"),
+        os.path.join(os.getcwd(), "data", "ontologies", "Organisations.csv"),
+        "/Users/p.jansma/Downloads/Organisations.csv",
+    ]
+    seen: set[str] = set()
+    for candidate in candidates:
+        if not candidate:
+            continue
+        candidate = os.path.abspath(os.path.expanduser(str(candidate)))
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if os.path.exists(candidate):
+            return candidate
+    return None
+
+
 def _resource_row_from_sections(
     label: str,
     pdf_path: str,
@@ -283,7 +322,7 @@ def _resource_row_from_sections(
 
     row.update({
         "id": resource_ref,
-        "pid": _serialize_value(overview.get("pid")),
+        "pid": _normalize_identifier_value(overview.get("pid")),
         "name": str(overview.get("name") or label),
         "acronym": _serialize_value(overview.get("acronym")),
         "type": _serialize_value(overview.get("type")),
@@ -291,8 +330,16 @@ def _resource_row_from_sections(
         "website": _serialize_value(overview.get("website")),
         "description": _serialize_value(overview.get("description")),
         "keywords": _serialize_value(overview.get("keywords")),
-        "internal identifiers": _serialize_value([x.get("identifier") for x in internal_ids if isinstance(x, dict) and x.get("identifier")]),
-        "external identifiers": _serialize_value([x.get("identifier") for x in external_ids if isinstance(x, dict) and x.get("identifier")]),
+        "internal identifiers": _serialize_value([
+            _normalize_identifier_value(x.get("identifier"))
+            for x in internal_ids
+            if isinstance(x, dict) and x.get("identifier")
+        ]),
+        "external identifiers": _serialize_value([
+            _normalize_identifier_value(x.get("identifier"))
+            for x in external_ids
+            if isinstance(x, dict) and x.get("identifier")
+        ]),
         "start year": _serialize_value(overview.get("start_year")),
         "end year": _serialize_value(overview.get("end_year")),
         "contact email": _serialize_value(overview.get("contact_email") or contributors.get("contact_point_email")),
@@ -723,7 +770,7 @@ def cli() -> None:
             row = _blank_row(COHORT_SHEETS["Internal identifiers"])
             row.update({
                 "resource": resource_ref,
-                "identifier": _serialize_value(item.get("identifier")),
+                "identifier": _normalize_identifier_value(item.get("identifier")),
                 "internal identifier type": _serialize_value(item.get("type")),
                 "internal identifier type other": _serialize_value(item.get("type_other")),
             })
@@ -736,7 +783,7 @@ def cli() -> None:
             row = _blank_row(COHORT_SHEETS["External identifiers"])
             row.update({
                 "resource": resource_ref,
-                "identifier": _serialize_value(item.get("identifier")),
+                "identifier": _normalize_identifier_value(item.get("identifier")),
                 "external identifier type": _serialize_value(item.get("type")),
                 "external identifier type other": _serialize_value(item.get("type_other")),
             })
@@ -762,7 +809,7 @@ def cli() -> None:
             row.update({
                 "resource": resource_ref,
                 "name": sub_name,
-                "pid": _serialize_value(sub.get("pid")),
+                "pid": _normalize_identifier_value(sub.get("pid")),
                 "description": _serialize_value(sub.get("description")),
                 "keywords": _serialize_value(sub.get("keywords")),
                 "number of participants": _serialize_value(sub.get("number_of_participants")),
@@ -807,7 +854,7 @@ def cli() -> None:
             row.update({
                 "resource": resource_ref,
                 "name": _serialize_value(item.get("name")),
-                "pid": _serialize_value(item.get("pid")),
+                "pid": _normalize_identifier_value(item.get("pid")),
                 "description": _serialize_value(item.get("description")),
                 "subpopulations": _serialize_value(item.get("subpopulations")),
                 "keywords": _serialize_value(item.get("keywords")),
@@ -880,7 +927,7 @@ def cli() -> None:
             row = _blank_row(COHORT_SHEETS["Publications"])
             row.update({
                 "resource": resource_ref,
-                "doi": _serialize_value(item.get("doi")),
+                "doi": _normalize_identifier_value(item.get("doi")),
                 "title": _serialize_value(item.get("title")),
                 "is design publication": _serialize_value(item.get("is_design_publication")),
             })
@@ -1011,12 +1058,18 @@ def cli() -> None:
     schema_xlsx = _resolve_schema_xlsx(args.schema_xlsx)
     if schema_xlsx:
         try:
+            ref_organisations_csv = _resolve_ref_organisations_csv()
             fix_workbook(
                 input_path=args.output,
                 schema_path=schema_xlsx,
                 output_path=args.output,
+                ref_organisations_csv=ref_organisations_csv,
             )
             log.info("Applied schema-based datatype normalization using %s", schema_xlsx)
+            if ref_organisations_csv:
+                log.info("Applied organisation ontology mapping using %s", ref_organisations_csv)
+            else:
+                log.info("No Organisations.csv found; skipping organisation ontology mapping.")
         except Exception as e:
             log.warning("Could not normalize workbook datatypes with schema %s: %s", schema_xlsx, e)
     else:
