@@ -829,6 +829,14 @@ fetch_emx2_csv "data/_ontologies/Resources.csv" REF_RESOURCES_CSV
 fetch_emx2_csv "data/_ontologies/Organisations.csv" REF_ORGANISATIONS_CSV
 fetch_emx2_csv "data/_models/shared/Subpopulations.csv" REF_SUBPOPULATIONS_CSV
 
+if python3 src/emx2_dynamic_runtime.py required-paths --mode cohort >/dev/null 2>&1; then
+  while IFS= read -r rel_path; do
+    [[ -z "$rel_path" ]] && continue
+    dyn_var="EMX2_DYNAMIC_$(echo "$rel_path" | tr -c '[:alnum:]' '_' | tr '[:lower:]' '[:upper:]')"
+    fetch_emx2_csv "$rel_path" "$dyn_var"
+  done < <(python3 src/emx2_dynamic_runtime.py required-paths --mode cohort)
+fi
+
 if [[ -z "${COUNTRY_ONTOLOGY_CSV:-}" ]]; then
   for c in \
     "${PWD}/Countries.csv" \

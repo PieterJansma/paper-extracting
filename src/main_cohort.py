@@ -14,7 +14,14 @@ import pandas as pd
 from llm_client import OpenAICompatibleClient
 from extract_pipeline import load_pdf_text, build_context_prefix_messages
 
+from emx2_dynamic_runtime import (
+    COHORT_RUNTIME_TABLES,
+    apply_dynamic_constraints_to_config,
+    build_runtime_registry,
+    write_json,
+)
 from fix_molgenis_staging_types_callable import fix_workbook
+from fix_molgenis_staging_types_dynamic import fix_workbook_dynamic
 from map_countries_ontology import map_workbook_countries
 from map_regions_ontology import map_workbook_regions
 
@@ -253,6 +260,10 @@ def _resolve_ref_organisations_csv(explicit_path: str | None = None) -> str | No
         if os.path.exists(candidate):
             return candidate
     return None
+
+
+def _env_flag(name: str, default: str = "1") -> bool:
+    return str(os.environ.get(name, default)).strip().lower() not in {"0", "false", "no", "off"}
 
 
 def _resource_row_from_sections(
@@ -556,6 +567,30 @@ def cli() -> None:
 
     setup_logging(cfg.get("logging", {}).get("level", "INFO"))
     log = logging.getLogger("main_cohort")
+
+    dynamic_runtime_enabled = _env_flag("COHORT_DYNAMIC_EMX2_RUNTIME", "1")
+    dynamic_registry: Dict[str, Any] | None = None
+    dynamic_prompt_summary: Dict[str, List[str]] = {}
+    if dynamic_runtime_enabled:
+        try:
+            dynamic_registry = build_runtime_registry(
+                "UMCGCohortsStaging",
+                tables=COHORT_RUNTIME_TABLES,
+                local_root=os.environ.get("MOLGENIS_EMX2_LOCAL_ROOT"),
+                fallback_schema_csv=os.environ.get("EMX2_RUNTIME_SCHEMA_CSV"),
+                cache_dir=os.environ.get("EMX2_CACHE_DIR"),
+            )
+            dynamic_prompt_summary = apply_dynamic_constraints_to_config(cfg, dynamic_registry)
+            log.info(
+                "Dynamic EMX2 runtime enabled (tables=%d, sources=%d)",
+                len(dynamic_registry.get("tables", {})),
+                len(dynamic_registry.get("sources", {})),
+            )
+        except Exception as e:
+            dynamic_runtime_enabled = False
+            dynamic_registry = None
+            dynamic_prompt_summary = {}
+            log.warning("Could not build dynamic EMX2 runtime; falling back to legacy prompt/validation: %s", e)
 
     llm_cfg = cfg["llm"]
     pdf_cfg = cfg["pdf"]
@@ -1055,25 +1090,65 @@ def cli() -> None:
     else:
         log.info("No Regions.csv found; skipping region mapping.")
 
-    schema_xlsx = _resolve_schema_xlsx(args.schema_xlsx)
-    if schema_xlsx:
+    if dynamic_runtime_enabled and dynamic_registry:
         try:
-            ref_organisations_csv = _resolve_ref_organisations_csv()
-            fix_workbook(
+            fix_workbook_dynamic(
                 input_path=args.output,
-                schema_path=schema_xlsx,
                 output_path=args.output,
-                ref_organisations_csv=ref_organisations_csv,
+                registry=dynamic_registry,
+                profile="UMCGCohortsStaging",
+                local_root=os.environ.get("MOLGENIS_EMX2_LOCAL_ROOT"),
+                fallback_schema_csv=os.environ.get("EMX2_RUNTIME_SCHEMA_CSV"),
+                cache_dir=os.environ.get("EMX2_CACHE_DIR"),
             )
-            log.info("Applied schema-based datatype normalization using %s", schema_xlsx)
-            if ref_organisations_csv:
-                log.info("Applied organisation ontology mapping using %s", ref_organisations_csv)
-            else:
-                log.info("No Organisations.csv found; skipping organisation ontology mapping.")
+            log.info("Applied dynamic EMX2 datatype normalization.")
         except Exception as e:
-            log.warning("Could not normalize workbook datatypes with schema %s: %s", schema_xlsx, e)
+            log.warning("Could not normalize workbook with dynamic EMX2 runtime: %s", e)
+            schema_xlsx = _resolve_schema_xlsx(args.schema_xlsx)
+            if schema_xlsx:
+                try:
+                    ref_organisations_csv = _resolve_ref_organisations_csv()
+                    fix_workbook(
+                        input_path=args.output,
+                        schema_path=schema_xlsx,
+                        output_path=args.output,
+                        ref_organisations_csv=ref_organisations_csv,
+                    )
+                    log.info("Fell back to legacy schema-based datatype normalization using %s", schema_xlsx)
+                except Exception as inner_e:
+                    log.warning("Legacy fallback normalization also failed with schema %s: %s", schema_xlsx, inner_e)
     else:
-        log.warning("No schema workbook found; skipping datatype normalization.")
+        schema_xlsx = _resolve_schema_xlsx(args.schema_xlsx)
+        if schema_xlsx:
+            try:
+                ref_organisations_csv = _resolve_ref_organisations_csv()
+                fix_workbook(
+                    input_path=args.output,
+                    schema_path=schema_xlsx,
+                    output_path=args.output,
+                    ref_organisations_csv=ref_organisations_csv,
+                )
+                log.info("Applied legacy schema-based datatype normalization using %s", schema_xlsx)
+                if ref_organisations_csv:
+                    log.info("Applied organisation ontology mapping using %s", ref_organisations_csv)
+                else:
+                    log.info("No Organisations.csv found; skipping organisation ontology mapping.")
+            except Exception as e:
+                log.warning("Could not normalize workbook datatypes with schema %s: %s", schema_xlsx, e)
+        else:
+            log.warning("No schema workbook found; skipping datatype normalization.")
+
+    if dynamic_registry:
+        try:
+            write_json(f"{args.output}.dynamic_emx2_registry.json", dynamic_registry)
+            log.info("Wrote dynamic EMX2 registry: %s.dynamic_emx2_registry.json", args.output)
+        except Exception as e:
+            log.warning("Could not write dynamic EMX2 registry dump: %s", e)
+        try:
+            write_json(f"{args.output}.dynamic_prompt_constraints.json", dynamic_prompt_summary)
+            log.info("Wrote dynamic prompt constraints: %s.dynamic_prompt_constraints.json", args.output)
+        except Exception as e:
+            log.warning("Could not write dynamic prompt constraints dump: %s", e)
 
     try:
         with open(issue_file, "w", encoding="utf-8") as f:
