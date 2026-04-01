@@ -292,11 +292,14 @@ fi
 
 echo "[4/4] Rendering compact summary..."
 python3 "${REPO_ROOT}/src/render_prompt_update_summary.py" \
-  --base-prompts "${BASE_PROMPTS}" \
   --base-dynamic "${OUT_DIR}/base_dynamic.toml" \
   --variant-dynamic "${OUT_DIR}/variant_dynamic.toml" \
   --updated-prompts "${OUT_DIR}/updated_from_existing.toml" \
   --comparison-json "${OUT_DIR}/prompt_update.compare.json" \
+  --base-schema-csv "${OUT_DIR}/base_schema.csv" \
+  --variant-schema-csv "${OUT_DIR}/variant_schema.csv" \
+  --base-local-root "${BASE_ROOT}" \
+  --variant-local-root "${VARIANT_ROOT}" \
   --output "${OUT_DIR}/prompt_update.summary.md" >/dev/null
 
 echo "[5/5] Done."
