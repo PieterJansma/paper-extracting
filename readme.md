@@ -130,6 +130,179 @@ Belangrijk:
 - de uiteindelijke runtime-prompt wordt per run berekend
 - changed tasks zijn terug te zien in `logs/runs/<run_id>/`
 
+## Dynamic Fetch Flow (English)
+
+This is the exact idea behind the dynamic cohort route.
+
+The starting point is always:
+
+- baseline prompt: `prompts/prompts_cohort.toml`
+- baseline schema: `schemas/molgenis_UMCGCohortsStaging.csv`
+- active profile: `UMCGCohortsStaging`
+
+### Step 1: A Python helper decides what must be fetched
+
+The first decision is not made in shell; it is made by `src/emx2_dynamic_runtime.py`.
+
+That script:
+
+1. reads the shared EMX2 model rows for profile `UMCGCohortsStaging`
+2. filters them to the cohort runtime tables
+3. inspects every field
+4. derives which extra CSV files are required:
+   - ontology CSVs such as `data/_ontologies/Access rights.csv`
+   - model/ref CSVs such as `data/_models/shared/Organisations.csv`
+5. exports a combined live schema CSV when needed
+
+The key commands are:
+
+```bash
+python3 src/emx2_dynamic_runtime.py required-paths --mode cohort
+python3 src/emx2_dynamic_runtime.py model-paths --mode cohort
+python3 src/emx2_dynamic_runtime.py export-schema-csv --profile UMCGCohortsStaging --output tmp/live_schema.csv
+```
+
+So the idea is:
+
+- Python decides what is needed
+- shell only fetches what Python says is needed
+
+### Step 2: `run_cluster_cohort.sh` fetches those files
+
+`src/run_cluster_cohort.sh` then calls that helper and fetches the files from `molgenis/molgenis-emx2`.
+
+It does this in two layers:
+
+1. a small fixed bootstrap set:
+   - `Countries.csv`
+   - `Regions.csv`
+   - `Resources.csv`
+   - `Organisations.csv`
+   - `Subpopulations.csv`
+2. the dynamic set returned by:
+   - `required-paths --mode cohort`
+   - `model-paths --mode cohort`
+
+The actual fetch function is `fetch_emx2_csv()` inside `src/run_cluster_cohort.sh`.
+It tries the configured Git ref first, then falls back to `main`, then `master`, and stores the fetched files under the per-run cache:
+
+- `logs/runs/<run_id>/emx2_cache/repo/...`
+
+### Step 3: The live schema is exported and checked
+
+After fetching, `run_cluster_cohort.sh` exports a fresh live schema with:
+
+```bash
+python3 src/emx2_dynamic_runtime.py export-schema-csv \
+  --profile UMCGCohortsStaging \
+  --local-root "$MOLGENIS_EMX2_LOCAL_ROOT" \
+  --output "$LIVE_SCHEMA_CSV"
+```
+
+That exported file is the current live view of the profile, built from the fetched shared model CSVs.
+
+Then the script checks:
+
+1. is the live schema identical to the cached previous live schema?
+2. if yes:
+   - reuse the cached synced prompt
+3. if no:
+   - rebuild the synced prompt from the cohort baseline
+
+### Step 4: The prompt is rebuilt only where needed
+
+If the live schema changed, `src/cohort_prompt_schema_updater.py` is used.
+
+It compares:
+
+- old schema: `schemas/molgenis_UMCGCohortsStaging.csv`
+- new live schema: exported live schema from the fetched EMX2 files
+- base prompt: `prompts/prompts_cohort.toml`
+
+The updater then:
+
+1. keeps unchanged tasks exactly as they were
+2. updates only changed tasks
+3. removes fields that disappeared from the schema
+4. adds fields that were added to the schema
+5. updates ontology choices when the source ontology CSV changed
+
+If `COHORT_PROMPT_SCHEMA_SYNC_LLM=1`, Qwen is then used only on those changed tasks or changed field blocks to improve readability while preserving the old prompt style.
+
+### Step 5: `main_cohort.py` uses that runtime prompt
+
+After the schema-sync step, `src/main_cohort.py` runs with:
+
+- the runtime config
+- the runtime prompt chosen by the previous steps
+
+So the extraction model never guesses which live files matter.
+That decision was already made by `emx2_dynamic_runtime.py`.
+
+## Expected Example
+
+Here is the expected idea of a real change:
+
+- `Resources.csv`
+  - removes `release description`
+  - adds `data access url`
+- `Access rights.csv`
+  - adds `Embargoed access`
+- `Release types.csv`
+  - adds `Quarterly`
+
+Expected result:
+
+- `task_access_conditions` changes
+  - `release_description` disappears
+  - `data_access_url` is added
+  - `access_rights` gets the new allowed value `Embargoed access`
+  - `release_type` gets the new allowed value `Quarterly`
+- unrelated tasks such as `task_overview` stay unchanged
+
+That is exactly the behavior demonstrated by:
+
+```bash
+PROMPT_SCHEMA_DEMO_WITH_LLM=1 bash src/run_prompt_schema_demo.sh
+```
+
+## Useful Inspection Commands
+
+If you want to show the flow clearly to someone else, these are the most useful commands:
+
+Show what Python thinks must be fetched:
+
+```bash
+python3 src/emx2_dynamic_runtime.py required-paths --mode cohort
+python3 src/emx2_dynamic_runtime.py model-paths --mode cohort
+```
+
+Show the exported live schema:
+
+```bash
+python3 src/emx2_dynamic_runtime.py export-schema-csv \
+  --profile UMCGCohortsStaging \
+  --output tmp/live_schema.csv
+```
+
+Run the real dynamic cohort route:
+
+```bash
+COHORT_DYNAMIC_EMX2_RUNTIME=1 \
+COHORT_DYNAMIC_PROMPTS=0 \
+COHORT_PROMPT_SCHEMA_SYNC=1 \
+COHORT_PROMPT_SCHEMA_SYNC_LLM=1 \
+bash src/run_cluster_cohort.sh -p all --pdfs data/oncolifes.pdf -o oncolifes_dynamic.xlsx
+```
+
+Show what changed in the prompt:
+
+```bash
+LATEST_RUN="$(ls -td logs/runs/* | head -n 1)"
+cat "$LATEST_RUN/prompt_schema_sync.compare.md"
+cat "$LATEST_RUN/prompt_schema_sync.llm.compare.md"
+```
+
 ## Prompt Demo Route
 
 Gebruik deze om aan anderen te laten zien wat een schemawijziging doet met de prompt.
