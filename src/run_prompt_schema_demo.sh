@@ -290,13 +290,23 @@ fi
 
 "${update_cmd[@]}" >/dev/null
 
-echo "[4/4] Done."
+echo "[4/4] Rendering compact summary..."
+python3 "${REPO_ROOT}/src/render_prompt_update_summary.py" \
+  --base-prompts "${BASE_PROMPTS}" \
+  --base-dynamic "${OUT_DIR}/base_dynamic.toml" \
+  --variant-dynamic "${OUT_DIR}/variant_dynamic.toml" \
+  --updated-prompts "${OUT_DIR}/updated_from_existing.toml" \
+  --comparison-json "${OUT_DIR}/prompt_update.compare.json" \
+  --output "${OUT_DIR}/prompt_update.summary.md" >/dev/null
+
+echo "[5/5] Done."
 echo "  Base schema: ${OUT_DIR}/base_schema.csv"
 echo "  Variant schema: ${OUT_DIR}/variant_schema.csv"
 echo "  Base dynamic prompt: ${OUT_DIR}/base_dynamic.toml"
 echo "  Variant dynamic prompt: ${OUT_DIR}/variant_dynamic.toml"
 echo "  Updated prompt from existing TOML: ${OUT_DIR}/updated_from_existing.toml"
 echo "  Prompt comparison: ${OUT_DIR}/prompt_update.compare.md"
+echo "  Compact summary: ${OUT_DIR}/prompt_update.summary.md"
 echo "  Prompt report: ${OUT_DIR}/prompt_update.report.json"
 if [[ "${WITH_LLM}" == "1" ]]; then
   echo "  LLM report: ${OUT_DIR}/prompt_update.llm_report.json"
