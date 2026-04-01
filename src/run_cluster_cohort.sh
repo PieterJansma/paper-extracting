@@ -75,8 +75,10 @@ MOLGENIS_EMX2_REPO="${MOLGENIS_EMX2_REPO:-molgenis/molgenis-emx2}"
 MOLGENIS_EMX2_REF="${MOLGENIS_EMX2_REF:-main}"
 EMX2_CACHE_DIR="${EMX2_CACHE_DIR:-${RUN_DIR}/emx2_cache}"
 EMX2_REPO_ROOT="${EMX2_REPO_ROOT:-${EMX2_CACHE_DIR}/repo}"
-COHORT_PROMPT_SCHEMA_SYNC="${COHORT_PROMPT_SCHEMA_SYNC:-1}"
-COHORT_PROMPT_SCHEMA_SYNC_LLM="${COHORT_PROMPT_SCHEMA_SYNC_LLM:-1}"
+COHORT_DYNAMIC_EMX2_RUNTIME="${COHORT_DYNAMIC_EMX2_RUNTIME:-0}"
+COHORT_DYNAMIC_PROMPTS="${COHORT_DYNAMIC_PROMPTS:-0}"
+COHORT_PROMPT_SCHEMA_SYNC="${COHORT_PROMPT_SCHEMA_SYNC:-0}"
+COHORT_PROMPT_SCHEMA_SYNC_LLM="${COHORT_PROMPT_SCHEMA_SYNC_LLM:-0}"
 COHORT_PROMPT_SCHEMA_BASE_CSV="${COHORT_PROMPT_SCHEMA_BASE_CSV:-${PWD}/molgenis_UMCGCohortsStaging.csv}"
 COHORT_PROMPT_SCHEMA_STATE_DIR="${COHORT_PROMPT_SCHEMA_STATE_DIR:-${PWD}/tmp/cohort_prompt_schema_sync_state}"
 
@@ -199,8 +201,9 @@ fetch_emx2_csv() {
       continue
     fi
     seen="${seen}${ref}|"
-    local url="https://raw.githubusercontent.com/${MOLGENIS_EMX2_REPO}/${ref}/${rel_path}"
-    if curl -fsSL "$url" -o "$tmp_file"; then
+    local url_path="${rel_path// /%20}"
+    local url="https://raw.githubusercontent.com/${MOLGENIS_EMX2_REPO}/${ref}/${url_path}"
+    if curl -fsSL "$url" -o "$tmp_file" 2>/dev/null; then
       mkdir -p "$(dirname "$repo_file")"
       cp "$tmp_file" "$out_file"
       mv "$tmp_file" "$repo_file"
@@ -328,6 +331,10 @@ if [[ -n "$SCHEMA_SYNC_BASE_PROMPTS" && -f "$SCHEMA_SYNC_BASE_PROMPTS" ]] && fla
   SCHEMA_SYNC_ACTIVE=1
   export COHORT_DYNAMIC_PROMPTS=0
 fi
+export COHORT_DYNAMIC_EMX2_RUNTIME
+export COHORT_DYNAMIC_PROMPTS
+export COHORT_PROMPT_SCHEMA_SYNC
+export COHORT_PROMPT_SCHEMA_SYNC_LLM
 export MOLGENIS_EMX2_LOCAL_ROOT="$EMX2_REPO_ROOT"
 export STRIP_REFERENCES
 status_event "runtime_config_ready" "runtime config prepared"
