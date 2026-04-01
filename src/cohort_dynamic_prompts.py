@@ -39,6 +39,19 @@ AUTO_SKIP_COLUMNS: Dict[str, set[str]] = {
     "Subpopulation counts": {"resource", "subpopulation", "age group", "N total", "N female", "N male"},
     "Collection events": {"resource"},
     "Agents": {"resource"},
+    "Organisations": {
+        "resource",
+        "id",
+        "type",
+        "name",
+        "organisation",
+        "other organisation",
+        "department",
+        "website",
+        "email",
+        "logo",
+        "role",
+    },
     "Contacts": {"resource"},
     "Publications": {"resource"},
     "Documentation": {"resource"},
@@ -66,6 +79,9 @@ RESOURCE_TASK_HINTS: List[tuple[str, tuple[str, ...]]] = [
     ("task_information", ("publication", "funding", "acknowledg", "provenance", "document", "citation", "supplement", "theme")),
     ("task_linkage", ("linkage", "linked", "linkable")),
 ]
+
+INLINE_ALLOWED_VALUES_MAX = 8
+INLINE_ALLOWED_VALUES_MEDIUM_MAX = 16
 
 
 def _normalize_key(value: Any) -> str:
@@ -173,8 +189,8 @@ ORGANISATION_ITEM_FIELDS = [
     _schema_field("id", "Agents", "id", note="Use an explicit acronym, identifier or short name from the PDF.", nullable=False),
     _schema_field("type", "Agents", "type", note="Use the exact allowed label for an individual versus organisation only when explicit.", nullable=False),
     _schema_field("name", "Agents", "name", note="Only for explicit individual contributors."),
-    _schema_field("organisation", "Agents", "organisation", note="Use the explicit organisation name as written in the PDF."),
-    _schema_field("other_organisation", "Agents", "other organisation", note="Only if an alternative organisation spelling or label is explicitly given."),
+    _schema_field("organisation", "Agents", "organisation", note="Use the explicit organisation name only when it exactly matches a current schema organisation."),
+    _schema_field("other_organisation", "Agents", "other organisation", note="If the explicit organisation name does not exactly match a current schema organisation, copy the exact wording here."),
     _schema_field("department", "Agents", "department", note="Only if explicitly stated."),
     _schema_field("website", "Agents", "website", note="Only if explicitly shown."),
     _schema_field("email", "Agents", "email", note="Only if explicitly shown."),
@@ -225,7 +241,7 @@ TASK_SPECS: Dict[str, Dict[str, Any]] = {
             "Use null for missing scalar fields and [] for missing lists.",
             "Do not invent identifiers, names, dates, URLs or emails.",
             "For free-text fields, keep wording verbatim or near-verbatim.",
-            "For choice and reference fields, use exact labels from the PDF; the current allowed values are injected automatically below.",
+            "For choice and reference fields, use exact labels from the PDF only when they match current schema values.",
         ],
         "fields": [
             _schema_field("pid", "Resources", "pid", note="Only if the PDF explicitly states a persistent identifier."),
@@ -390,7 +406,7 @@ TASK_SPECS: Dict[str, Dict[str, Any]] = {
         "global_rules": [
             "Use null for missing scalar fields and [] for missing lists.",
             "Do not invent organisations, people, roles, emails or ORCIDs.",
-            "For choice and reference fields, use exact labels from the PDF; the current allowed values are injected automatically below.",
+            "For choice and reference fields, use exact labels from the PDF only when they match current schema values.",
         ],
         "fields": [
             _list_object(
@@ -398,16 +414,16 @@ TASK_SPECS: Dict[str, Dict[str, Any]] = {
                 ORGANISATION_ITEM_FIELDS,
                 note="Return one object per explicit contributing organisation or agent. If none are explicit, return [].",
             ),
-            _helper_field("publisher", "string|null", note="Return the exact organisations_involved[].id of the publishing organisation only when explicitly stated.", table="Resources", column="publisher"),
-            _helper_field("creator", ["string"], note="Return exact organisations_involved[].id values for creator organisations only when explicitly stated.", table="Resources", column="creator"),
+            _helper_field("publisher", "string|null", note="Set only if the PDF explicitly states the publishing organisation of the resource. The value must exactly match one `organisations_involved[].id`. If that organisation is explicit but missing from `organisations_involved[]`, add the organisation row first and then use its id.", table="Resources", column="publisher"),
+            _helper_field("creator", ["string"], note="Return only organisations explicitly stated as creator, developer or maintainer of the resource. Each value must exactly match one `organisations_involved[].id`. If an explicit creator organisation is missing from `organisations_involved[]`, add it first and then use its id.", table="Resources", column="creator"),
             _list_object(
                 "people_involved",
                 PEOPLE_ITEM_FIELDS,
                 note="Return one object per explicit person contributing to the resource. If none are explicit, return [].",
             ),
-            _helper_field("contact_point_first_name", "string|null", note="Only if the PDF explicitly identifies a primary contact person for the resource."),
-            _helper_field("contact_point_last_name", "string|null", note="Only if the PDF explicitly identifies a primary contact person for the resource."),
-            _helper_field("contact_point_email", "string|null", note="Only if the PDF explicitly identifies a primary contact person for the resource."),
+            _helper_field("contact_point_first_name", "string|null", note="Only if the PDF explicitly identifies a primary contact person for the resource. This helper must match one person in `people_involved[]`."),
+            _helper_field("contact_point_last_name", "string|null", note="Only if the PDF explicitly identifies a primary contact person for the resource. This helper must match one person in `people_involved[]`."),
+            _helper_field("contact_point_email", "string|null", note="Only if the PDF explicitly identifies a primary contact person for the resource. If explicit, it should match that same person in `people_involved[]`."),
         ],
     },
     "task_contributors_org": {
@@ -425,8 +441,8 @@ TASK_SPECS: Dict[str, Dict[str, Any]] = {
                 ORGANISATION_ITEM_FIELDS,
                 note="Return one object per explicit contributing organisation or agent. If none are explicit, return [].",
             ),
-            _helper_field("publisher", "string|null", note="Return the exact organisations_involved[].id of the publishing organisation only when explicitly stated.", table="Resources", column="publisher"),
-            _helper_field("creator", ["string"], note="Return exact organisations_involved[].id values for creator organisations only when explicitly stated.", table="Resources", column="creator"),
+            _helper_field("publisher", "string|null", note="Set only if the PDF explicitly states the publishing organisation of the resource. The value must exactly match one `organisations_involved[].id`. If that organisation is explicit but missing from `organisations_involved[]`, add the organisation row first and then use its id.", table="Resources", column="publisher"),
+            _helper_field("creator", ["string"], note="Return only organisations explicitly stated as creator, developer or maintainer of the resource. Each value must exactly match one `organisations_involved[].id`. If an explicit creator organisation is missing from `organisations_involved[]`, add it first and then use its id.", table="Resources", column="creator"),
         ],
     },
     "task_contributors_people": {
@@ -444,9 +460,9 @@ TASK_SPECS: Dict[str, Dict[str, Any]] = {
                 PEOPLE_ITEM_FIELDS,
                 note="Return one object per explicit person contributing to the resource. If none are explicit, return [].",
             ),
-            _helper_field("contact_point_first_name", "string|null", note="Only if the PDF explicitly identifies a primary contact person for the resource."),
-            _helper_field("contact_point_last_name", "string|null", note="Only if the PDF explicitly identifies a primary contact person for the resource."),
-            _helper_field("contact_point_email", "string|null", note="Only if the PDF explicitly identifies a primary contact person for the resource."),
+            _helper_field("contact_point_first_name", "string|null", note="Only if the PDF explicitly identifies a primary contact person for the resource. This helper must match one person in `people_involved[]`."),
+            _helper_field("contact_point_last_name", "string|null", note="Only if the PDF explicitly identifies a primary contact person for the resource. This helper must match one person in `people_involved[]`."),
+            _helper_field("contact_point_email", "string|null", note="Only if the PDF explicitly identifies a primary contact person for the resource. If explicit, it should match that same person in `people_involved[]`."),
         ],
     },
     "task_samplesets": {
@@ -504,7 +520,7 @@ TASK_SPECS: Dict[str, Dict[str, Any]] = {
         ],
         "global_rules": [
             "Use null for missing scalar fields and [] for missing lists.",
-            "For choice fields, use exact labels from the PDF; the current allowed values are injected automatically below.",
+            "For choice fields, use exact labels from the PDF only when they match current schema values.",
         ],
         "fields": [
             _schema_field("informed_consent_type", "Resources", "informed consent type", note="Return the explicit consent-type label only."),
@@ -526,7 +542,7 @@ TASK_SPECS: Dict[str, Dict[str, Any]] = {
         "global_rules": [
             "Use null for missing scalar fields and [] for missing lists.",
             "Do not invent DOIs, titles, URLs, file names or references.",
-            "For choice fields, use exact labels from the PDF; the current allowed values are injected automatically below.",
+            "For choice fields, use exact labels from the PDF only when they match current schema values.",
         ],
         "fields": [
             _list_object(
@@ -592,9 +608,9 @@ def _render_template(specs: List[Dict[str, Any]], registry: Dict[str, Any]) -> s
 def _generic_rule_from_meta(meta: Dict[str, Any], *, nullable: bool = True) -> str:
     column_type = str(meta.get("column_type") or "").strip()
     if column_type in {"ontology", "ref"}:
-        return "Use the exact explicit label from the PDF. If not explicit -> null. The current allowed values are injected automatically below."
+        return "Use the exact explicit label from the PDF only when it exactly matches a current schema value. If not explicit or not an exact match -> null."
     if column_type in {"ontology_array", "ref_array"}:
-        return "Return exact explicit labels only. If not explicit -> []. The current allowed values are injected automatically below."
+        return "Return exact explicit labels from the PDF only when they exactly match current schema values. If none are explicit or none match exactly -> []."
     if column_type == "string_array":
         return "Return a list of explicit values only. If not explicit -> []."
     if column_type in {"int", "non_negative_int"}:
@@ -608,6 +624,23 @@ def _generic_rule_from_meta(meta: Dict[str, Any], *, nullable: bool = True) -> s
     if not nullable:
         return "Only include a row when this field is explicit."
     return "Use the explicit value from the PDF only. If not explicit -> null."
+
+
+def _allowed_values_note(meta: Dict[str, Any]) -> str:
+    values = [str(v or "").strip() for v in list(meta.get("allowed_values") or [])]
+    values = [v for v in values if v]
+    if not values:
+        return ""
+
+    ref_table = str(meta.get("ref_table") or "").strip()
+    label = f"`{ref_table}.csv`" if ref_table else "the current schema list"
+    count = len(values)
+
+    if count <= INLINE_ALLOWED_VALUES_MAX:
+        return f"Current schema values: {', '.join(values)}."
+    if count <= INLINE_ALLOWED_VALUES_MEDIUM_MAX:
+        return f"Current schema values ({count}): {', '.join(values)}."
+    return f"Use only exact values from {label} ({count} current values)."
 
 
 def _field_reference(spec: Dict[str, Any]) -> str:
@@ -638,6 +671,9 @@ def _render_field_lines(spec: Dict[str, Any], registry: Dict[str, Any], prefix: 
     desc = str(meta.get("description") or "").strip()
     if desc:
         parts.append(f"Schema meaning: {desc}")
+    allowed_note = _allowed_values_note(meta)
+    if allowed_note:
+        parts.append(allowed_note)
     parts.append(_generic_rule_from_meta(meta, nullable=bool(spec.get("nullable", True))))
     ref = _field_reference(spec)
     if ref:
@@ -759,6 +795,11 @@ def _materialize_spec(spec: Dict[str, Any], registry: Dict[str, Any]) -> Dict[st
             for child in materialized_children
             if str(child.get("key") or "").strip()
         }
+        covered_norm_names = {
+            _normalize_key(str(child.get("key") or "").strip())
+            for child in materialized_children
+            if str(child.get("key") or "").strip()
+        }
         for table_name in sorted(represented_tables):
             table_meta = registry.get("tables", {}).get(table_name, {}).get("fields", {})
             covered = covered_by_table.get(table_name, set())
@@ -769,10 +810,14 @@ def _materialize_spec(spec: Dict[str, Any], registry: Dict[str, Any]) -> Dict[st
                     continue
                 if str(meta.get("column_type") or "").strip() == "refback":
                     continue
+                if _normalize_key(column_name) in covered_norm_names:
+                    continue
                 enriched_meta = dict(meta)
                 enriched_meta["_table_name"] = table_name
-                materialized_children.append(_auto_field_from_meta(column_name, enriched_meta, existing_keys))
+                auto_field = _auto_field_from_meta(column_name, enriched_meta, existing_keys)
+                materialized_children.append(auto_field)
                 covered.add(column_name)
+                covered_norm_names.add(_normalize_key(str(auto_field.get("key") or "").strip()))
             covered_by_table[table_name] = covered
 
         if not materialized_children:

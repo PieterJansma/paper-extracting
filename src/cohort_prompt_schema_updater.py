@@ -157,7 +157,8 @@ def _build_rewrite_messages(
         "- Do not mention removed fields.\n"
         "- Do mention newly added fields when relevant.\n"
         "- Do not change the template_json; it is provided only for grounding.\n"
-        "- Do not invent allowed values; those are injected dynamically elsewhere.\n"
+        "- Do not invent allowed values.\n"
+        "- If the deterministic instructions already include exact current schema values or exact-match rules, preserve them.\n"
         "- Return JSON only: {\"instructions\": \"...\"}\n\n"
         f"{json.dumps(payload, ensure_ascii=False, indent=2)}"
     )
