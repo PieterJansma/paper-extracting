@@ -172,109 +172,37 @@ flag_enabled() {
   esac
 }
 
-write_unified_diff_file() {
-  local old_file="$1"
-  local new_file="$2"
-  local out_file="$3"
-  local old_label="${4:-old}"
-  local new_label="${5:-new}"
-
-  python3 - "$old_file" "$new_file" "$out_file" "$old_label" "$new_label" <<'PY'
-import difflib
-import sys
-from pathlib import Path
-
-old_path = Path(sys.argv[1])
-new_path = Path(sys.argv[2])
-out_path = Path(sys.argv[3])
-old_label = sys.argv[4]
-new_label = sys.argv[5]
-
-old_lines = old_path.read_text(encoding="utf-8").splitlines(keepends=True)
-new_lines = new_path.read_text(encoding="utf-8").splitlines(keepends=True)
-diff = difflib.unified_diff(old_lines, new_lines, fromfile=old_label, tofile=new_label)
-out_path.write_text("".join(diff), encoding="utf-8")
-PY
-}
-
-archive_prompt_schema_history() {
+archive_prompt_schema_diff() {
   local history_root="$1"
-  local baseline_schema="$2"
-  local previous_live_schema="$3"
-  local current_live_schema="$4"
-  local base_prompt="$5"
-  local final_prompt="$6"
-  local report_json="$7"
-  local compare_json="$8"
-  local compare_md="$9"
-  local llm_report_json="${10:-}"
-  local llm_compare_json="${11:-}"
-  local llm_compare_md="${12:-}"
+  local deterministic_compare_md="$2"
+  local llm_compare_md="${3:-}"
+  local change_count="${4:-0}"
 
-  local ts_utc
-  ts_utc="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   local stamp
   stamp="$(date -u +"%Y%m%dT%H%M%SZ")"
-  local history_dir="${history_root}/${stamp}"
-  mkdir -p "$history_dir"
+  local out_file="${history_root}/${stamp}.prompt_change.md"
+  mkdir -p "$history_root"
 
-  cp -f "$baseline_schema" "$history_dir/baseline_schema.csv"
-  cp -f "$current_live_schema" "$history_dir/current_live_schema.csv"
-  cp -f "$base_prompt" "$history_dir/base_prompt.toml"
-  cp -f "$final_prompt" "$history_dir/final_prompt.toml"
-  cp -f "$report_json" "$history_dir/prompt_schema_sync.report.json"
-  [[ -f "$compare_json" ]] && cp -f "$compare_json" "$history_dir/prompt_schema_sync.compare.json"
-  [[ -f "$compare_md" ]] && cp -f "$compare_md" "$history_dir/prompt_schema_sync.compare.md"
+  {
+    echo "# Prompt Change"
+    echo
+    echo "- timestamp_utc: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    echo "- changed_tasks: ${change_count}"
+    if [[ -n "$llm_compare_md" && -f "$llm_compare_md" ]]; then
+      echo "- source: llm compare"
+    else
+      echo "- source: deterministic compare"
+    fi
+    echo "- baseline_prompt: prompts/prompts_cohort.toml"
+    echo
+    if [[ -n "$llm_compare_md" && -f "$llm_compare_md" ]]; then
+      cat "$llm_compare_md"
+    else
+      cat "$deterministic_compare_md"
+    fi
+  } > "$out_file"
 
-  write_unified_diff_file \
-    "$baseline_schema" \
-    "$current_live_schema" \
-    "$history_dir/baseline_vs_current_schema.diff" \
-    "baseline_schema" \
-    "current_live_schema"
-
-  local basis_label="baseline_schema"
-  if [[ -n "$previous_live_schema" && -f "$previous_live_schema" ]]; then
-    cp -f "$previous_live_schema" "$history_dir/previous_live_schema.csv"
-    write_unified_diff_file \
-      "$previous_live_schema" \
-      "$current_live_schema" \
-      "$history_dir/previous_live_vs_current_schema.diff" \
-      "previous_live_schema" \
-      "current_live_schema"
-    basis_label="previous_live_schema"
-  fi
-
-  if [[ -n "$llm_report_json" && -f "$llm_report_json" ]]; then
-    cp -f "$llm_report_json" "$history_dir/prompt_schema_sync.llm_report.json"
-  fi
-  if [[ -n "$llm_compare_json" && -f "$llm_compare_json" ]]; then
-    cp -f "$llm_compare_json" "$history_dir/prompt_schema_sync.llm.compare.json"
-  fi
-  if [[ -n "$llm_compare_md" && -f "$llm_compare_md" ]]; then
-    cp -f "$llm_compare_md" "$history_dir/prompt_schema_sync.llm.compare.md"
-  fi
-
-  python3 - "$history_dir/history_manifest.json" "$ts_utc" "$basis_label" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-manifest_path = Path(sys.argv[1])
-created_utc = sys.argv[2]
-basis_label = sys.argv[3]
-payload = {
-    "created_utc": created_utc,
-    "change_basis": basis_label,
-    "files": sorted(
-        p.name for p in manifest_path.parent.iterdir()
-        if p.is_file() and p.name != manifest_path.name
-    ),
-}
-manifest_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-PY
-
-  printf '%s\n' "$history_dir"
+  printf '%s\n' "$out_file"
 }
 
 fetch_emx2_csv() {
@@ -1117,22 +1045,14 @@ PY
         fi
 
         SCHEMA_SYNC_HISTORY_SAVED_AT="$(
-          archive_prompt_schema_history \
+          archive_prompt_schema_diff \
             "$COHORT_PROMPT_SCHEMA_HISTORY_DIR" \
-            "$COHORT_PROMPT_SCHEMA_BASE_CSV" \
-            "${SCHEMA_SYNC_STATE_SCHEMA:-}" \
-            "$LIVE_SCHEMA_CSV" \
-            "$SCHEMA_SYNC_BASE_PROMPTS" \
-            "$RUNTIME_PROMPTS" \
-            "$SCHEMA_SYNC_REPORT_JSON" \
-            "$SCHEMA_SYNC_COMPARE_JSON" \
             "$SCHEMA_SYNC_COMPARE_MD" \
-            "$SCHEMA_SYNC_LLM_REPORT_JSON" \
-            "$SCHEMA_SYNC_LLM_COMPARE_JSON" \
-            "$SCHEMA_SYNC_LLM_COMPARE_MD"
+            "$SCHEMA_SYNC_LLM_COMPARE_MD" \
+            "$SCHEMA_SYNC_CHANGED_TASKS"
         )"
-        echo "  Schema history opgeslagen: $SCHEMA_SYNC_HISTORY_SAVED_AT"
-        status_event "prompt_schema_sync_archived" "schema change archived at ${SCHEMA_SYNC_HISTORY_SAVED_AT}"
+        echo "  Prompt diff opgeslagen: $SCHEMA_SYNC_HISTORY_SAVED_AT"
+        status_event "prompt_schema_sync_archived" "prompt diff archived at ${SCHEMA_SYNC_HISTORY_SAVED_AT}"
 
         cp -f "$LIVE_SCHEMA_CSV" "$SCHEMA_SYNC_STATE_SCHEMA"
         cp -f "$RUNTIME_PROMPTS" "$SCHEMA_SYNC_STATE_PROMPTS"
