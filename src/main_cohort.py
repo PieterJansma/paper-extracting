@@ -21,6 +21,11 @@ from emx2_dynamic_runtime import (
     write_json,
     write_task_prompts_toml,
 )
+from cohort_dynamic_prompts import (
+    build_dynamic_task_sections,
+    postprocess_section_results_dynamic,
+    replace_task_sections,
+)
 from fix_molgenis_staging_types_callable import fix_workbook
 from fix_molgenis_staging_types_dynamic import fix_workbook_dynamic
 from map_countries_ontology import map_workbook_countries
@@ -29,6 +34,7 @@ from map_regions_ontology import map_workbook_regions
 from main_final import (
     setup_logging,
     load_config,
+    _load_toml_file,
     stem,
     _ordered_keys_from_template,
     _ordered_item_keys_from_template,
@@ -562,14 +568,18 @@ def cli() -> None:
     if "D" in selected_passes:
         selected_passes.extend(["D1", "D2"])
 
+    dynamic_runtime_enabled = _env_flag("COHORT_DYNAMIC_EMX2_RUNTIME", "1")
+    dynamic_prompt_generation_enabled = _env_flag("COHORT_DYNAMIC_PROMPTS", "1")
     cfg_path = os.environ.get("PDF_EXTRACT_CONFIG", "config.final.toml")
     prompts_path = (os.environ.get("PDF_EXTRACT_PROMPTS") or "").strip() or None
-    cfg = load_config(cfg_path, prompts_path=prompts_path)
+    if dynamic_runtime_enabled and dynamic_prompt_generation_enabled and not prompts_path:
+        cfg = _load_toml_file(cfg_path)
+    else:
+        cfg = load_config(cfg_path, prompts_path=prompts_path)
 
     setup_logging(cfg.get("logging", {}).get("level", "INFO"))
     log = logging.getLogger("main_cohort")
 
-    dynamic_runtime_enabled = _env_flag("COHORT_DYNAMIC_EMX2_RUNTIME", "1")
     dynamic_registry: Dict[str, Any] | None = None
     dynamic_prompt_summary: Dict[str, List[str]] = {}
     if dynamic_runtime_enabled:
@@ -581,11 +591,14 @@ def cli() -> None:
                 fallback_schema_csv=os.environ.get("EMX2_RUNTIME_SCHEMA_CSV"),
                 cache_dir=os.environ.get("EMX2_CACHE_DIR"),
             )
+            if dynamic_prompt_generation_enabled:
+                replace_task_sections(cfg, build_dynamic_task_sections(dynamic_registry))
             dynamic_prompt_summary = apply_dynamic_constraints_to_config(cfg, dynamic_registry)
             log.info(
-                "Dynamic EMX2 runtime enabled (tables=%d, sources=%d)",
+                "Dynamic EMX2 runtime enabled (tables=%d, sources=%d, dynamic_prompts=%s)",
                 len(dynamic_registry.get("tables", {})),
                 len(dynamic_registry.get("sources", {})),
+                "on" if dynamic_prompt_generation_enabled else "off",
             )
         except Exception as e:
             dynamic_runtime_enabled = False
@@ -769,6 +782,8 @@ def cli() -> None:
             )
 
         _postprocess_section_results(per_section_results, paper_text)
+        if dynamic_runtime_enabled and dynamic_registry is not None:
+            postprocess_section_results_dynamic(per_section_results, paper_text, dynamic_registry)
 
         # keep old flat resource row for diagnostics/order stability if needed
         flat_resource_row, flat_columns = _build_resource_row(

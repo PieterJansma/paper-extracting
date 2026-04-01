@@ -74,6 +74,11 @@ AUTO_FETCH_EMX2_ONTOLOGIES="${AUTO_FETCH_EMX2_ONTOLOGIES:-1}"
 MOLGENIS_EMX2_REPO="${MOLGENIS_EMX2_REPO:-molgenis/molgenis-emx2}"
 MOLGENIS_EMX2_REF="${MOLGENIS_EMX2_REF:-main}"
 EMX2_CACHE_DIR="${EMX2_CACHE_DIR:-${RUN_DIR}/emx2_cache}"
+EMX2_REPO_ROOT="${EMX2_REPO_ROOT:-${EMX2_CACHE_DIR}/repo}"
+COHORT_PROMPT_SCHEMA_SYNC="${COHORT_PROMPT_SCHEMA_SYNC:-1}"
+COHORT_PROMPT_SCHEMA_SYNC_LLM="${COHORT_PROMPT_SCHEMA_SYNC_LLM:-1}"
+COHORT_PROMPT_SCHEMA_BASE_CSV="${COHORT_PROMPT_SCHEMA_BASE_CSV:-${PWD}/molgenis_UMCGCohortsStaging.csv}"
+COHORT_PROMPT_SCHEMA_STATE_DIR="${COHORT_PROMPT_SCHEMA_STATE_DIR:-${PWD}/tmp/cohort_prompt_schema_sync_state}"
 
 # ------------------------------------------------------------------------------
 # CLI passthrough:
@@ -155,6 +160,15 @@ with open(status_log, "a", encoding="utf-8") as f:
 PY
 }
 
+flag_enabled() {
+  local value
+  value="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
+  case "$value" in
+    1|true|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 fetch_emx2_csv() {
   local rel_path="$1"
   local target_var="$2"
@@ -174,6 +188,7 @@ fetch_emx2_csv() {
   local safe_name
   safe_name="$(echo "$rel_path" | tr '/ ' '__')"
   local out_file="${EMX2_CACHE_DIR}/${safe_name}"
+  local repo_file="${EMX2_REPO_ROOT}/${rel_path}"
   local tmp_file="${out_file}.tmp"
   local refs=("$MOLGENIS_EMX2_REF" "main" "master")
   local seen="|"
@@ -186,9 +201,11 @@ fetch_emx2_csv() {
     seen="${seen}${ref}|"
     local url="https://raw.githubusercontent.com/${MOLGENIS_EMX2_REPO}/${ref}/${rel_path}"
     if curl -fsSL "$url" -o "$tmp_file"; then
-      mv "$tmp_file" "$out_file"
-      export "$target_var=$out_file"
-      echo "  ${target_var}=${out_file} (fetched ${ref}:${rel_path})"
+      mkdir -p "$(dirname "$repo_file")"
+      cp "$tmp_file" "$out_file"
+      mv "$tmp_file" "$repo_file"
+      export "$target_var=$repo_file"
+      echo "  ${target_var}=${repo_file} (fetched ${ref}:${rel_path})"
       status_event "ontology_fetched" "${target_var} fetched from ${ref}:${rel_path}"
       return 0
     fi
@@ -258,17 +275,36 @@ if [[ ! -f "config.final.toml" ]]; then
 fi
 
 PROMPTS_SRC="${PDF_EXTRACT_PROMPTS:-prompts_cohort.toml}"
+DYNAMIC_RUNTIME_FLAG="$(printf '%s' "${COHORT_DYNAMIC_EMX2_RUNTIME:-1}" | tr '[:upper:]' '[:lower:]')"
+DYNAMIC_PROMPTS_FLAG="$(printf '%s' "${COHORT_DYNAMIC_PROMPTS:-1}" | tr '[:upper:]' '[:lower:]')"
+PROMPTS_OPTIONAL=0
+if flag_enabled "$DYNAMIC_RUNTIME_FLAG"; then
+  if flag_enabled "$DYNAMIC_PROMPTS_FLAG"; then
+    PROMPTS_OPTIONAL=1
+  fi
+fi
 if [[ ! -f "$PROMPTS_SRC" ]]; then
-  echo "❌ ERROR: prompts bestand ontbreekt: $PROMPTS_SRC"
-  echo "   Zet PDF_EXTRACT_PROMPTS of plaats prompts.toml in ${PWD}"
-  exit 1
+  if [[ "$PROMPTS_OPTIONAL" == "1" ]]; then
+    echo "ℹ️  Geen prompts bestand gevonden; main_cohort.py genereert de task-prompts dynamisch uit EMX2."
+    PROMPTS_SRC=""
+  else
+    echo "❌ ERROR: prompts bestand ontbreekt: $PROMPTS_SRC"
+    echo "   Zet PDF_EXTRACT_PROMPTS of plaats prompts.toml in ${PWD}"
+    exit 1
+  fi
 fi
 
 echo "[0/4] Runtime config maken met base_url via Load Balancer..."
 RUNTIME_CFG="${RUN_DIR}/config.runtime.toml"
 cp -f "config.final.toml" "$RUNTIME_CFG"
-RUNTIME_PROMPTS="${RUN_DIR}/prompts.runtime.toml"
-cp -f "$PROMPTS_SRC" "$RUNTIME_PROMPTS"
+RUNTIME_PROMPTS=""
+SCHEMA_SYNC_BASE_PROMPTS=""
+SCHEMA_SYNC_ACTIVE=0
+if [[ -n "$PROMPTS_SRC" ]]; then
+  RUNTIME_PROMPTS="${RUN_DIR}/prompts.runtime.toml"
+  cp -f "$PROMPTS_SRC" "$RUNTIME_PROMPTS"
+  SCHEMA_SYNC_BASE_PROMPTS="$RUNTIME_PROMPTS"
+fi
 sed -i -E "s|^(base_url[[:space:]]*=[[:space:]]*\").*(\"[[:space:]]*)$|\1http://127.0.0.1:${PORT_LB}/v1\2|g" "$RUNTIME_CFG"
 if [[ -n "$LLM_CHUNKING_ENABLED" ]]; then
   sed -i -E "s|^(chunking_enabled[[:space:]]*=[[:space:]]*).*$|\1${LLM_CHUNKING_ENABLED}|g" "$RUNTIME_CFG"
@@ -283,7 +319,16 @@ if [[ -n "$LLM_CHUNK_OVERLAP_CHARS" ]]; then
   sed -i -E "s|^(chunk_overlap_chars[[:space:]]*=[[:space:]]*).*$|\1${LLM_CHUNK_OVERLAP_CHARS}|g" "$RUNTIME_CFG"
 fi
 export PDF_EXTRACT_CONFIG="$RUNTIME_CFG"
-export PDF_EXTRACT_PROMPTS="$RUNTIME_PROMPTS"
+if [[ -n "$RUNTIME_PROMPTS" ]]; then
+  export PDF_EXTRACT_PROMPTS="$RUNTIME_PROMPTS"
+else
+  unset PDF_EXTRACT_PROMPTS || true
+fi
+if [[ -n "$SCHEMA_SYNC_BASE_PROMPTS" && -f "$SCHEMA_SYNC_BASE_PROMPTS" ]] && flag_enabled "$COHORT_PROMPT_SCHEMA_SYNC"; then
+  SCHEMA_SYNC_ACTIVE=1
+  export COHORT_DYNAMIC_PROMPTS=0
+fi
+export MOLGENIS_EMX2_LOCAL_ROOT="$EMX2_REPO_ROOT"
 export STRIP_REFERENCES
 status_event "runtime_config_ready" "runtime config prepared"
 
@@ -835,6 +880,161 @@ if python3 src/emx2_dynamic_runtime.py required-paths --mode cohort >/dev/null 2
     dyn_var="EMX2_DYNAMIC_$(echo "$rel_path" | tr -c '[:alnum:]' '_' | tr '[:lower:]' '[:upper:]')"
     fetch_emx2_csv "$rel_path" "$dyn_var"
   done < <(python3 src/emx2_dynamic_runtime.py required-paths --mode cohort)
+fi
+
+if python3 src/emx2_dynamic_runtime.py model-paths --mode cohort >/dev/null 2>&1; then
+  while IFS= read -r rel_path; do
+    [[ -z "$rel_path" ]] && continue
+    dyn_var="EMX2_MODEL_$(echo "$rel_path" | tr -c '[:alnum:]' '_' | tr '[:lower:]' '[:upper:]')"
+    fetch_emx2_csv "$rel_path" "$dyn_var"
+  done < <(python3 src/emx2_dynamic_runtime.py model-paths --mode cohort)
+fi
+
+if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
+  if [[ ! -f "$COHORT_PROMPT_SCHEMA_BASE_CSV" ]]; then
+    echo "⚠️  Skip prompt schema sync: base schema ontbreekt: $COHORT_PROMPT_SCHEMA_BASE_CSV"
+    status_event "warning" "prompt schema sync skipped; base schema missing"
+  else
+    echo "[4a/4] Schema-check voor prompts..."
+    LIVE_SCHEMA_CSV="${RUN_DIR}/emx2_schema.live.csv"
+    SCHEMA_SYNC_PROMPTS="${RUN_DIR}/prompts.schema_sync.runtime.toml"
+    SCHEMA_SYNC_REPORT_JSON="${RUN_DIR}/prompt_schema_sync.report.json"
+    SCHEMA_SYNC_COMPARE_JSON="${RUN_DIR}/prompt_schema_sync.compare.json"
+    SCHEMA_SYNC_COMPARE_MD="${RUN_DIR}/prompt_schema_sync.compare.md"
+    SCHEMA_SYNC_LLM_PROMPTS="${RUN_DIR}/prompts.schema_sync.llm.runtime.toml"
+    SCHEMA_SYNC_LLM_REPORT_JSON="${RUN_DIR}/prompt_schema_sync.llm_report.json"
+    SCHEMA_SYNC_LLM_COMPARE_JSON="${RUN_DIR}/prompt_schema_sync.llm.compare.json"
+    SCHEMA_SYNC_LLM_COMPARE_MD="${RUN_DIR}/prompt_schema_sync.llm.compare.md"
+    mkdir -p "$COHORT_PROMPT_SCHEMA_STATE_DIR"
+    SCHEMA_SYNC_STATE_SCHEMA="${COHORT_PROMPT_SCHEMA_STATE_DIR}/live_schema.csv"
+    SCHEMA_SYNC_STATE_PROMPTS="${COHORT_PROMPT_SCHEMA_STATE_DIR}/prompts.runtime.toml"
+    SCHEMA_SYNC_STATE_REPORT_JSON="${COHORT_PROMPT_SCHEMA_STATE_DIR}/report.json"
+    SCHEMA_SYNC_STATE_COMPARE_JSON="${COHORT_PROMPT_SCHEMA_STATE_DIR}/compare.json"
+    SCHEMA_SYNC_STATE_COMPARE_MD="${COHORT_PROMPT_SCHEMA_STATE_DIR}/compare.md"
+    SCHEMA_SYNC_STATE_LLM_REPORT_JSON="${COHORT_PROMPT_SCHEMA_STATE_DIR}/llm_report.json"
+    SCHEMA_SYNC_STATE_LLM_COMPARE_JSON="${COHORT_PROMPT_SCHEMA_STATE_DIR}/llm_compare.json"
+    SCHEMA_SYNC_STATE_LLM_COMPARE_MD="${COHORT_PROMPT_SCHEMA_STATE_DIR}/llm_compare.md"
+    status_event "prompt_schema_sync_started" "checking EMX2 schema against base prompt"
+
+    if python3 src/emx2_dynamic_runtime.py export-schema-csv \
+      --profile UMCGCohortsStaging \
+      --local-root "$MOLGENIS_EMX2_LOCAL_ROOT" \
+      --output "$LIVE_SCHEMA_CSV" >/dev/null; then
+
+      if [[ -f "$SCHEMA_SYNC_STATE_SCHEMA" && -f "$SCHEMA_SYNC_STATE_PROMPTS" ]] && cmp -s "$LIVE_SCHEMA_CSV" "$SCHEMA_SYNC_STATE_SCHEMA"; then
+        cp -f "$SCHEMA_SYNC_STATE_PROMPTS" "$SCHEMA_SYNC_PROMPTS"
+        if [[ -f "$SCHEMA_SYNC_STATE_REPORT_JSON" ]]; then
+          cp -f "$SCHEMA_SYNC_STATE_REPORT_JSON" "$SCHEMA_SYNC_REPORT_JSON"
+        fi
+        if [[ -f "$SCHEMA_SYNC_STATE_COMPARE_JSON" ]]; then
+          cp -f "$SCHEMA_SYNC_STATE_COMPARE_JSON" "$SCHEMA_SYNC_COMPARE_JSON"
+        fi
+        if [[ -f "$SCHEMA_SYNC_STATE_COMPARE_MD" ]]; then
+          cp -f "$SCHEMA_SYNC_STATE_COMPARE_MD" "$SCHEMA_SYNC_COMPARE_MD"
+        fi
+        if [[ -f "$SCHEMA_SYNC_STATE_LLM_REPORT_JSON" ]]; then
+          cp -f "$SCHEMA_SYNC_STATE_LLM_REPORT_JSON" "$SCHEMA_SYNC_LLM_REPORT_JSON"
+        fi
+        if [[ -f "$SCHEMA_SYNC_STATE_LLM_COMPARE_JSON" ]]; then
+          cp -f "$SCHEMA_SYNC_STATE_LLM_COMPARE_JSON" "$SCHEMA_SYNC_LLM_COMPARE_JSON"
+        fi
+        if [[ -f "$SCHEMA_SYNC_STATE_LLM_COMPARE_MD" ]]; then
+          cp -f "$SCHEMA_SYNC_STATE_LLM_COMPARE_MD" "$SCHEMA_SYNC_LLM_COMPARE_MD"
+        fi
+        export PDF_EXTRACT_PROMPTS="$SCHEMA_SYNC_PROMPTS"
+        RUNTIME_PROMPTS="$SCHEMA_SYNC_PROMPTS"
+        echo "  Prompt schema sync: geen wijziging in live schema; cached prompt gebruikt."
+        echo "  Vergelijking: $SCHEMA_SYNC_COMPARE_MD"
+        status_event "prompt_schema_sync_cached" "live EMX2 schema unchanged; reused cached prompt sync"
+      elif python3 src/cohort_prompt_schema_updater.py \
+        --base-prompts "$SCHEMA_SYNC_BASE_PROMPTS" \
+        --old-schema-csv "$COHORT_PROMPT_SCHEMA_BASE_CSV" \
+        --new-schema-csv "$LIVE_SCHEMA_CSV" \
+        --output "$SCHEMA_SYNC_PROMPTS" \
+        --report-json "$SCHEMA_SYNC_REPORT_JSON" \
+        --comparison-json "$SCHEMA_SYNC_COMPARE_JSON" \
+        --comparison-md "$SCHEMA_SYNC_COMPARE_MD" >/dev/null; then
+
+        SCHEMA_SYNC_CHANGED_TASKS="$(
+          python3 - "$SCHEMA_SYNC_REPORT_JSON" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    report = json.load(f)
+tasks = report.get("tasks") or {}
+count = 0
+for task_report in tasks.values():
+    if isinstance(task_report, dict) and task_report.get("changed"):
+        count += 1
+print(count)
+PY
+        )"
+
+        export PDF_EXTRACT_PROMPTS="$SCHEMA_SYNC_PROMPTS"
+        RUNTIME_PROMPTS="$SCHEMA_SYNC_PROMPTS"
+        echo "  Prompt schema sync: changed_tasks=${SCHEMA_SYNC_CHANGED_TASKS}"
+        echo "  PDF_EXTRACT_PROMPTS=$PDF_EXTRACT_PROMPTS"
+        echo "  Vergelijking: $SCHEMA_SYNC_COMPARE_MD"
+        status_event "prompt_schema_sync_ready" "prompt schema sync ready with ${SCHEMA_SYNC_CHANGED_TASKS} changed task(s)"
+
+        if [[ "${SCHEMA_SYNC_CHANGED_TASKS:-0}" -gt 0 ]] && flag_enabled "$COHORT_PROMPT_SCHEMA_SYNC_LLM"; then
+          echo "  Schema gewijzigd; Qwen herschrijft alleen de changed tasks..."
+          if python3 src/cohort_prompt_schema_updater.py \
+            --base-prompts "$SCHEMA_SYNC_BASE_PROMPTS" \
+            --old-schema-csv "$COHORT_PROMPT_SCHEMA_BASE_CSV" \
+            --new-schema-csv "$LIVE_SCHEMA_CSV" \
+            --output "$SCHEMA_SYNC_LLM_PROMPTS" \
+            --report-json "$SCHEMA_SYNC_REPORT_JSON" \
+            --rewrite-changed-with-llm \
+            --llm-config "$RUNTIME_CFG" \
+            --llm-report-json "$SCHEMA_SYNC_LLM_REPORT_JSON" \
+            --comparison-json "$SCHEMA_SYNC_LLM_COMPARE_JSON" \
+            --comparison-md "$SCHEMA_SYNC_LLM_COMPARE_MD" >/dev/null; then
+            export PDF_EXTRACT_PROMPTS="$SCHEMA_SYNC_LLM_PROMPTS"
+            RUNTIME_PROMPTS="$SCHEMA_SYNC_LLM_PROMPTS"
+            echo "  LLM prompt sync actief: $PDF_EXTRACT_PROMPTS"
+            echo "  LLM vergelijking: $SCHEMA_SYNC_LLM_COMPARE_MD"
+            status_event "prompt_schema_sync_llm_done" "Qwen rewrote changed prompt tasks"
+          else
+            echo "⚠️  Qwen prompt sync mislukte; fallback naar deterministische schema-sync prompt."
+            status_event "warning" "Qwen prompt sync failed; using deterministic schema-sync prompt"
+          fi
+        fi
+
+        cp -f "$LIVE_SCHEMA_CSV" "$SCHEMA_SYNC_STATE_SCHEMA"
+        cp -f "$RUNTIME_PROMPTS" "$SCHEMA_SYNC_STATE_PROMPTS"
+        cp -f "$SCHEMA_SYNC_REPORT_JSON" "$SCHEMA_SYNC_STATE_REPORT_JSON"
+        if [[ -f "$SCHEMA_SYNC_COMPARE_JSON" ]]; then
+          cp -f "$SCHEMA_SYNC_COMPARE_JSON" "$SCHEMA_SYNC_STATE_COMPARE_JSON"
+        fi
+        if [[ -f "$SCHEMA_SYNC_COMPARE_MD" ]]; then
+          cp -f "$SCHEMA_SYNC_COMPARE_MD" "$SCHEMA_SYNC_STATE_COMPARE_MD"
+        fi
+        if [[ -f "$SCHEMA_SYNC_LLM_REPORT_JSON" ]]; then
+          cp -f "$SCHEMA_SYNC_LLM_REPORT_JSON" "$SCHEMA_SYNC_STATE_LLM_REPORT_JSON"
+        else
+          rm -f "$SCHEMA_SYNC_STATE_LLM_REPORT_JSON"
+        fi
+        if [[ -f "$SCHEMA_SYNC_LLM_COMPARE_JSON" ]]; then
+          cp -f "$SCHEMA_SYNC_LLM_COMPARE_JSON" "$SCHEMA_SYNC_STATE_LLM_COMPARE_JSON"
+        else
+          rm -f "$SCHEMA_SYNC_STATE_LLM_COMPARE_JSON"
+        fi
+        if [[ -f "$SCHEMA_SYNC_LLM_COMPARE_MD" ]]; then
+          cp -f "$SCHEMA_SYNC_LLM_COMPARE_MD" "$SCHEMA_SYNC_STATE_LLM_COMPARE_MD"
+        else
+          rm -f "$SCHEMA_SYNC_STATE_LLM_COMPARE_MD"
+        fi
+      else
+        echo "⚠️  Prompt schema sync mislukte; doorgaan met bestaande runtime prompt."
+        status_event "warning" "prompt schema sync failed; using existing runtime prompt"
+      fi
+    else
+      echo "⚠️  Prompt schema sync mislukte; doorgaan met bestaande runtime prompt."
+      status_event "warning" "live schema export failed; using existing runtime prompt"
+    fi
+  fi
 fi
 
 if [[ -z "${COUNTRY_ONTOLOGY_CSV:-}" ]]; then

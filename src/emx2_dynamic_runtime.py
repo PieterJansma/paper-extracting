@@ -27,9 +27,16 @@ COHORT_RUNTIME_TABLES: Tuple[str, ...] = (
 )
 
 COHORT_TASK_TEMPLATE_TARGETS: Dict[str, Dict[str, str]] = {
-    "task_overview": {"": "Resources"},
+    "task_overview": {
+        "internal_identifiers[]": "Internal identifiers",
+        "external_identifiers[]": "External identifiers",
+        "": "Resources",
+    },
     "task_design_structure": {"": "Resources"},
-    "task_subpopulations": {"subpopulations[]": "Subpopulations"},
+    "task_subpopulations": {
+        "subpopulations[].counts[]": "Subpopulation counts",
+        "subpopulations[]": "Subpopulations",
+    },
     "task_collection_events": {"collection_events[]": "Collection events"},
     "task_collection_events_core": {"collection_events[]": "Collection events"},
     "task_collection_events_enrichment": {"collection_events[]": "Collection events"},
@@ -53,12 +60,25 @@ COHORT_TASK_TEMPLATE_TARGETS: Dict[str, Dict[str, str]] = {
         "documentation[]": "Documentation",
         "": "Resources",
     },
+    "task_areas_of_information": {"": "Collection events"},
     "task_linkage": {"": "Resources"},
 }
 
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
+
+
+def cohort_model_paths() -> List[str]:
+    paths: List[str] = []
+    seen: set[str] = set()
+    for table_name in COHORT_RUNTIME_TABLES:
+        rel_path = f"data/_models/shared/{table_name}.csv"
+        if rel_path in seen:
+            continue
+        seen.add(rel_path)
+        paths.append(rel_path)
+    return paths
 
 
 def _normalize_key(value: Any) -> str:
@@ -468,6 +488,39 @@ def write_json(path: str | Path, payload: Any) -> None:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
 
+def export_profile_schema_csv(
+    output_path: str | Path,
+    *,
+    profile: str = DEFAULT_PROFILE,
+    local_root: str | None = None,
+    fallback_schema_csv: str | None = None,
+) -> Dict[str, Any]:
+    rows, model_source = load_profile_model_rows(
+        profile,
+        local_root=local_root,
+        fallback_schema_csv=fallback_schema_csv,
+    )
+    if not rows:
+        raise RuntimeError(f"No profile rows found for {profile}")
+
+    fieldnames: List[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        for key in row.keys():
+            if key in seen:
+                continue
+            seen.add(key)
+            fieldnames.append(key)
+
+    out_path = Path(output_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+    return model_source
+
+
 def write_task_prompts_toml(cfg: Dict[str, Any], path: str | Path) -> None:
     out_path = Path(path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -501,6 +554,10 @@ def main() -> None:
     req.add_argument("--local-root", default=None)
     req.add_argument("--fallback-schema-csv", default=None)
 
+    model = sub.add_parser("model-paths", help="Print shared model CSV paths needed for a mode/profile.")
+    model.add_argument("--profile", default=DEFAULT_PROFILE)
+    model.add_argument("--mode", default="cohort", choices=["cohort"])
+
     dump = sub.add_parser("dump-registry", help="Write resolved runtime registry as JSON.")
     dump.add_argument("--profile", default=DEFAULT_PROFILE)
     dump.add_argument("--mode", default="cohort", choices=["cohort"])
@@ -509,8 +566,15 @@ def main() -> None:
     dump.add_argument("--cache-dir", default=None)
     dump.add_argument("--output", required=True)
 
+    export = sub.add_parser("export-schema-csv", help="Export a combined profile schema CSV from shared model files.")
+    export.add_argument("--profile", default=DEFAULT_PROFILE)
+    export.add_argument("--local-root", default=None)
+    export.add_argument("--fallback-schema-csv", default=None)
+    export.add_argument("--output", required=True)
+
     args = parser.parse_args()
-    tables = COHORT_RUNTIME_TABLES if args.mode == "cohort" else ()
+    mode = getattr(args, "mode", "cohort")
+    tables = COHORT_RUNTIME_TABLES if mode == "cohort" else ()
 
     if args.cmd == "required-paths":
         for rel_path in required_fetch_paths(
@@ -520,6 +584,21 @@ def main() -> None:
             fallback_schema_csv=args.fallback_schema_csv,
         ):
             print(rel_path)
+        return
+
+    if args.cmd == "model-paths":
+        for rel_path in cohort_model_paths():
+            print(rel_path)
+        return
+
+    if args.cmd == "export-schema-csv":
+        model_source = export_profile_schema_csv(
+            args.output,
+            profile=args.profile,
+            local_root=args.local_root,
+            fallback_schema_csv=args.fallback_schema_csv,
+        )
+        print(json.dumps({"output": str(Path(args.output).resolve()), "model_source": model_source}, ensure_ascii=False))
         return
 
     registry = build_runtime_registry(

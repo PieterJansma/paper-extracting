@@ -32,11 +32,16 @@ def _load_toml(path: Path) -> Dict[str, Any]:
 
 def _strip_manual_allowed_lists(text: str) -> str:
     pattern = re.compile(
-        r"(?m)^(?P<indent>[ \t]*)Allowed values(?: \(exact strings only\))?:\n"
-        r"(?:(?P=indent)- .*\n)+"
+        r"(?m)^(?P<indent>[ \t]*)Allowed values[^\n]*:\n"
+        r"(?:(?P=indent)[ \t]*- .*\n)+"
     )
-    return pattern.sub(
+    text = pattern.sub(
         lambda match: f"{match.group('indent')}Allowed values: injected dynamically at runtime.\n",
+        text,
+    )
+    return re.sub(
+        r"Allowed:\s*[^\n]+",
+        "Allowed values are injected dynamically at runtime.",
         text,
     )
 
