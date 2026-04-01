@@ -10,5 +10,6 @@ dist/
 .pytest_cache/
 logs/
 src/logs/
+tmp/prompt_schema_demo/
 config.runtime.toml
 tcp_lb.py

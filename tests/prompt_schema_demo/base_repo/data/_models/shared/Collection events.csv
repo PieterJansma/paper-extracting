@@ -1,0 +1,4 @@
+tableName,tableExtends,columnName,columnType,key,required,refSchema,refTable,refLink,refBack,validation,semantics,description,profiles,visible,label,computed,refLabel,defaultValue
+Collection events,,name,,1,TRUE,,,,,,,Name of the collection event,UMCGCohortsStaging,,,,,
+Collection events,,description,text,,,,,,,,,Description of the collection event,UMCGCohortsStaging,,,,,
+Collection events,,data categories,ontology_array,,,CatalogueOntologies,Data categories,,,,,Methods of data collection used in this collection event,UMCGCohortsStaging,,,,,

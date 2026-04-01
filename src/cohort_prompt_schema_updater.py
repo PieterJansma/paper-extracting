@@ -111,9 +111,14 @@ def build_updated_prompt_cfg(
             str(old_section.get("template_json") or ""),
             str(new_section.get("template_json") or ""),
         )
-        changed = any(diff.values())
+        instruction_changed = (
+            str(old_section.get("instructions") or "").strip()
+            != str(new_section.get("instructions") or "").strip()
+        )
+        changed = any(diff.values()) or instruction_changed
         report["tasks"][task_name] = {
             "changed": changed,
+            "instruction_changed": instruction_changed,
             **diff,
         }
 
@@ -255,6 +260,7 @@ def build_prompt_comparison(
         final_section = final_cfg.get(task_name) or {}
         comparisons["tasks"][task_name] = {
             "changed": True,
+            "instruction_changed": bool(task_report.get("instruction_changed")),
             "schema_diff": {
                 "added_fields": list(task_report.get("added_fields") or []),
                 "removed_fields": list(task_report.get("removed_fields") or []),
@@ -290,6 +296,7 @@ def _render_comparison_markdown(comparison: Dict[str, Any]) -> str:
         removed = list(schema_diff.get("removed_fields") or [])
         changed = list(schema_diff.get("changed_fields") or [])
         lines.append(f"- LLM rewritten: {'yes' if payload.get('llm_rewritten') else 'no'}")
+        lines.append(f"- Instructions changed: {'yes' if payload.get('instruction_changed') else 'no'}")
         lines.append(f"- Added fields: {', '.join(added) if added else '(none)'}")
         lines.append(f"- Removed fields: {', '.join(removed) if removed else '(none)'}")
         lines.append(f"- Changed fields: {', '.join(changed) if changed else '(none)'}")
@@ -320,6 +327,8 @@ def main() -> None:
     parser.add_argument("--base-prompts", required=True)
     parser.add_argument("--old-schema-csv", required=True)
     parser.add_argument("--new-schema-csv", required=True)
+    parser.add_argument("--old-local-root", default=None)
+    parser.add_argument("--new-local-root", default=None)
     parser.add_argument("--output", required=True)
     parser.add_argument("--report-json", default=None)
     parser.add_argument("--profile", default="UMCGCohortsStaging")
@@ -335,11 +344,13 @@ def main() -> None:
     old_registry = build_runtime_registry(
         args.profile,
         tables=COHORT_RUNTIME_TABLES,
+        local_root=args.old_local_root,
         fallback_schema_csv=args.old_schema_csv,
     )
     new_registry = build_runtime_registry(
         args.profile,
         tables=COHORT_RUNTIME_TABLES,
+        local_root=args.new_local_root,
         fallback_schema_csv=args.new_schema_csv,
     )
     old_generated = build_dynamic_task_sections(old_registry)
