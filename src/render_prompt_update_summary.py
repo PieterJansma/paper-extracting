@@ -61,6 +61,37 @@ def _field_lines(section: Dict[str, Any]) -> Dict[str, str]:
     return out
 
 
+def _extract_original_field_blocks(instructions: str | None) -> Dict[str, str]:
+    lines = str(instructions or "").splitlines()
+    out: Dict[str, str] = {}
+
+    def is_divider(idx: int) -> bool:
+        if idx < 0 or idx >= len(lines):
+            return False
+        stripped = lines[idx].strip()
+        return len(stripped) >= 10 and set(stripped) == {"-"}
+
+    i = 0
+    while i + 2 < len(lines):
+        if is_divider(i) and is_divider(i + 2):
+            heading = lines[i + 1].strip()
+            if heading:
+                j = i + 3
+                while j + 2 < len(lines) and not (is_divider(j) and is_divider(j + 2)):
+                    j += 1
+                block = "\n".join(lines[i + 1 : j]).strip()
+                heading_key = re.sub(r"\s*\(.*?\)\s*$", "", heading).strip()
+                out[_normalize(heading_key)] = block
+                for part in heading_key.split("/"):
+                    part_key = _normalize(part)
+                    if part_key:
+                        out.setdefault(part_key, block)
+                i = j
+                continue
+        i += 1
+    return out
+
+
 def _source_ref(line: str | None) -> Tuple[str, str]:
     text = str(line or "")
     match = SOURCE_RE.search(text)
@@ -123,6 +154,12 @@ def _field_sort_key(path: str) -> Tuple[int, str]:
 
 def _resolve_display_field(path: str) -> str:
     return path.strip() or "(unknown)"
+
+
+def _find_best_original_block(instructions: str | None, field_path: str) -> str:
+    blocks = _extract_original_field_blocks(instructions)
+    leaf = str(field_path).split(".")[-1].replace("[]", "")
+    return blocks.get(_normalize(leaf), "")
 
 
 def _changed_field_paths(
@@ -213,6 +250,7 @@ def _csv_change_lines(
 
 def build_summary_markdown(
     *,
+    base_prompts: Dict[str, Dict[str, Any]],
     base_dynamic: Dict[str, Dict[str, Any]],
     variant_dynamic: Dict[str, Dict[str, Any]],
     updated_prompts: Dict[str, Dict[str, Any]],
@@ -249,6 +287,7 @@ def build_summary_markdown(
 
     for task_name in changed_task_names:
         payload = tasks[task_name]
+        base_prompt_section = base_prompts.get(task_name) or {}
         base_dynamic_section = base_dynamic.get(task_name) or {}
         variant_dynamic_section = variant_dynamic.get(task_name) or {}
         updated_section = updated_prompts.get(task_name) or {}
@@ -267,6 +306,8 @@ def build_summary_markdown(
             before_line = base_lines.get(field_path, "")
             needed_line = variant_lines.get(field_path, "")
             final_line = updated_lines.get(field_path, needed_line)
+            before_block = _find_best_original_block(base_prompt_section.get("instructions"), field_path)
+            final_block = _find_best_original_block(updated_section.get("instructions"), field_path)
 
             lines.append(f"### `{_resolve_display_field(field_path)}`")
             lines.append("")
@@ -282,13 +323,20 @@ def build_summary_markdown(
                 )
             )
             lines.append("")
-            lines.append("| Before | Needed After Schema Change | Final Now |")
-            lines.append("| --- | --- | --- |")
-            lines.append(
-                f"| {_markdown_escape(before_line or '(field not present)')} "
-                f"| {_markdown_escape(needed_line or '(field removed from generated prompt)')} "
-                f"| {_markdown_escape(final_line or '(field removed from final prompt)')} |"
-            )
+            lines.append("Before prompt:")
+            lines.append("```text")
+            lines.append(before_block or before_line or "(field not present)")
+            lines.append("```")
+            lines.append("")
+            lines.append("Needed after schema change:")
+            lines.append("```text")
+            lines.append(needed_line or "(field removed from generated prompt)")
+            lines.append("```")
+            lines.append("")
+            lines.append("Final prompt now:")
+            lines.append("```text")
+            lines.append(final_block or final_line or "(field removed from final prompt)")
+            lines.append("```")
             lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"
@@ -296,6 +344,7 @@ def build_summary_markdown(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Render a compact field-level summary for prompt schema updates.")
+    parser.add_argument("--base-prompts", required=True)
     parser.add_argument("--base-dynamic", required=True)
     parser.add_argument("--variant-dynamic", required=True)
     parser.add_argument("--updated-prompts", required=True)
@@ -307,6 +356,7 @@ def main() -> None:
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
+    base_prompts = _task_sections(_load_toml(args.base_prompts))
     base_dynamic = _task_sections(_load_toml(args.base_dynamic))
     variant_dynamic = _task_sections(_load_toml(args.variant_dynamic))
     updated_prompts = _task_sections(_load_toml(args.updated_prompts))
@@ -316,6 +366,7 @@ def main() -> None:
 
     out = build_summary_markdown(
         base_dynamic=base_dynamic,
+        base_prompts=base_prompts,
         variant_dynamic=variant_dynamic,
         updated_prompts=updated_prompts,
         comparison=comparison,

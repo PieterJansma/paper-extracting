@@ -292,6 +292,7 @@ fi
 
 echo "[4/4] Rendering compact summary..."
 python3 "${REPO_ROOT}/src/render_prompt_update_summary.py" \
+  --base-prompts "${BASE_PROMPTS}" \
   --base-dynamic "${OUT_DIR}/base_dynamic.toml" \
   --variant-dynamic "${OUT_DIR}/variant_dynamic.toml" \
   --updated-prompts "${OUT_DIR}/updated_from_existing.toml" \

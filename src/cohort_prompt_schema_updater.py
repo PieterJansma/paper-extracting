@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -16,6 +17,7 @@ from llm_client import OpenAICompatibleClient
 
 
 TASK_PREFIX = "task_"
+FIELD_LINE_RE = re.compile(r"^\s*-\s+`([^`]+)`:\s*(.*)$")
 
 
 def _load_toml(path: Path) -> Dict[str, Any]:
@@ -70,6 +72,84 @@ def _template_diff(old_template_json: str, new_template_json: str) -> Dict[str, 
         "removed_fields": removed,
         "changed_fields": changed,
     }
+
+
+def _normalize(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").strip().lower())
+
+
+def _field_lines(instructions: str | None) -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    for raw_line in str(instructions or "").splitlines():
+        match = FIELD_LINE_RE.match(raw_line)
+        if not match:
+            continue
+        out[match.group(1)] = raw_line.strip()
+    return out
+
+
+def _extract_original_field_blocks(instructions: str | None) -> Dict[str, str]:
+    lines = str(instructions or "").splitlines()
+    out: Dict[str, str] = {}
+
+    def is_divider(idx: int) -> bool:
+        if idx < 0 or idx >= len(lines):
+            return False
+        stripped = lines[idx].strip()
+        return len(stripped) >= 10 and set(stripped) == {"-"}
+
+    i = 0
+    while i + 2 < len(lines):
+        if is_divider(i) and is_divider(i + 2):
+            heading = lines[i + 1].strip()
+            if heading:
+                j = i + 3
+                while j + 2 < len(lines) and not (is_divider(j) and is_divider(j + 2)):
+                    j += 1
+                block = "\n".join(lines[i + 1 : j]).strip()
+                heading_key = re.sub(r"\s*\(.*?\)\s*$", "", heading).strip()
+                out[_normalize(heading_key)] = block
+                for part in heading_key.split("/"):
+                    part_key = _normalize(part)
+                    if part_key:
+                        out.setdefault(part_key, block)
+                i = j
+                continue
+        i += 1
+    return out
+
+
+def _changed_field_paths(
+    old_section: Dict[str, Any],
+    new_section: Dict[str, Any],
+    diff: Dict[str, List[str]],
+) -> List[str]:
+    old_lines = _field_lines(old_section.get("instructions"))
+    new_lines = _field_lines(new_section.get("instructions"))
+    changed: set[str] = set()
+
+    for key in set(old_lines) | set(new_lines):
+        if old_lines.get(key) != new_lines.get(key):
+            changed.add(key)
+
+    line_keys = set(old_lines) | set(new_lines)
+
+    def resolve_leaf(leaf: str) -> str:
+        if leaf in line_keys:
+            return leaf
+        for key in sorted(line_keys):
+            if key.endswith(f".{leaf}") or key.endswith(f"[]{'.' + leaf}"):
+                return key
+        return leaf
+
+    for leaf in list(diff.get("added_fields") or []):
+        changed.add(resolve_leaf(str(leaf)))
+    for leaf in list(diff.get("removed_fields") or []):
+        changed.add(resolve_leaf(str(leaf)))
+    for leaf in list(diff.get("changed_fields") or []):
+        changed.add(resolve_leaf(str(leaf)))
+
+    return sorted(changed)
 
 
 def _prepend_schema_change_notice(task_name: str, section: Dict[str, Any], diff: Dict[str, List[str]]) -> Dict[str, Any]:
@@ -146,9 +226,27 @@ def _build_rewrite_messages(
     new_section: Dict[str, Any],
     diff: Dict[str, List[str]],
 ) -> List[Dict[str, str]]:
+    changed_field_paths = _changed_field_paths(old_section, new_section, diff)
+    old_prompt_blocks = _extract_original_field_blocks((base_section or {}).get("instructions", ""))
+    old_generated_lines = _field_lines(old_section.get("instructions"))
+    new_generated_lines = _field_lines(new_section.get("instructions"))
+
+    changed_field_details = []
+    for field_path in changed_field_paths:
+        leaf = str(field_path).split(".")[-1].replace("[]", "")
+        changed_field_details.append(
+            {
+                "field_path": field_path,
+                "old_prompt_block": old_prompt_blocks.get(_normalize(leaf), ""),
+                "old_generated_rule": old_generated_lines.get(field_path, ""),
+                "new_generated_rule": new_generated_lines.get(field_path, ""),
+            }
+        )
+
     payload = {
         "task_name": task_name,
         "schema_diff": diff,
+        "changed_field_details": changed_field_details,
         "old_template_json": old_section.get("template_json", ""),
         "new_template_json": new_section.get("template_json", ""),
         "old_instructions": (base_section or {}).get("instructions", ""),
@@ -159,8 +257,14 @@ def _build_rewrite_messages(
         "Goals:\n"
         "- Keep the strong style and task-specific nuance from the old instructions when still valid.\n"
         "- Adapt the instructions to the new schema exactly.\n"
+        "- Prefer minimally editing the old task instead of rewriting it from scratch.\n"
+        "- For changed fields with an old prompt block, preserve that block's concrete rules, examples and edge-case wording whenever still valid.\n"
+        "- For unchanged fields, keep the original detailed blocks and overall task framing.\n"
         "- Do not mention removed fields.\n"
         "- Do mention newly added fields when relevant.\n"
+        "- For a newly added field that has no old block, write a new field block in the same style and level of detail as neighboring blocks in the old instructions.\n"
+        "- If the old task uses divider-style field sections, keep that formatting.\n"
+        "- Do not collapse a detailed original prompt into generic bullet lines.\n"
         "- Do not change the template_json; it is provided only for grounding.\n"
         "- Do not invent allowed values.\n"
         "- If the deterministic instructions already include exact current schema values or exact-match rules, preserve them.\n"
