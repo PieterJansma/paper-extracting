@@ -1,0 +1,90 @@
+{
+  "tasks": {
+    "task_access_conditions": {
+      "changed": true,
+      "added_fields": [
+        "data_access_url"
+      ],
+      "removed_fields": [],
+      "changed_fields": []
+    },
+    "task_areas_of_information": {
+      "changed": false,
+      "added_fields": [],
+      "removed_fields": [],
+      "changed_fields": []
+    },
+    "task_collection_events": {
+      "changed": false,
+      "added_fields": [],
+      "removed_fields": [],
+      "changed_fields": []
+    },
+    "task_contributors": {
+      "changed": false,
+      "added_fields": [],
+      "removed_fields": [],
+      "changed_fields": []
+    },
+    "task_contributors_org": {
+      "changed": false,
+      "added_fields": [],
+      "removed_fields": [],
+      "changed_fields": []
+    },
+    "task_contributors_people": {
+      "changed": false,
+      "added_fields": [],
+      "removed_fields": [],
+      "changed_fields": []
+    },
+    "task_datasets": {
+      "changed": false,
+      "added_fields": [],
+      "removed_fields": [],
+      "changed_fields": []
+    },
+    "task_design_structure": {
+      "changed": false,
+      "added_fields": [],
+      "removed_fields": [],
+      "changed_fields": []
+    },
+    "task_information": {
+      "changed": false,
+      "added_fields": [],
+      "removed_fields": [],
+      "changed_fields": []
+    },
+    "task_linkage": {
+      "changed": false,
+      "added_fields": [],
+      "removed_fields": [],
+      "changed_fields": []
+    },
+    "task_overview": {
+      "changed": false,
+      "added_fields": [],
+      "removed_fields": [],
+      "changed_fields": []
+    },
+    "task_population": {
+      "changed": false,
+      "added_fields": [],
+      "removed_fields": [],
+      "changed_fields": []
+    },
+    "task_samplesets": {
+      "changed": false,
+      "added_fields": [],
+      "removed_fields": [],
+      "changed_fields": []
+    },
+    "task_subpopulations": {
+      "changed": false,
+      "added_fields": [],
+      "removed_fields": [],
+      "changed_fields": []
+    }
+  }
+}
