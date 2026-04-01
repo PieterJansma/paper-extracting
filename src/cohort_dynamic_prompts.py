@@ -15,6 +15,24 @@ from emx2_dynamic_runtime import (
 
 TASK_PREFIX = "task_"
 AUTO_SKIP_COLUMNS: Dict[str, set[str]] = {
+    "Resources": {
+        "overview",
+        "hricore",
+        "id",
+        "internal identifiers",
+        "external identifiers",
+        "design and structure",
+        "subpopulations",
+        "collection events",
+        "population",
+        "contributors",
+        "organisations involved",
+        "people involved",
+        "contact point",
+        "linkage",
+        "access conditions",
+        "information",
+    },
     "Internal identifiers": {"resource"},
     "External identifiers": {"resource"},
     "Subpopulations": {"resource", "counts"},
@@ -25,6 +43,29 @@ AUTO_SKIP_COLUMNS: Dict[str, set[str]] = {
     "Publications": {"resource"},
     "Documentation": {"resource"},
 }
+
+AUTO_OWNER_TASKS: Dict[str, str] = {
+    "Internal identifiers": "task_overview",
+    "External identifiers": "task_overview",
+    "Subpopulations": "task_subpopulations",
+    "Subpopulation counts": "task_subpopulations",
+    "Collection events": "task_collection_events",
+    "Agents": "task_contributors_org",
+    "Organisations": "task_contributors_org",
+    "Contacts": "task_contributors_people",
+    "Publications": "task_information",
+    "Documentation": "task_information",
+}
+
+RESOURCE_TASK_HINTS: List[tuple[str, tuple[str, ...]]] = [
+    ("task_access_conditions", ("access", "consent", "release", "fee", "license", "legislation", "condition")),
+    ("task_design_structure", ("design", "structure", "schematic", "data collection")),
+    ("task_population", ("population", "participant", "sample", "country", "region", "age", "inclusion", "exclusion", "disease", "comorbidity")),
+    ("task_contributors_org", ("contributor", "organisation", "organization", "publisher", "creator")),
+    ("task_contributors_people", ("contact point", "contact person")),
+    ("task_information", ("publication", "funding", "acknowledg", "provenance", "document", "citation", "supplement", "theme")),
+    ("task_linkage", ("linkage", "linked", "linkable")),
+]
 
 
 def _normalize_key(value: Any) -> str:
@@ -78,14 +119,21 @@ def _helper_field(
     placeholder: Any,
     *,
     note: str,
+    table: str | None = None,
+    column: str | None = None,
 ) -> Dict[str, Any]:
-    return {
+    spec = {
         "kind": "field",
         "key": key,
         "placeholder": placeholder,
         "note": note,
         "nullable": True,
     }
+    if table:
+        spec["table"] = table
+    if column:
+        spec["column"] = column
+    return spec
 
 
 def _list_object(
@@ -350,8 +398,8 @@ TASK_SPECS: Dict[str, Dict[str, Any]] = {
                 ORGANISATION_ITEM_FIELDS,
                 note="Return one object per explicit contributing organisation or agent. If none are explicit, return [].",
             ),
-            _helper_field("publisher", "string|null", note="Return the exact organisations_involved[].id of the publishing organisation only when explicitly stated."),
-            _helper_field("creator", ["string"], note="Return exact organisations_involved[].id values for creator organisations only when explicitly stated."),
+            _helper_field("publisher", "string|null", note="Return the exact organisations_involved[].id of the publishing organisation only when explicitly stated.", table="Resources", column="publisher"),
+            _helper_field("creator", ["string"], note="Return exact organisations_involved[].id values for creator organisations only when explicitly stated.", table="Resources", column="creator"),
             _list_object(
                 "people_involved",
                 PEOPLE_ITEM_FIELDS,
@@ -377,8 +425,8 @@ TASK_SPECS: Dict[str, Dict[str, Any]] = {
                 ORGANISATION_ITEM_FIELDS,
                 note="Return one object per explicit contributing organisation or agent. If none are explicit, return [].",
             ),
-            _helper_field("publisher", "string|null", note="Return the exact organisations_involved[].id of the publishing organisation only when explicitly stated."),
-            _helper_field("creator", ["string"], note="Return exact organisations_involved[].id values for creator organisations only when explicitly stated."),
+            _helper_field("publisher", "string|null", note="Return the exact organisations_involved[].id of the publishing organisation only when explicitly stated.", table="Resources", column="publisher"),
+            _helper_field("creator", ["string"], note="Return exact organisations_involved[].id values for creator organisations only when explicitly stated.", table="Resources", column="creator"),
         ],
     },
     "task_contributors_people": {
@@ -598,7 +646,11 @@ def _render_field_lines(spec: Dict[str, Any], registry: Dict[str, Any], prefix: 
 
 
 def _spec_coverage(spec: Dict[str, Any], out: Dict[str, set[str]]) -> None:
+    table = str(spec.get("table") or "").strip()
+    column = str(spec.get("column") or "").strip()
     if "placeholder" in spec:
+        if table and column:
+            out.setdefault(table, set()).add(column)
         return
     if spec.get("kind") == "list":
         for child in spec.get("item_fields", []):
@@ -609,6 +661,20 @@ def _spec_coverage(spec: Dict[str, Any], out: Dict[str, set[str]]) -> None:
 
 def _snake_case(value: str) -> str:
     return re.sub(r"_+", "_", re.sub(r"[^a-z0-9]+", "_", str(value or "").strip().lower())).strip("_")
+
+
+def _unique_key(base_key: str, existing_keys: set[str], table_name: str = "") -> str:
+    key = base_key or "field"
+    if key not in existing_keys:
+        return key
+    if table_name:
+        prefixed = f"{_snake_case(table_name)}_{key}"
+        if prefixed not in existing_keys:
+            return prefixed
+    idx = 2
+    while f"{key}_{idx}" in existing_keys:
+        idx += 1
+    return f"{key}_{idx}"
 
 
 def _primary_table_for_list(spec: Dict[str, Any]) -> str:
@@ -623,18 +689,46 @@ def _primary_table_for_list(spec: Dict[str, Any]) -> str:
     return sorted(counts.items(), key=lambda item: (-item[1], item[0]))[0][0]
 
 
-def _auto_field_from_meta(column_name: str, meta: Dict[str, Any]) -> Dict[str, Any]:
+def _tables_in_spec(spec: Dict[str, Any], out: set[str]) -> None:
+    table = str(spec.get("table") or "").strip()
+    if table:
+        out.add(table)
+    if spec.get("kind") == "list":
+        for child in spec.get("item_fields", []):
+            _tables_in_spec(child, out)
+
+
+def _auto_field_from_meta(column_name: str, meta: Dict[str, Any], existing_keys: set[str] | None = None) -> Dict[str, Any]:
     description = str(meta.get("description") or "").strip()
     note = "Auto-added from the current schema."
     if description:
         note += f" {description}"
+    table_name = str(meta.get("_table_name") or "").strip()
+    key = _snake_case(column_name)
+    if existing_keys is not None:
+        key = _unique_key(key, existing_keys, table_name)
+        existing_keys.add(key)
     return _schema_field(
-        _snake_case(column_name),
-        str(meta.get("_table_name") or ""),
+        key,
+        table_name,
         column_name,
         note=note,
         nullable=str(meta.get("required") or "").strip().upper() != "TRUE",
     )
+
+
+def _resource_owner_task(column_name: str, meta: Dict[str, Any]) -> str:
+    text = f"{column_name} {str(meta.get('description') or '')}".lower()
+    for task_name, needles in RESOURCE_TASK_HINTS:
+        if any(needle in text for needle in needles):
+            return task_name
+    return "task_overview"
+
+
+def _owner_task_for_field(table_name: str, column_name: str, meta: Dict[str, Any]) -> str:
+    if table_name == "Resources":
+        return _resource_owner_task(column_name, meta)
+    return AUTO_OWNER_TASKS.get(table_name, "task_overview")
 
 
 def _materialize_spec(spec: Dict[str, Any], registry: Dict[str, Any]) -> Dict[str, Any] | None:
@@ -649,22 +743,37 @@ def _materialize_spec(spec: Dict[str, Any], registry: Dict[str, Any]) -> Dict[st
             if rendered is not None:
                 materialized_children.append(rendered)
 
+        represented_tables: set[str] = set()
+        for child in spec.get("item_fields", []):
+            _tables_in_spec(child, represented_tables)
         primary_table = _primary_table_for_list(spec)
         if primary_table:
-            table_meta = registry.get("tables", {}).get(primary_table, {}).get("fields", {})
-            covered: set[str] = set()
-            for child in materialized_children:
-                _spec_coverage(child, {primary_table: covered})
+            represented_tables.add(primary_table)
+
+        covered_by_table: Dict[str, set[str]] = {}
+        for child in materialized_children:
+            _spec_coverage(child, covered_by_table)
+
+        existing_keys = {
+            str(child.get("key") or "").strip()
+            for child in materialized_children
+            if str(child.get("key") or "").strip()
+        }
+        for table_name in sorted(represented_tables):
+            table_meta = registry.get("tables", {}).get(table_name, {}).get("fields", {})
+            covered = covered_by_table.get(table_name, set())
             for column_name, meta in table_meta.items():
                 if column_name in covered:
                     continue
-                if column_name in AUTO_SKIP_COLUMNS.get(primary_table, set()):
+                if column_name in AUTO_SKIP_COLUMNS.get(table_name, set()):
                     continue
                 if str(meta.get("column_type") or "").strip() == "refback":
                     continue
                 enriched_meta = dict(meta)
-                enriched_meta["_table_name"] = primary_table
-                materialized_children.append(_auto_field_from_meta(column_name, enriched_meta))
+                enriched_meta["_table_name"] = table_name
+                materialized_children.append(_auto_field_from_meta(column_name, enriched_meta, existing_keys))
+                covered.add(column_name)
+            covered_by_table[table_name] = covered
 
         if not materialized_children:
             return None
@@ -680,12 +789,43 @@ def _materialize_spec(spec: Dict[str, Any], registry: Dict[str, Any]) -> Dict[st
 def build_dynamic_task_sections(registry: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     cfg: Dict[str, Dict[str, Any]] = {}
 
+    task_fields: Dict[str, List[Dict[str, Any]]] = {}
     for task_name, spec in TASK_SPECS.items():
         fields = []
         for field_spec in spec.get("fields", []):
             materialized = _materialize_spec(field_spec, registry)
             if materialized is not None:
                 fields.append(materialized)
+        task_fields[task_name] = fields
+
+    global_covered: Dict[str, set[str]] = {}
+    for fields in task_fields.values():
+        for field_spec in fields:
+            _spec_coverage(field_spec, global_covered)
+
+    for table_name, table_meta in (registry.get("tables") or {}).items():
+        for column_name, meta in (table_meta.get("fields") or {}).items():
+            if column_name in global_covered.get(table_name, set()):
+                continue
+            if column_name in AUTO_SKIP_COLUMNS.get(table_name, set()):
+                continue
+            if str(meta.get("column_type") or "").strip() == "refback":
+                continue
+            owner_task = _owner_task_for_field(table_name, column_name, meta)
+            if owner_task not in task_fields:
+                continue
+            existing_keys = {
+                str(field.get("key") or "").strip()
+                for field in task_fields[owner_task]
+                if str(field.get("key") or "").strip()
+            }
+            enriched_meta = dict(meta)
+            enriched_meta["_table_name"] = table_name
+            task_fields[owner_task].append(_auto_field_from_meta(column_name, enriched_meta, existing_keys))
+            global_covered.setdefault(table_name, set()).add(column_name)
+
+    for task_name, spec in TASK_SPECS.items():
+        fields = task_fields.get(task_name, [])
         lines = [
             "Return ONLY valid JSON matching the template. No extra text.",
             "",
