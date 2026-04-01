@@ -189,8 +189,8 @@ ORGANISATION_ITEM_FIELDS = [
     _schema_field("id", "Agents", "id", note="Use an explicit acronym, identifier or short name from the PDF.", nullable=False),
     _schema_field("type", "Agents", "type", note="Use the exact allowed label for an individual versus organisation only when explicit.", nullable=False),
     _schema_field("name", "Agents", "name", note="Only for explicit individual contributors."),
-    _schema_field("organisation", "Agents", "organisation", note="Use the explicit organisation name only when it exactly matches a current schema organisation."),
-    _schema_field("other_organisation", "Agents", "other organisation", note="If the explicit organisation name does not exactly match a current schema organisation, copy the exact wording here."),
+    _schema_field("organisation", "Agents", "organisation", note="Use the explicit organisation name as written in the PDF."),
+    _schema_field("other_organisation", "Agents", "other organisation", note="Only if an alternative organisation spelling or label is explicitly given."),
     _schema_field("department", "Agents", "department", note="Only if explicitly stated."),
     _schema_field("website", "Agents", "website", note="Only if explicitly shown."),
     _schema_field("email", "Agents", "email", note="Only if explicitly shown."),
@@ -241,7 +241,8 @@ TASK_SPECS: Dict[str, Dict[str, Any]] = {
             "Use null for missing scalar fields and [] for missing lists.",
             "Do not invent identifiers, names, dates, URLs or emails.",
             "For free-text fields, keep wording verbatim or near-verbatim.",
-            "For choice and reference fields, use exact labels from the PDF only when they match current schema values.",
+            "For choice fields, use exact labels from the PDF only when they match current schema values.",
+            "For reference-like fields, return the explicit label or name from the PDF; matching is handled later in the pipeline.",
         ],
         "fields": [
             _schema_field("pid", "Resources", "pid", note="Only if the PDF explicitly states a persistent identifier."),
@@ -406,7 +407,8 @@ TASK_SPECS: Dict[str, Dict[str, Any]] = {
         "global_rules": [
             "Use null for missing scalar fields and [] for missing lists.",
             "Do not invent organisations, people, roles, emails or ORCIDs.",
-            "For choice and reference fields, use exact labels from the PDF only when they match current schema values.",
+            "For choice fields, use exact labels from the PDF only when they match current schema values.",
+            "For reference-like fields, return the explicit label or name from the PDF; matching is handled later in the pipeline.",
         ],
         "fields": [
             _list_object(
@@ -414,8 +416,8 @@ TASK_SPECS: Dict[str, Dict[str, Any]] = {
                 ORGANISATION_ITEM_FIELDS,
                 note="Return one object per explicit contributing organisation or agent. If none are explicit, return [].",
             ),
-            _helper_field("publisher", "string|null", note="Set only if the PDF explicitly states the publishing organisation of the resource. The value must exactly match one `organisations_involved[].id`. If that organisation is explicit but missing from `organisations_involved[]`, add the organisation row first and then use its id.", table="Resources", column="publisher"),
-            _helper_field("creator", ["string"], note="Return only organisations explicitly stated as creator, developer or maintainer of the resource. Each value must exactly match one `organisations_involved[].id`. If an explicit creator organisation is missing from `organisations_involved[]`, add it first and then use its id.", table="Resources", column="creator"),
+            _helper_field("publisher", "string|null", note="Set only if the PDF explicitly states the publishing organisation of the resource. Return the explicit organisation name as written in the PDF. Reference matching is handled later in the pipeline.", table="Resources", column="publisher"),
+            _helper_field("creator", ["string"], note="Return only organisations explicitly stated as creator, developer or maintainer of the resource. Return the explicit organisation names as written in the PDF. Reference matching is handled later in the pipeline.", table="Resources", column="creator"),
             _list_object(
                 "people_involved",
                 PEOPLE_ITEM_FIELDS,
@@ -441,8 +443,8 @@ TASK_SPECS: Dict[str, Dict[str, Any]] = {
                 ORGANISATION_ITEM_FIELDS,
                 note="Return one object per explicit contributing organisation or agent. If none are explicit, return [].",
             ),
-            _helper_field("publisher", "string|null", note="Set only if the PDF explicitly states the publishing organisation of the resource. The value must exactly match one `organisations_involved[].id`. If that organisation is explicit but missing from `organisations_involved[]`, add the organisation row first and then use its id.", table="Resources", column="publisher"),
-            _helper_field("creator", ["string"], note="Return only organisations explicitly stated as creator, developer or maintainer of the resource. Each value must exactly match one `organisations_involved[].id`. If an explicit creator organisation is missing from `organisations_involved[]`, add it first and then use its id.", table="Resources", column="creator"),
+            _helper_field("publisher", "string|null", note="Set only if the PDF explicitly states the publishing organisation of the resource. Return the explicit organisation name as written in the PDF. Reference matching is handled later in the pipeline.", table="Resources", column="publisher"),
+            _helper_field("creator", ["string"], note="Return only organisations explicitly stated as creator, developer or maintainer of the resource. Return the explicit organisation names as written in the PDF. Reference matching is handled later in the pipeline.", table="Resources", column="creator"),
         ],
     },
     "task_contributors_people": {
@@ -607,10 +609,14 @@ def _render_template(specs: List[Dict[str, Any]], registry: Dict[str, Any]) -> s
 
 def _generic_rule_from_meta(meta: Dict[str, Any], *, nullable: bool = True) -> str:
     column_type = str(meta.get("column_type") or "").strip()
-    if column_type in {"ontology", "ref"}:
+    if column_type == "ontology":
         return "Use the exact explicit label from the PDF only when it exactly matches a current schema value. If not explicit or not an exact match -> null."
-    if column_type in {"ontology_array", "ref_array"}:
+    if column_type == "ontology_array":
         return "Return exact explicit labels from the PDF only when they exactly match current schema values. If none are explicit or none match exactly -> []."
+    if column_type == "ref":
+        return "Use the explicit label or name from the PDF only. Reference matching is handled later in the pipeline. If not explicit -> null."
+    if column_type == "ref_array":
+        return "Return explicit labels or names from the PDF only. Reference matching is handled later in the pipeline. If none are explicit -> []."
     if column_type == "string_array":
         return "Return a list of explicit values only. If not explicit -> []."
     if column_type in {"int", "non_negative_int"}:
@@ -627,6 +633,10 @@ def _generic_rule_from_meta(meta: Dict[str, Any], *, nullable: bool = True) -> s
 
 
 def _allowed_values_note(meta: Dict[str, Any]) -> str:
+    column_type = str(meta.get("column_type") or "").strip()
+    if column_type not in {"ontology", "ontology_array"}:
+        return ""
+
     values = [str(v or "").strip() for v in list(meta.get("allowed_values") or [])]
     values = [v for v in values if v]
     if not values:
