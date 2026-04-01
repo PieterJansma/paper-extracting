@@ -229,6 +229,45 @@ The updater then:
 
 If `COHORT_PROMPT_SCHEMA_SYNC_LLM=1`, Qwen is then used only on those changed tasks or changed field blocks to improve readability while preserving the old prompt style.
 
+### Step 4b: Every detected schema change is archived with date and time
+
+Whenever the live schema differs from the previously cached schema, `src/run_cluster_cohort.sh` now writes a timestamped history snapshot.
+
+Default history location:
+
+- `tmp/cohort_prompt_schema_sync_state/history/<UTC timestamp>/`
+
+Timestamp format:
+
+- `YYYYMMDDTHHMMSSZ`
+- example: `20260401T143522Z`
+
+Each history snapshot contains:
+
+- `baseline_schema.csv`
+- `previous_live_schema.csv` when available
+- `current_live_schema.csv`
+- `baseline_vs_current_schema.diff`
+- `previous_live_vs_current_schema.diff` when available
+- `base_prompt.toml`
+- `final_prompt.toml`
+- `prompt_schema_sync.report.json`
+- `prompt_schema_sync.compare.json`
+- `prompt_schema_sync.compare.md`
+- optional Qwen files:
+  - `prompt_schema_sync.llm_report.json`
+  - `prompt_schema_sync.llm.compare.json`
+  - `prompt_schema_sync.llm.compare.md`
+- `history_manifest.json`
+
+This means you can always go back and inspect:
+
+- what the schema looked like before
+- what the schema looks like now
+- which prompt was used as the baseline
+- which prompt was finally used after sync
+- what exactly changed in both schema and prompt
+
 ### Step 5: `main_cohort.py` uses that runtime prompt
 
 After the schema-sync step, `src/main_cohort.py` runs with:
@@ -350,6 +389,14 @@ Daar vind je onder andere:
 De prompt-schema demo schrijft tijdelijke review-output onder:
 
 - `tmp/prompt_schema_demo/`
+
+De dynamische cohort schema-sync bewaart de laatste state onder:
+
+- `tmp/cohort_prompt_schema_sync_state/`
+
+En bewaart een timestamped change history onder:
+
+- `tmp/cohort_prompt_schema_sync_state/history/`
 
 ## Meest Aangepaste Bestanden
 
