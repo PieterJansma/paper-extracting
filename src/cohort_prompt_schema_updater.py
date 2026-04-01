@@ -106,6 +106,8 @@ def _extract_original_field_blocks(instructions: str | None) -> Dict[str, str]:
                 j = i + 3
                 while j + 2 < len(lines) and not (is_divider(j) and is_divider(j + 2)):
                     j += 1
+                if j + 2 >= len(lines):
+                    j = len(lines)
                 block = "\n".join(lines[i + 1 : j]).strip()
                 heading_key = re.sub(r"\s*\(.*?\)\s*$", "", heading).strip()
                 out[_normalize(heading_key)] = block
@@ -117,6 +119,127 @@ def _extract_original_field_blocks(instructions: str | None) -> Dict[str, str]:
                 continue
         i += 1
     return out
+
+
+def _parse_instruction_segments(instructions: str | None) -> List[Dict[str, Any]]:
+    lines = str(instructions or "").splitlines()
+    segments: List[Dict[str, Any]] = []
+
+    def is_divider(idx: int) -> bool:
+        if idx < 0 or idx >= len(lines):
+            return False
+        stripped = lines[idx].strip()
+        return len(stripped) >= 10 and set(stripped) == {"-"}
+
+    cursor = 0
+    i = 0
+    while i + 2 < len(lines):
+        if not (is_divider(i) and is_divider(i + 2)):
+            i += 1
+            continue
+        if cursor < i:
+            segments.append({
+                "kind": "text",
+                "text": "\n".join(lines[cursor:i]).rstrip(),
+            })
+        heading = lines[i + 1].strip()
+        heading_key = re.sub(r"\s*\(.*?\)\s*$", "", heading).strip()
+        j = i + 3
+        while j + 2 < len(lines) and not (is_divider(j) and is_divider(j + 2)):
+            j += 1
+        if j + 2 >= len(lines):
+            j = len(lines)
+        block = "\n".join(lines[i + 1:j]).strip()
+        aliases = {_normalize(heading_key)}
+        for part in heading_key.split("/"):
+            part_key = _normalize(part)
+            if part_key:
+                aliases.add(part_key)
+        segments.append({
+            "kind": "field_block",
+            "heading": heading,
+            "heading_key": heading_key,
+            "aliases": aliases,
+            "block": block,
+        })
+        cursor = j
+        i = j
+    if cursor < len(lines):
+        segments.append({
+            "kind": "text",
+            "text": "\n".join(lines[cursor:]).rstrip(),
+        })
+    return segments
+
+
+def _render_instruction_segments(segments: List[Dict[str, Any]]) -> str:
+    parts: List[str] = []
+    for seg in segments:
+        if seg.get("kind") == "text":
+            text = str(seg.get("text") or "").rstrip()
+            if text:
+                parts.append(text)
+            continue
+        if seg.get("kind") == "field_block":
+            block = str(seg.get("block") or "").strip()
+            if block:
+                parts.append("--------------------------------------------------\n" + block)
+    return "\n\n".join(part for part in parts if part).rstrip()
+
+
+def _field_path_leaf(field_path: str) -> str:
+    return str(field_path).split(".")[-1].replace("[]", "")
+
+
+def _find_segment_index_for_field(segments: List[Dict[str, Any]], field_path: str) -> int:
+    leaf = _normalize(_field_path_leaf(field_path))
+    for idx, seg in enumerate(segments):
+        if seg.get("kind") != "field_block":
+            continue
+        aliases = set(seg.get("aliases") or set())
+        if leaf in aliases:
+            return idx
+    return -1
+
+
+def _new_field_order(instructions: str | None) -> List[str]:
+    return list(_field_lines(instructions).keys())
+
+
+def _insert_segment_for_field(
+    segments: List[Dict[str, Any]],
+    *,
+    field_path: str,
+    new_block: str,
+    new_generated_section: Dict[str, Any],
+) -> None:
+    order = _new_field_order(new_generated_section.get("instructions"))
+    try:
+        target_idx = order.index(field_path)
+    except ValueError:
+        target_idx = len(order)
+
+    insert_at = len(segments)
+    for prev_field in reversed(order[:target_idx]):
+        prev_idx = _find_segment_index_for_field(segments, prev_field)
+        if prev_idx >= 0:
+            insert_at = prev_idx + 1
+            break
+    else:
+        for idx, seg in enumerate(segments):
+            if seg.get("kind") == "field_block":
+                insert_at = idx
+                break
+
+    heading = _field_path_leaf(field_path)
+    heading = heading.replace("_", " ")
+    segments.insert(insert_at, {
+        "kind": "field_block",
+        "heading": heading,
+        "heading_key": heading,
+        "aliases": {_normalize(heading)},
+        "block": str(new_block or "").strip(),
+    })
 
 
 def _changed_field_paths(
@@ -286,6 +409,169 @@ def _build_rewrite_messages(
     ]
 
 
+def _build_field_rewrite_messages(
+    *,
+    task_name: str,
+    field_path: str,
+    old_block: str,
+    old_generated_rule: str,
+    new_generated_rule: str,
+    previous_block: str,
+    next_block: str,
+    action: str,
+) -> List[Dict[str, str]]:
+    payload = {
+        "task_name": task_name,
+        "field_path": field_path,
+        "action": action,
+        "old_field_block": old_block,
+        "old_generated_rule": old_generated_rule,
+        "new_generated_rule": new_generated_rule,
+        "previous_field_block": previous_block,
+        "next_field_block": next_block,
+    }
+    prompt = (
+        "Update one field block inside an existing extraction prompt.\n"
+        "Goals:\n"
+        "- Preserve the original field-block style, detail, examples and edge-case rules whenever still valid.\n"
+        "- Change only what is required by the new schema.\n"
+        "- Do not rewrite the whole task.\n"
+        "- Do not collapse a rich field block into a generic one-line rule.\n"
+        "- If action=replace: minimally edit the old block.\n"
+        "- If action=add: write a new field block in the same style and detail level as neighboring blocks.\n"
+        "- If action=remove: return action=remove and an empty block.\n"
+        "- Use the exact current schema values from new_generated_rule when relevant.\n"
+        "- Do not mention removed schema values in the final block.\n"
+        "- Return JSON only: {\"action\":\"replace|add|remove\",\"block\":\"...\"}\n\n"
+        f"{json.dumps(payload, ensure_ascii=False, indent=2)}"
+    )
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You edit one field block inside a detailed extraction prompt. "
+                "Keep the old tone and structure, preserve valid examples, and only output JSON."
+            ),
+        },
+        {
+            "role": "user",
+            "content": prompt,
+        },
+    ]
+
+
+def _rewrite_task_field_blocks_with_llm(
+    *,
+    client: OpenAICompatibleClient,
+    llm_cfg: Dict[str, Any],
+    task_name: str,
+    base_section: Dict[str, Any] | None,
+    old_section: Dict[str, Any],
+    new_section: Dict[str, Any],
+    task_report: Dict[str, Any],
+) -> Tuple[str | None, Dict[str, Any]]:
+    if not base_section:
+        return None, {}
+
+    segments = _parse_instruction_segments(base_section.get("instructions"))
+    if not any(seg.get("kind") == "field_block" for seg in segments):
+        return None, {}
+
+    old_lines = _field_lines(old_section.get("instructions"))
+    new_lines = _field_lines(new_section.get("instructions"))
+    diff = {
+        "added_fields": list(task_report.get("added_fields") or []),
+        "removed_fields": list(task_report.get("removed_fields") or []),
+        "changed_fields": list(task_report.get("changed_fields") or []),
+    }
+    changed_fields = _changed_field_paths(old_section, new_section, diff)
+    field_report: Dict[str, Any] = {}
+
+    for field_path in changed_fields:
+        idx = _find_segment_index_for_field(segments, field_path)
+        old_block = ""
+        previous_block = ""
+        next_block = ""
+        if idx >= 0:
+            old_block = str(segments[idx].get("block") or "")
+            for prev in reversed(segments[:idx]):
+                if prev.get("kind") == "field_block":
+                    previous_block = str(prev.get("block") or "")
+                    break
+            for nxt in segments[idx + 1:]:
+                if nxt.get("kind") == "field_block":
+                    next_block = str(nxt.get("block") or "")
+                    break
+        else:
+            seen_current = False
+            order = _new_field_order(new_section.get("instructions"))
+            if field_path in order:
+                for candidate in order:
+                    seg_idx = _find_segment_index_for_field(segments, candidate)
+                    if seg_idx < 0:
+                        continue
+                    if candidate == field_path:
+                        seen_current = True
+                        continue
+                    if not seen_current:
+                        previous_block = str(segments[seg_idx].get("block") or "")
+                    elif not next_block:
+                        next_block = str(segments[seg_idx].get("block") or "")
+                        break
+
+        action = "replace"
+        if field_path in new_lines and field_path not in old_lines:
+            action = "add"
+        elif field_path in old_lines and field_path not in new_lines:
+            action = "remove"
+
+        messages = _build_field_rewrite_messages(
+            task_name=task_name,
+            field_path=field_path,
+            old_block=old_block,
+            old_generated_rule=old_lines.get(field_path, ""),
+            new_generated_rule=new_lines.get(field_path, ""),
+            previous_block=previous_block,
+            next_block=next_block,
+            action=action,
+        )
+        raw = client.chat(
+            messages,
+            temperature=float(llm_cfg.get("temperature", 0.0)),
+            max_tokens=int(llm_cfg.get("max_tokens", 8000)),
+            response_format={"type": "json_object"},
+            timeout=int(llm_cfg.get("timeout", 900)),
+        )
+        payload = json.loads(raw)
+        resolved_action = str(payload.get("action") or action).strip().lower() or action
+        new_block = str(payload.get("block") or "").strip()
+        field_report[field_path] = {
+            "action": resolved_action,
+            "has_old_block": bool(old_block),
+        }
+
+        if resolved_action == "remove":
+            if idx >= 0:
+                segments.pop(idx)
+            continue
+
+        if resolved_action == "replace" and idx >= 0 and new_block:
+            segments[idx] = dict(segments[idx])
+            segments[idx]["block"] = new_block
+            continue
+
+        if resolved_action == "add" and new_block:
+            _insert_segment_for_field(
+                segments,
+                field_path=field_path,
+                new_block=new_block,
+                new_generated_section=new_section,
+            )
+
+    rewritten = _render_instruction_segments(segments)
+    return (rewritten or None), field_report
+
+
 def rewrite_changed_tasks_with_llm(
     *,
     updated_cfg: Dict[str, Dict[str, Any]],
@@ -314,6 +600,25 @@ def rewrite_changed_tasks_with_llm(
         base_section = base_prompts.get(task_name)
         old_section = old_generated.get(task_name, {})
         new_section = updated_cfg.get(task_name) or new_generated.get(task_name, {})
+        field_rewrite, field_report = _rewrite_task_field_blocks_with_llm(
+            client=client,
+            llm_cfg=llm_cfg,
+            task_name=task_name,
+            base_section=base_section,
+            old_section=old_section,
+            new_section=new_generated.get(task_name, new_section),
+            task_report=task_report,
+        )
+        if field_rewrite:
+            updated_cfg[task_name] = dict(updated_cfg[task_name])
+            updated_cfg[task_name]["instructions"] = field_rewrite
+            rewrite_report[task_name] = {
+                "rewritten": True,
+                "mode": "field_blocks",
+                "instruction_length": len(field_rewrite),
+                "fields": field_report,
+            }
+            continue
         messages = _build_rewrite_messages(
             task_name=task_name,
             base_section=base_section,
@@ -340,6 +645,7 @@ def rewrite_changed_tasks_with_llm(
         updated_cfg[task_name]["instructions"] = rewritten
         rewrite_report[task_name] = {
             "rewritten": True,
+            "mode": "full_task",
             "instruction_length": len(rewritten),
         }
     return rewrite_report

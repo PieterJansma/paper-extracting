@@ -79,6 +79,8 @@ def _extract_original_field_blocks(instructions: str | None) -> Dict[str, str]:
                 j = i + 3
                 while j + 2 < len(lines) and not (is_divider(j) and is_divider(j + 2)):
                     j += 1
+                if j + 2 >= len(lines):
+                    j = len(lines)
                 block = "\n".join(lines[i + 1 : j]).strip()
                 heading_key = re.sub(r"\s*\(.*?\)\s*$", "", heading).strip()
                 out[_normalize(heading_key)] = block
