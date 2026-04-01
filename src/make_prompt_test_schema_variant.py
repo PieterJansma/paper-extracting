@@ -21,7 +21,7 @@ def _write_rows(path: Path, rows: List[Dict[str, str]], fieldnames: List[str]) -
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Create a small EMX2 schema variant for prompt-update testing.")
-    parser.add_argument("--input", default="molgenis_UMCGCohortsStaging.csv")
+    parser.add_argument("--input", default="schemas/molgenis_UMCGCohortsStaging.csv")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 

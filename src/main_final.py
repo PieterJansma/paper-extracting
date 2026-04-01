@@ -23,7 +23,7 @@ from extract_pipeline import load_pdf_text, extract_fields, build_context_prefix
 # ==============================================================================
 
 TASK_SECTION_PREFIX = "task_"
-DEFAULT_PROMPTS_FILE = "prompts.toml"
+DEFAULT_PROMPTS_FILE = "prompts/prompts.toml"
 
 def setup_logging(level: str = "INFO") -> None:
     logging.basicConfig(
@@ -89,7 +89,7 @@ def load_config(path: str, prompts_path: str | None = None) -> Dict[str, Any]:
 
     if not _has_task_sections(cfg):
         raise SystemExit(
-            "No task_* prompt sections found. Put prompts in config or provide prompts.toml "
+            "No task_* prompt sections found. Put prompts in config or provide prompts/prompts.toml "
             "via PDF_EXTRACT_PROMPTS."
         )
     return cfg

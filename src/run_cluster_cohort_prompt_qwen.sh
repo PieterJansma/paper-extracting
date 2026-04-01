@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
 LLAMA_BIN="/groups/umcg-gcc/tmp02/users/umcg-pjansma/Repositories/llama.cpp/build/bin/llama-server"
 MODEL_PATH="/groups/umcg-gcc/tmp02/users/umcg-pjansma/Models/GGUF/Qwen2.5-32B-Instruct/Qwen2.5-32B-Instruct-Q4_K_M.gguf"
 
@@ -33,7 +36,7 @@ EMX2_CACHE_DIR="${EMX2_CACHE_DIR:-${RUN_DIR}/emx2_cache}"
 EMX2_REPO_ROOT="${EMX2_REPO_ROOT:-${EMX2_CACHE_DIR}/repo}"
 
 OUTPUT_PATH="prompts_full_qwen.runtime.toml"
-BASE_PROMPTS="prompts_cohort.toml"
+BASE_PROMPTS="${REPO_ROOT}/prompts/prompts_cohort.toml"
 PROFILE="UMCGCohortsStaging"
 
 while [[ $# -gt 0 ]]; do

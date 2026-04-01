@@ -79,7 +79,7 @@ def _comparison_markdown(tasks: Dict[str, Dict[str, Any]]) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate a full cohort prompt from live EMX2 CSV files and rewrite all task instructions with Qwen.")
-    parser.add_argument("--base-prompts", default="prompts_cohort.toml")
+    parser.add_argument("--base-prompts", default="prompts/prompts_cohort.toml")
     parser.add_argument("--profile", default="UMCGCohortsStaging")
     parser.add_argument("--local-root", default=None)
     parser.add_argument("--fallback-schema-csv", default=None)

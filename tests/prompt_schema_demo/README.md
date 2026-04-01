@@ -29,4 +29,4 @@ Belangrijkste outputs:
 - `tmp/prompt_schema_demo/updated_from_existing.toml`
 - `tmp/prompt_schema_demo/prompt_update.compare.md`
 
-De runner gebruikt bewust de bestaande `prompts_cohort.toml` als basisprompt en vervangt alleen de tasks die echt geraakt zijn door de variant.
+De runner gebruikt bewust de bestaande `prompts/prompts_cohort.toml` als basisprompt en vervangt alleen de tasks die echt geraakt zijn door de variant.

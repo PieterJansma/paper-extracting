@@ -309,7 +309,7 @@ def autosize_and_style(ws):
 def main():
     parser = argparse.ArgumentParser(description="Convert current extractor workbook to UMCG cohort workbook shape.")
     parser.add_argument("--source", required=True, help="Current extractor output workbook (.xlsx)")
-    parser.add_argument("--model", required=True, help="Model workbook such as molgenis_UMCGCohortsStaging.xlsx")
+    parser.add_argument("--model", required=True, help="Model workbook such as schemas/molgenis_UMCGCohortsStaging.xlsx")
     parser.add_argument("--output", required=True, help="Converted cohort workbook (.xlsx)")
     parser.add_argument("--report", default=None, help="Optional JSON report path")
     args = parser.parse_args()

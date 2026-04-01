@@ -79,7 +79,7 @@ COHORT_DYNAMIC_EMX2_RUNTIME="${COHORT_DYNAMIC_EMX2_RUNTIME:-0}"
 COHORT_DYNAMIC_PROMPTS="${COHORT_DYNAMIC_PROMPTS:-0}"
 COHORT_PROMPT_SCHEMA_SYNC="${COHORT_PROMPT_SCHEMA_SYNC:-0}"
 COHORT_PROMPT_SCHEMA_SYNC_LLM="${COHORT_PROMPT_SCHEMA_SYNC_LLM:-0}"
-COHORT_PROMPT_SCHEMA_BASE_CSV="${COHORT_PROMPT_SCHEMA_BASE_CSV:-${PWD}/molgenis_UMCGCohortsStaging.csv}"
+COHORT_PROMPT_SCHEMA_BASE_CSV="${COHORT_PROMPT_SCHEMA_BASE_CSV:-${PWD}/schemas/molgenis_UMCGCohortsStaging.csv}"
 COHORT_PROMPT_SCHEMA_STATE_DIR="${COHORT_PROMPT_SCHEMA_STATE_DIR:-${PWD}/tmp/cohort_prompt_schema_sync_state}"
 
 # ------------------------------------------------------------------------------
@@ -277,7 +277,7 @@ if [[ ! -f "config.final.toml" ]]; then
   exit 1
 fi
 
-PROMPTS_SRC="${PDF_EXTRACT_PROMPTS:-prompts_cohort.toml}"
+PROMPTS_SRC="${PDF_EXTRACT_PROMPTS:-prompts/prompts_cohort.toml}"
 DYNAMIC_RUNTIME_FLAG="$(printf '%s' "${COHORT_DYNAMIC_EMX2_RUNTIME:-1}" | tr '[:upper:]' '[:lower:]')"
 DYNAMIC_PROMPTS_FLAG="$(printf '%s' "${COHORT_DYNAMIC_PROMPTS:-1}" | tr '[:upper:]' '[:lower:]')"
 PROMPTS_OPTIONAL=0
@@ -292,7 +292,7 @@ if [[ ! -f "$PROMPTS_SRC" ]]; then
     PROMPTS_SRC=""
   else
     echo "❌ ERROR: prompts bestand ontbreekt: $PROMPTS_SRC"
-    echo "   Zet PDF_EXTRACT_PROMPTS of plaats prompts.toml in ${PWD}"
+    echo "   Zet PDF_EXTRACT_PROMPTS of plaats prompts/prompts_cohort.toml in ${PWD}"
     exit 1
   fi
 fi

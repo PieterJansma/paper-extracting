@@ -23,7 +23,7 @@ SLOTS="${SLOTS:-1}"
 NGL="${NGL:-999}"
 
 PROFILE="${PROMPT_SCHEMA_DEMO_PROFILE:-UMCGCohortsStaging}"
-BASE_PROMPTS="${PROMPT_SCHEMA_DEMO_BASE_PROMPTS:-${REPO_ROOT}/prompts_cohort.toml}"
+BASE_PROMPTS="${PROMPT_SCHEMA_DEMO_BASE_PROMPTS:-${REPO_ROOT}/prompts/prompts_cohort.toml}"
 BASE_ROOT="${PROMPT_SCHEMA_DEMO_BASE_ROOT:-${REPO_ROOT}/tests/prompt_schema_demo/base_repo}"
 VARIANT_ROOT="${PROMPT_SCHEMA_DEMO_VARIANT_ROOT:-${REPO_ROOT}/tests/prompt_schema_demo/variant_repo}"
 OUT_DIR="${PROMPT_SCHEMA_DEMO_OUT_DIR:-${REPO_ROOT}/tmp/prompt_schema_demo}"

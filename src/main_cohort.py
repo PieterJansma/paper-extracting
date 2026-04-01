@@ -185,10 +185,13 @@ def _serialize_bool_default_false(value: Any) -> str:
 
 
 def _resolve_schema_xlsx(explicit_path: str | None = None) -> str | None:
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     candidates = [
         explicit_path,
         os.environ.get("MOLGENIS_SCHEMA_XLSX"),
+        os.path.join(os.getcwd(), "schemas", "molgenis_UMCGCohortsStaging.xlsx"),
         os.path.join(os.getcwd(), "molgenis_UMCGCohortsStaging.xlsx"),
+        os.path.join(repo_root, "schemas", "molgenis_UMCGCohortsStaging.xlsx"),
         os.path.join(os.path.dirname(__file__), "molgenis_UMCGCohortsStaging.xlsx"),
         "/mnt/data/molgenis_UMCGCohortsStaging.xlsx",
     ]
@@ -559,7 +562,7 @@ def cli() -> None:
     parser.add_argument(
         "--schema-xlsx",
         default=None,
-        help="Optional path to molgenis_UMCGCohortsStaging.xlsx for post-write datatype normalization.",
+        help="Optional path to schemas/molgenis_UMCGCohortsStaging.xlsx for post-write datatype normalization.",
     )
     args = parser.parse_args()
     selected_passes = [p.upper() for p in args.passes]

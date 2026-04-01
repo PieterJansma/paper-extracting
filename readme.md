@@ -1,250 +1,209 @@
-# Paper Extracting (Final Pipeline)
+# Paper Extracting
 
-This repository extracts structured metadata from papers (PDFs) into a multi-sheet Excel file.
-The final pipeline is built around:
+Deze repository extraheert gestructureerde metadata uit papers naar Excel-workbooks. Er zijn drie duidelijke routes:
 
-- `config.final.toml` (runtime settings: model, endpoint, pdf defaults)
-- `prompts.toml` (prompts, schemas, extraction rules)
-- `src/main_final.py` (multi-pass extraction + Excel writer)
-- `src/run_cluster_final.sh` (cluster runtime with 2x llama-server + load balancer)
+- `final`: algemene pipeline met de baseline promptset
+- `cohort`: cohort-specifieke pipeline met een eigen baseline promptset
+- `dynamic cohort`: cohort-route die live schema- en ontology-wijzigingen doorrekent vanaf de cohort-basisprompt
 
-## What It Produces
+Alle commands hieronder gaan ervan uit dat je vanuit de repo-root runt.
 
-One Excel workbook with these sheets:
+## Structuur
 
-- `resources`
-- `subpopulations`
-- `collection_events`
-- `datasets`
-- `samplesets`
-- `organisations`
-- `people`
-- `publications`
-- `documentation`
+- `config.final.toml`
+  runtime-instellingen voor LLM, PDF en timeouts
+- `prompts/prompts.toml`
+  baseline promptset voor de algemene/final pipeline
+- `prompts/prompts_cohort.toml`
+  cohort-specifieke baseline promptset
+- `prompts/archive/`
+  oudere of experimentele promptvarianten om mee te vergelijken
+- `schemas/molgenis_UMCGCohortsStaging.csv`
+  schema-export die de dynamische cohort-route als bron van waarheid gebruikt
+- `schemas/molgenis_UMCGCohortsStaging.xlsx`
+  workbook voor post-write datatype-normalisatie
+- `src/main_final.py`
+  extractieflow voor de algemene/final pipeline
+- `src/main_cohort.py`
+  extractieflow voor de cohort-pipeline
+- `src/run_cluster_final.sh`
+  cluster-runner voor de final pipeline
+- `src/run_cluster_cohort.sh`
+  cluster-runner voor de cohort-pipeline
+- `src/run_prompt_schema_demo.sh`
+  demo-runner die laat zien hoe schemawijzigingen prompt-updates veroorzaken
+- `tests/prompt_schema_demo/`
+  kleine nep-EMX2 fixture voor schema-diff en Qwen prompt rewrite tests
 
-## Quick Start (Local)
+## Promptmodel
 
-1. Create and activate a virtual environment.
+De promptlogica is nu expliciet in lagen verdeeld:
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
+1. `prompts/prompts.toml` is de baseline voor de algemene/final route.
+2. `prompts/prompts_cohort.toml` is de baseline voor de cohort-route.
+3. De dynamische cohort-route start altijd vanuit `prompts/prompts_cohort.toml`.
+4. Daarna vergelijkt hij het actuele `UMCGCohortsStaging` schema met de bekende baseline.
+5. Alleen de geraakte tasks worden aangepast; ongewijzigde tasks blijven exact uit de bestaande cohort-prompt komen.
 
-2. Install the project (recommended).
+Kort:
 
-```bash
-pip3 install -e . --no-build-isolation
-```
+- menselijke baseline blijft leidend
+- schema bepaalt wat moet veranderen
+- ontology/ref CSV’s leveren de actuele choices en referenties
+- Qwen herschrijft alleen de changed tasks of changed field blocks
 
-3. Configure:
-- `config.final.toml`:
-- `[llm]` -> your OpenAI-compatible endpoint (`base_url`, `model`, `api_key`)
-- `[pdf].path` -> default PDF path
-- `[pdf].max_pages = 0` -> read full paper (recommended for completeness)
-- `prompts.toml`:
-  - all `task_*` extraction templates + instructions
+## Route 1: Final Pipeline
 
-4. Run all passes on one PDF.
+Gebruik deze route voor de algemene, niet-cohort-specifieke extractieflow.
+
+Lokale run:
 
 ```bash
 pdf-extract -p all -o final_result.xlsx
 ```
 
-## Common CLI Usage
-
-Run selected passes:
-
-```bash
-pdf-extract -p A B E -o out.xlsx
-```
-
-Run multiple PDFs:
-
-```bash
-pdf-extract -p all \
-  --pdfs data/a.pdf data/b.pdf \
-  --paper-names paper_a paper_b \
-  -o out.xlsx
-```
-
-Show CLI help:
-
-```bash
-pdf-extract --help
-```
-
-## Cluster Usage
-
-`src/run_cluster_final.sh` does the full runtime setup:
-
-- starts 2 llama-server instances (GPU0/GPU1)
-- waits for health checks
-- starts a local TCP load balancer
-- writes `config.runtime.toml` with LB URL
-- runs `src/main_final.py`
-- syncs output via `rsync` by default (`SYNC_OUTPUT_ENABLE=1`)
-
-Default run:
-
-```bash
-bash src/run_cluster_final.sh
-```
-
-Run via Slurm batch:
-
-```bash
-sbatch src/run_cluster_final.sbatch -p all --pdfs data/*.pdf -o final_all.xlsx
-```
-
-Disable sync if your wrapper handles transfer:
-
-```bash
-SYNC_OUTPUT_ENABLE=0 bash src/run_cluster_final.sh -p all --pdfs data/*.pdf -o final_all.xlsx
-```
-
-All PDFs in `data/`:
+Cluster-run:
 
 ```bash
 bash src/run_cluster_final.sh -p all --pdfs data/*.pdf -o final_all.xlsx
 ```
 
-Force OCR for selected papers:
+Belangrijk:
+
+- promptbron: `prompts/prompts.toml`
+- hoofdscript: `src/main_final.py`
+- cluster-runner: `src/run_cluster_final.sh`
+
+## Route 2: Cohort Pipeline
+
+Dit is de normale cohortflow zonder automatische schema-sync.
+
+Lokale/cluster-run:
 
 ```bash
-bash src/run_cluster_final.sh --ocr -p A --pdfs data/concrete.pdf -o onepaper.xlsx
+bash src/run_cluster_cohort.sh -p all --pdfs data/oncolifes.pdf -o oncolifes_cohort.xlsx
 ```
 
-Write side-by-side text compare files (`pypdf` vs OCR) without extra env exports:
+Belangrijk:
+
+- promptbron: `prompts/prompts_cohort.toml`
+- hoofdscript: `src/main_cohort.py`
+- cluster-runner: `src/run_cluster_cohort.sh`
+- default gedrag: gebruikt gewoon de bestaande cohort-basisprompt
+
+## Route 3: Dynamische Cohort Promptflow
+
+Deze route is bedoeld voor schema-gedreven promptupdates.
+
+Hij doet dit:
+
+1. leest `schemas/molgenis_UMCGCohortsStaging.csv`
+2. haalt de relevante live EMX2 ontology/ref CSV’s op
+3. vergelijkt live schema tegen de baseline
+4. houdt `prompts/prompts_cohort.toml` als startpunt
+5. past alleen changed tasks aan
+6. laat Qwen die changed tasks of field blocks herschrijven
+
+Run op cluster:
 
 ```bash
-bash src/run_cluster_final.sh --ocr --ocr-dump -p A --pdfs data/concrete.pdf -o onepaper.xlsx
+COHORT_DYNAMIC_EMX2_RUNTIME=1 \
+COHORT_DYNAMIC_PROMPTS=0 \
+COHORT_PROMPT_SCHEMA_SYNC=1 \
+COHORT_PROMPT_SCHEMA_SYNC_LLM=1 \
+bash src/run_cluster_cohort.sh -p all --pdfs data/oncolifes.pdf -o oncolifes_dynamic.xlsx
 ```
 
-Per-run artifacts are written under `logs/runs/<run_id>/`:
-- `status.jsonl` (state transitions)
-- `pipeline_issues.json` (per-paper/pass warnings and errors)
-- run-specific logs and runtime config
-
-Single-paper OCR test (writes two full text files only):
+Zonder Qwen-polish:
 
 ```bash
-bash src/run_ocr_text_compare.sh data/concrete.pdf
+COHORT_DYNAMIC_EMX2_RUNTIME=1 \
+COHORT_DYNAMIC_PROMPTS=0 \
+COHORT_PROMPT_SCHEMA_SYNC=1 \
+COHORT_PROMPT_SCHEMA_SYNC_LLM=0 \
+bash src/run_cluster_cohort.sh -p all --pdfs data/oncolifes.pdf -o oncolifes_dynamic.xlsx
 ```
 
-Default output location:
-- `logs/text_compare_single/<paper>.pypdf.txt`
-- `logs/text_compare_single/<paper>.ocr.txt`
+Belangrijk:
 
-Vision OCR in `run_cluster_final.sh` is preconfigured for this cluster setup (GLM-OCR defaults in script).
-You can run without extra OCR exports.
-By default it uses prefetch mode (`OCR_VLM_PREFETCH_MODE=1`):
-- script first checks which PDFs are weak with pypdf/layout
-- starts OCR server only for those weak PDFs to prefetch OCR text
-- stops OCR server
-- starts Qwen servers for extraction (no concurrent GPU contention)
-- `STRIP_REFERENCES=1` by default in `run_cluster_final.sh` to remove trailing
-  reference/bibliography sections and lower context usage
+- basistemplate blijft `prompts/prompts_cohort.toml`
+- de uiteindelijke runtime-prompt wordt per run berekend
+- changed tasks zijn terug te zien in `logs/runs/<run_id>/`
 
-Disable reference stripping if needed:
+## Prompt Demo Route
+
+Gebruik deze om aan anderen te laten zien wat een schemawijziging doet met de prompt.
+
+Deterministische demo:
 
 ```bash
-STRIP_REFERENCES=0 bash src/run_cluster_final.sh -p all --pdfs data/*.pdf -o final_all.xlsx
+bash src/run_prompt_schema_demo.sh
 ```
 
-Override only when needed:
+Demo met Qwen rewrite:
 
 ```bash
-pip3 install pypdfium2 pillow
-
-export OCR_VLM_MODEL_PATH=/path/to/vision-model.gguf
-# required for many vision models:
-export OCR_VLM_MMPROJ_PATH=/path/to/mmproj.gguf
-# optional separate llama-server binary for OCR (if different build):
-export OCR_VLM_LLAMA_BIN=/path/to/llama-server
-export OCR_VLM_PREFETCH_MODE=1
-
-# optional tuning:
-export OCR_VLM_ALIAS=glm-ocr
-export OCR_VLM_PORT=18090
-export OCR_VLM_CTX=8192
-export OCR_VLM_NGL=999
-export OCR_VLM_GPU=0,1
-
-bash src/run_cluster_final.sh -p all --pdfs data/*.pdf -o final_all.xlsx
+PROMPT_SCHEMA_DEMO_WITH_LLM=1 bash src/run_prompt_schema_demo.sh
 ```
 
-Write side-by-side text comparison artifacts (`pypdf` vs OCR) for inspection:
+Belangrijkste demo-outputs:
 
-```bash
-export OCR_COMPARE_DUMP_DIR=logs/text_compare
-# optional: include more/less diff lines
-export OCR_COMPARE_DIFF_MAX_LINES=120000
-```
+- `tmp/prompt_schema_demo/base_schema.csv`
+- `tmp/prompt_schema_demo/variant_schema.csv`
+- `tmp/prompt_schema_demo/base_dynamic.toml`
+- `tmp/prompt_schema_demo/updated_from_existing.toml`
+- `tmp/prompt_schema_demo/prompt_update.compare.md`
+- `tmp/prompt_schema_demo/prompt_update.summary.md`
 
-With `OCR_COMPARE_DUMP_DIR` enabled, for each processed paper the pipeline writes:
-- `<paper>.pypdf.txt`
-- `<paper>.ocr.txt`
-- `<paper>.diff.txt`
-- `<paper>.summary.txt`
+De demo gebruikt bewust:
 
-## Key Behavior and Defaults
+- bestaande basisprompt: `prompts/prompts_cohort.toml`
+- kleine fixture: `tests/prompt_schema_demo/`
 
-- `prompts.toml` is the source of truth for extraction logic.
-- `config.final.toml` contains runtime settings only.
-- Long papers are handled with automatic chunked extraction fallback.
-- Prompt cache is automatically disabled for very long papers when chunking is active.
-- In health context, post-processing keeps HRI defaults consistent:
-  - `theme` includes `Health`
-  - `applicable_legislation` includes `Data Governance Act`
-- Output is deterministic in column order (template-driven).
+## Outputs
 
-Long-paper tuning (optional, in `[llm]`):
-- `chunking_enabled`
-- `long_text_threshold_chars`
-- `chunk_size_chars`
-- `chunk_overlap_chars`
-- `max_chunks` (optional cap)
+Cluster-runs schrijven hun artifacts onder:
 
-## Files You Will Most Often Edit
+- `logs/runs/<run_id>/`
 
-- `prompts.toml`
-  - change extraction instructions and templates
-- `config.final.toml`
-  - change runtime/model/pdf settings
+Daar vind je onder andere:
+
+- runtime config
+- runtime prompt
+- status logs
+- compare-bestanden voor schema-sync
+- pipeline issues
+
+De prompt-schema demo schrijft tijdelijke review-output onder:
+
+- `tmp/prompt_schema_demo/`
+
+## Meest Aangepaste Bestanden
+
+- `prompts/prompts.toml`
+  baseline promptset voor final
+- `prompts/prompts_cohort.toml`
+  baseline promptset voor cohort
+- `schemas/molgenis_UMCGCohortsStaging.csv`
+  bron van waarheid voor dynamische cohort prompt-sync
 - `src/main_final.py`
-  - change post-processing, fallbacks, and output logic
+  final extractieflow
+- `src/main_cohort.py`
+  cohort extractieflow
+- `src/cohort_prompt_schema_updater.py`
+  schema-diff prompt updater
 - `src/run_cluster_final.sh`
-  - change model path, llama binary path, ports, rsync destination
+  final cluster-runner
+- `src/run_cluster_cohort.sh`
+  cohort cluster-runner
 
 ## Troubleshooting
 
-- No output or very sparse output:
-  - prompts may be too strict; relax rules in `prompts.toml`
-- Cluster model startup fails:
-  - check `logs/gpu0.log`, `logs/gpu1.log`, `logs/lb.log`
-- Wrong endpoint/model at runtime:
-  - verify `[llm]` in `config.final.toml` or `PDF_EXTRACT_CONFIG`
-- Missing prompts:
-  - verify `prompts.toml` exists or set `PDF_EXTRACT_PROMPTS`
-- PDF not found:
-  - fix `[pdf].path` or use `--pdfs`
-- Scanned/image PDF gives almost no text:
-  - fallback order is: normal pypdf -> pypdf layout mode -> OCR fallback
-  - OCR fallback runs only when extracted text quality is still low (including under 3000 chars)
-  - OCR fallback backend: vision OCR via OpenAI-compatible endpoint (for example GLM OCR)
-  - to keep full reference lists in context, set `STRIP_REFERENCES=0`
-  - to enable vision OCR fallback, set env vars before running:
-    - `OCR_VLM_BASE_URL` (for example `http://host:port/v1`)
-    - `OCR_VLM_MODEL` (for example your GLM OCR model id)
-    - optional: `OCR_VLM_API_KEY`, `OCR_VLM_MAX_PAGES` (default `0` = all pages), `OCR_VLM_TIMEOUT_SEC` (default `180`), `OCR_VLM_MAX_TOKENS` (default `4000`), `OCR_VLM_IMAGE_MAX_SIDE` (default `1536`)
-  - vision OCR page rendering uses `pypdfium2` (if installed) or `pdftoppm` (if available in PATH)
-- Excel writer error:
-  - install `openpyxl` or `xlsxwriter`
-
-## Typical Workflow
-
-1. Update extraction logic in `prompts.toml`.
-2. Test quickly on 1 PDF locally.
-3. Run full batch on cluster.
-4. Review output workbook and audit issues.
+- prompts worden niet gevonden
+  zet `PDF_EXTRACT_PROMPTS` of gebruik de standaardpaden onder `prompts/`
+- schema-sync lijkt niets te doen
+  check of `changed_tasks=0`; dan was het live schema niet veranderd
+- cohort normalisatie vindt het schema-workbook niet
+  zet `--schema-xlsx` of `MOLGENIS_SCHEMA_XLSX`, anders gebruikt de code `schemas/molgenis_UMCGCohortsStaging.xlsx`
+- demo-output is onduidelijk
+  open `tmp/prompt_schema_demo/prompt_update.summary.md`; dat bestand is bedoeld voor menselijke review

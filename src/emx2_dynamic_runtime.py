@@ -10,7 +10,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 
 DEFAULT_PROFILE = "UMCGCohortsStaging"
-DEFAULT_SCHEMA_CSV = "molgenis_UMCGCohortsStaging.csv"
+DEFAULT_SCHEMA_CSV = "schemas/molgenis_UMCGCohortsStaging.csv"
 
 COHORT_RUNTIME_TABLES: Tuple[str, ...] = (
     "Resources",

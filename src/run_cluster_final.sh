@@ -208,10 +208,10 @@ if [[ ! -f "config.final.toml" ]]; then
   exit 1
 fi
 
-PROMPTS_SRC="${PDF_EXTRACT_PROMPTS:-prompts.toml}"
+PROMPTS_SRC="${PDF_EXTRACT_PROMPTS:-prompts/prompts.toml}"
 if [[ ! -f "$PROMPTS_SRC" ]]; then
   echo "❌ ERROR: prompts bestand ontbreekt: $PROMPTS_SRC"
-  echo "   Zet PDF_EXTRACT_PROMPTS of plaats prompts.toml in ${PWD}"
+  echo "   Zet PDF_EXTRACT_PROMPTS of plaats prompts/prompts.toml in ${PWD}"
   exit 1
 fi
 

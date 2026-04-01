@@ -12,6 +12,10 @@ from typing import Any, Dict, Optional
 
 from openpyxl import load_workbook
 
+DEFAULT_SCHEMA_WORKBOOK = (
+    Path(__file__).resolve().parent.parent / "schemas" / "molgenis_UMCGCohortsStaging.xlsx"
+)
+
 # Explicitly cover every column type present in the UMCG staging schema.
 ARRAY_TYPES = {"ontology_array", "string_array", "ref_array"}
 PASSTHROUGH_TYPES = {"ref", "refback", "ontology", "text"}
@@ -1137,7 +1141,7 @@ def normalize_value(
 # ---------- Workbook runner ----------
 def fix_workbook(
     input_path: str | Path,
-    schema_path: str | Path = "/mnt/data/molgenis_UMCGCohortsStaging.xlsx",
+    schema_path: str | Path = DEFAULT_SCHEMA_WORKBOOK,
     output_path: str | Path | None = None,
     profile: str = "UMCGCohortsStaging",
     ref_organisations_csv: str | Path | None = None,
@@ -1207,7 +1211,7 @@ def fix_workbook(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Normalize MOLGENIS staging workbook cell values using schema types.")
     parser.add_argument("input", help="Input workbook to fix")
-    parser.add_argument("-s", "--schema", default="/mnt/data/molgenis_UMCGCohortsStaging.xlsx", help="Schema workbook")
+    parser.add_argument("-s", "--schema", default=str(DEFAULT_SCHEMA_WORKBOOK), help="Schema workbook")
     parser.add_argument("-o", "--output", default=None, help="Output workbook path")
     parser.add_argument("--profile", default="UMCGCohortsStaging", help="Profile name in schema workbook")
     parser.add_argument("--ref-organisations-csv", default=None, help="Optional Organisations.csv ontology file")
