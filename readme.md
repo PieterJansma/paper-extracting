@@ -130,6 +130,80 @@ Belangrijk:
 - de uiteindelijke runtime-prompt wordt per run berekend
 - changed tasks zijn terug te zien in `logs/runs/<run_id>/`
 
+### Testing Against Your GitHub Fork
+
+You do not have to use the official `molgenis/molgenis-emx2` source for testing.
+Both cluster runners already support a custom GitHub repo and ref through environment variables:
+
+- `MOLGENIS_EMX2_REPO`
+- `MOLGENIS_EMX2_REF`
+
+Example: test against your own fork and branch:
+
+```bash
+MOLGENIS_EMX2_REPO="your-github-user/molgenis-emx2" \
+MOLGENIS_EMX2_REF="your-test-branch" \
+COHORT_DYNAMIC_EMX2_RUNTIME=1 \
+COHORT_DYNAMIC_PROMPTS=0 \
+COHORT_PROMPT_SCHEMA_SYNC=1 \
+COHORT_PROMPT_SCHEMA_SYNC_LLM=1 \
+bash src/run_cluster_cohort.sh -p all --pdfs data/oncolifes.pdf -o oncolifes_dynamic.xlsx
+```
+
+The same idea works for the full prompt-Qwen test runner:
+
+```bash
+MOLGENIS_EMX2_REPO="your-github-user/molgenis-emx2" \
+MOLGENIS_EMX2_REF="your-test-branch" \
+bash src/run_cluster_cohort_prompt_qwen.sh -o tmp/prompts_test_from_fork_qwen.toml
+```
+
+Both runners now log the selected source as:
+
+```text
+EMX2 source=<repo>@<ref>
+```
+
+So you can verify in the run logs exactly which fork and branch were used.
+
+### Optional: Push Prompt Diffs Back To GitHub
+
+If you want the cluster run to publish the generated prompt-diff markdown back into this repository, `src/run_cluster_cohort.sh` can do that as an optional step.
+
+It is off by default.
+
+Relevant environment variables:
+
+- `COHORT_PROMPT_SCHEMA_PUSH_GIT=1`
+- `COHORT_PROMPT_SCHEMA_PUSH_DIR=reports/prompt_schema_history`
+- `COHORT_PROMPT_SCHEMA_PUSH_REMOTE=origin`
+- `COHORT_PROMPT_SCHEMA_PUSH_BRANCH=<branch>` (optional; if omitted it pushes `HEAD`)
+
+When enabled, each real prompt change will:
+
+1. write a local timestamped diff under `tmp/cohort_prompt_schema_sync_state/history/`
+2. copy that markdown file into `reports/prompt_schema_history/`
+3. update `reports/prompt_schema_history/latest.prompt_change.md`
+4. commit only those prompt-diff files
+5. push them to the configured remote/branch
+
+Example against your own fork branch:
+
+```bash
+MOLGENIS_EMX2_REPO="PieterJansma/molgenis-emx2" \
+MOLGENIS_EMX2_REF="prompt-test" \
+COHORT_DYNAMIC_EMX2_RUNTIME=1 \
+COHORT_DYNAMIC_PROMPTS=0 \
+COHORT_PROMPT_SCHEMA_SYNC=1 \
+COHORT_PROMPT_SCHEMA_SYNC_LLM=1 \
+COHORT_PROMPT_SCHEMA_PUSH_GIT=1 \
+COHORT_PROMPT_SCHEMA_PUSH_REMOTE=origin \
+COHORT_PROMPT_SCHEMA_PUSH_BRANCH="your-repo-branch" \
+bash src/run_cluster_cohort.sh -p all --pdfs data/oncolifes.pdf -o oncolifes_dynamic.xlsx
+```
+
+This requires that the cluster environment already has working Git push credentials.
+
 ## Dynamic Fetch Flow (English)
 
 This is the exact idea behind the dynamic cohort route.
@@ -203,7 +277,7 @@ That exported file is the current live view of the profile, built from the fetch
 
 Then the script checks:
 
-1. is the live schema identical to the cached previous live schema?
+1. is the live EMX2 source manifest identical to the cached previous source manifest?
 2. if yes:
    - reuse the cached synced prompt
 3. if no:

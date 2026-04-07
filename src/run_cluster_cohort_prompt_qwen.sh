@@ -354,6 +354,8 @@ wait_lb_ready "$PORT_LB" || exit 1
 status_event "lb_ready" "load balancer ready"
 
 echo "[2b/3] Fetch live EMX2 CSV files..."
+echo "  EMX2 source=${MOLGENIS_EMX2_REPO}@${MOLGENIS_EMX2_REF}"
+status_event "emx2_source_selected" "using EMX2 source ${MOLGENIS_EMX2_REPO}@${MOLGENIS_EMX2_REF}"
 if python3 src/emx2_dynamic_runtime.py required-paths --mode cohort >/dev/null 2>&1; then
   while IFS= read -r rel_path; do
     [[ -z "$rel_path" ]] && continue

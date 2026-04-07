@@ -82,6 +82,10 @@ COHORT_PROMPT_SCHEMA_SYNC_LLM="${COHORT_PROMPT_SCHEMA_SYNC_LLM:-0}"
 COHORT_PROMPT_SCHEMA_BASE_CSV="${COHORT_PROMPT_SCHEMA_BASE_CSV:-${PWD}/schemas/molgenis_UMCGCohortsStaging.csv}"
 COHORT_PROMPT_SCHEMA_STATE_DIR="${COHORT_PROMPT_SCHEMA_STATE_DIR:-${PWD}/tmp/cohort_prompt_schema_sync_state}"
 COHORT_PROMPT_SCHEMA_HISTORY_DIR="${COHORT_PROMPT_SCHEMA_HISTORY_DIR:-${COHORT_PROMPT_SCHEMA_STATE_DIR}/history}"
+COHORT_PROMPT_SCHEMA_PUSH_GIT="${COHORT_PROMPT_SCHEMA_PUSH_GIT:-0}"
+COHORT_PROMPT_SCHEMA_PUSH_DIR="${COHORT_PROMPT_SCHEMA_PUSH_DIR:-reports/prompt_schema_history}"
+COHORT_PROMPT_SCHEMA_PUSH_REMOTE="${COHORT_PROMPT_SCHEMA_PUSH_REMOTE:-origin}"
+COHORT_PROMPT_SCHEMA_PUSH_BRANCH="${COHORT_PROMPT_SCHEMA_PUSH_BRANCH:-}"
 
 # ------------------------------------------------------------------------------
 # CLI passthrough:
@@ -203,6 +207,115 @@ archive_prompt_schema_diff() {
   } > "$out_file"
 
   printf '%s\n' "$out_file"
+}
+
+write_tree_manifest() {
+  local root_dir="$1"
+  local out_file="$2"
+
+  python3 - "$root_dir" "$out_file" <<'PY'
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1]).resolve()
+out = Path(sys.argv[2]).resolve()
+
+files = []
+if root.exists():
+    for path in sorted(p for p in root.rglob("*") if p.is_file()):
+        rel = path.relative_to(root).as_posix()
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        files.append({"path": rel, "sha256": digest})
+
+payload = {"root": str(root), "files": files}
+out.parent.mkdir(parents=True, exist_ok=True)
+out.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+PY
+}
+
+refresh_tree_snapshot() {
+  local src_root="$1"
+  local dest_root="$2"
+
+  python3 - "$src_root" "$dest_root" <<'PY'
+import shutil
+import sys
+from pathlib import Path
+
+src = Path(sys.argv[1]).resolve()
+dest = Path(sys.argv[2]).resolve()
+if dest.exists():
+    shutil.rmtree(dest)
+dest.mkdir(parents=True, exist_ok=True)
+if src.exists():
+    for path in src.rglob("*"):
+        rel = path.relative_to(src)
+        target = dest / rel
+        if path.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, target)
+PY
+}
+
+push_prompt_schema_diff_to_git() {
+  local diff_file="$1"
+  local changed_tasks="${2:-0}"
+
+  if ! flag_enabled "$COHORT_PROMPT_SCHEMA_PUSH_GIT"; then
+    return 0
+  fi
+  if [[ ! -f "$diff_file" ]]; then
+    echo "⚠️  Git push overgeslagen: prompt diff ontbreekt: $diff_file"
+    status_event "warning" "git push skipped; prompt diff missing"
+    return 0
+  fi
+  if ! command -v git >/dev/null 2>&1; then
+    echo "⚠️  Git push overgeslagen: git niet beschikbaar."
+    status_event "warning" "git push skipped; git not available"
+    return 0
+  fi
+
+  local repo_root
+  repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  if [[ -z "$repo_root" ]]; then
+    echo "⚠️  Git push overgeslagen: geen git repository gevonden."
+    status_event "warning" "git push skipped; not inside git repository"
+    return 0
+  fi
+
+  local push_dir_abs="${repo_root}/${COHORT_PROMPT_SCHEMA_PUSH_DIR}"
+  mkdir -p "$push_dir_abs"
+  local base_name
+  base_name="$(basename "$diff_file")"
+  local push_file_abs="${push_dir_abs}/${base_name}"
+  local latest_file_abs="${push_dir_abs}/latest.prompt_change.md"
+  cp -f "$diff_file" "$push_file_abs"
+  cp -f "$diff_file" "$latest_file_abs"
+
+  local push_rel="${COHORT_PROMPT_SCHEMA_PUSH_DIR}/${base_name}"
+  local latest_rel="${COHORT_PROMPT_SCHEMA_PUSH_DIR}/latest.prompt_change.md"
+  local commit_msg="Archive prompt diff ${base_name} (${changed_tasks} changed tasks)"
+
+  (
+    cd "$repo_root"
+    git add -- "$push_rel" "$latest_rel"
+    if git diff --cached --quiet -- "$push_rel" "$latest_rel"; then
+      echo "  Git push: geen nieuwe wijzigingen voor ${push_rel}"
+      exit 0
+    fi
+    git commit --only -m "$commit_msg" -- "$push_rel" "$latest_rel" >/dev/null
+    if [[ -n "$COHORT_PROMPT_SCHEMA_PUSH_BRANCH" ]]; then
+      git push "$COHORT_PROMPT_SCHEMA_PUSH_REMOTE" "HEAD:${COHORT_PROMPT_SCHEMA_PUSH_BRANCH}" >/dev/null
+    else
+      git push "$COHORT_PROMPT_SCHEMA_PUSH_REMOTE" HEAD >/dev/null
+    fi
+  )
+  echo "  Prompt diff gepusht naar git: ${push_rel}"
+  status_event "prompt_schema_sync_git_pushed" "prompt diff pushed to git at ${push_rel}"
 }
 
 fetch_emx2_csv() {
@@ -907,6 +1020,8 @@ echo "[4/4] Starten main_cohort.py (PDF extractie → Excel)..."
 echo "  PDF_EXTRACT_CONFIG=$PDF_EXTRACT_CONFIG"
 echo "  PDF_EXTRACT_PROMPTS=$PDF_EXTRACT_PROMPTS"
 echo "  AUTO_FETCH_EMX2_ONTOLOGIES=$AUTO_FETCH_EMX2_ONTOLOGIES"
+echo "  EMX2 source=${MOLGENIS_EMX2_REPO}@${MOLGENIS_EMX2_REF}"
+status_event "emx2_source_selected" "using EMX2 source ${MOLGENIS_EMX2_REPO}@${MOLGENIS_EMX2_REF}"
 
 # Attempt to fetch latest ontology/model sources from molgenis-emx2.
 fetch_emx2_csv "data/_ontologies/Countries.csv" COUNTRY_ONTOLOGY_CSV
@@ -949,12 +1064,19 @@ if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
     mkdir -p "$COHORT_PROMPT_SCHEMA_STATE_DIR"
     SCHEMA_SYNC_STATE_SCHEMA="${COHORT_PROMPT_SCHEMA_STATE_DIR}/live_schema.csv"
     SCHEMA_SYNC_STATE_PROMPTS="${COHORT_PROMPT_SCHEMA_STATE_DIR}/prompts.runtime.toml"
+    SCHEMA_SYNC_STATE_SOURCE_ROOT="${COHORT_PROMPT_SCHEMA_STATE_DIR}/live_repo"
+    SCHEMA_SYNC_STATE_SOURCE_MANIFEST="${COHORT_PROMPT_SCHEMA_STATE_DIR}/source_manifest.json"
     SCHEMA_SYNC_STATE_REPORT_JSON="${COHORT_PROMPT_SCHEMA_STATE_DIR}/report.json"
     SCHEMA_SYNC_STATE_COMPARE_JSON="${COHORT_PROMPT_SCHEMA_STATE_DIR}/compare.json"
     SCHEMA_SYNC_STATE_COMPARE_MD="${COHORT_PROMPT_SCHEMA_STATE_DIR}/compare.md"
     SCHEMA_SYNC_STATE_LLM_REPORT_JSON="${COHORT_PROMPT_SCHEMA_STATE_DIR}/llm_report.json"
     SCHEMA_SYNC_STATE_LLM_COMPARE_JSON="${COHORT_PROMPT_SCHEMA_STATE_DIR}/llm_compare.json"
     SCHEMA_SYNC_STATE_LLM_COMPARE_MD="${COHORT_PROMPT_SCHEMA_STATE_DIR}/llm_compare.md"
+    SCHEMA_SYNC_SOURCE_MANIFEST="${RUN_DIR}/emx2_sources.manifest.json"
+    SCHEMA_SYNC_OLD_LOCAL_ROOT_ARGS=()
+    if [[ -d "$SCHEMA_SYNC_STATE_SOURCE_ROOT" ]]; then
+      SCHEMA_SYNC_OLD_LOCAL_ROOT_ARGS=(--old-local-root "$SCHEMA_SYNC_STATE_SOURCE_ROOT")
+    fi
     mkdir -p "$COHORT_PROMPT_SCHEMA_HISTORY_DIR"
     status_event "prompt_schema_sync_started" "checking EMX2 schema against base prompt"
 
@@ -963,7 +1085,9 @@ if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
       --local-root "$MOLGENIS_EMX2_LOCAL_ROOT" \
       --output "$LIVE_SCHEMA_CSV" >/dev/null; then
 
-      if [[ -f "$SCHEMA_SYNC_STATE_SCHEMA" && -f "$SCHEMA_SYNC_STATE_PROMPTS" ]] && cmp -s "$LIVE_SCHEMA_CSV" "$SCHEMA_SYNC_STATE_SCHEMA"; then
+      write_tree_manifest "$EMX2_REPO_ROOT" "$SCHEMA_SYNC_SOURCE_MANIFEST"
+
+      if [[ -f "$SCHEMA_SYNC_STATE_SOURCE_MANIFEST" && -f "$SCHEMA_SYNC_STATE_PROMPTS" ]] && cmp -s "$SCHEMA_SYNC_SOURCE_MANIFEST" "$SCHEMA_SYNC_STATE_SOURCE_MANIFEST"; then
         cp -f "$SCHEMA_SYNC_STATE_PROMPTS" "$SCHEMA_SYNC_PROMPTS"
         if [[ -f "$SCHEMA_SYNC_STATE_REPORT_JSON" ]]; then
           cp -f "$SCHEMA_SYNC_STATE_REPORT_JSON" "$SCHEMA_SYNC_REPORT_JSON"
@@ -985,13 +1109,15 @@ if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
         fi
         export PDF_EXTRACT_PROMPTS="$SCHEMA_SYNC_PROMPTS"
         RUNTIME_PROMPTS="$SCHEMA_SYNC_PROMPTS"
-        echo "  Prompt schema sync: geen wijziging in live schema; cached prompt gebruikt."
+        echo "  Prompt schema sync: geen wijziging in live EMX2 sources; cached prompt gebruikt."
         echo "  Vergelijking: $SCHEMA_SYNC_COMPARE_MD"
-        status_event "prompt_schema_sync_cached" "live EMX2 schema unchanged; reused cached prompt sync"
+        status_event "prompt_schema_sync_cached" "live EMX2 sources unchanged; reused cached prompt sync"
       elif python3 src/cohort_prompt_schema_updater.py \
         --base-prompts "$SCHEMA_SYNC_BASE_PROMPTS" \
         --old-schema-csv "$COHORT_PROMPT_SCHEMA_BASE_CSV" \
         --new-schema-csv "$LIVE_SCHEMA_CSV" \
+        "${SCHEMA_SYNC_OLD_LOCAL_ROOT_ARGS[@]}" \
+        --new-local-root "$EMX2_REPO_ROOT" \
         --output "$SCHEMA_SYNC_PROMPTS" \
         --report-json "$SCHEMA_SYNC_REPORT_JSON" \
         --comparison-json "$SCHEMA_SYNC_COMPARE_JSON" \
@@ -1026,6 +1152,8 @@ PY
             --base-prompts "$SCHEMA_SYNC_BASE_PROMPTS" \
             --old-schema-csv "$COHORT_PROMPT_SCHEMA_BASE_CSV" \
             --new-schema-csv "$LIVE_SCHEMA_CSV" \
+            "${SCHEMA_SYNC_OLD_LOCAL_ROOT_ARGS[@]}" \
+            --new-local-root "$EMX2_REPO_ROOT" \
             --output "$SCHEMA_SYNC_LLM_PROMPTS" \
             --report-json "$SCHEMA_SYNC_REPORT_JSON" \
             --rewrite-changed-with-llm \
@@ -1044,6 +1172,8 @@ PY
           fi
         fi
 
+        refresh_tree_snapshot "$EMX2_REPO_ROOT" "$SCHEMA_SYNC_STATE_SOURCE_ROOT"
+        cp -f "$SCHEMA_SYNC_SOURCE_MANIFEST" "$SCHEMA_SYNC_STATE_SOURCE_MANIFEST"
         SCHEMA_SYNC_HISTORY_SAVED_AT="$(
           archive_prompt_schema_diff \
             "$COHORT_PROMPT_SCHEMA_HISTORY_DIR" \
@@ -1053,6 +1183,10 @@ PY
         )"
         echo "  Prompt diff opgeslagen: $SCHEMA_SYNC_HISTORY_SAVED_AT"
         status_event "prompt_schema_sync_archived" "prompt diff archived at ${SCHEMA_SYNC_HISTORY_SAVED_AT}"
+        if ! push_prompt_schema_diff_to_git "$SCHEMA_SYNC_HISTORY_SAVED_AT" "$SCHEMA_SYNC_CHANGED_TASKS"; then
+          echo "⚠️  Git push van prompt diff mislukte; lokale diff blijft behouden."
+          status_event "warning" "git push of prompt diff failed; local diff retained"
+        fi
 
         cp -f "$LIVE_SCHEMA_CSV" "$SCHEMA_SYNC_STATE_SCHEMA"
         cp -f "$RUNTIME_PROMPTS" "$SCHEMA_SYNC_STATE_PROMPTS"
