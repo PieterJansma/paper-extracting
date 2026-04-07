@@ -178,35 +178,47 @@ flag_enabled() {
 
 archive_prompt_schema_diff() {
   local history_root="$1"
-  local deterministic_compare_md="$2"
-  local llm_compare_md="${3:-}"
-  local change_count="${4:-0}"
+  local deterministic_prompt_diff="$2"
+  local llm_prompt_diff="${3:-}"
 
   local stamp
   stamp="$(date -u +"%Y%m%dT%H%M%SZ")"
-  local out_file="${history_root}/${stamp}.prompt_change.md"
+  local out_file="${history_root}/${stamp}.prompt_change.diff"
   mkdir -p "$history_root"
 
-  {
-    echo "# Prompt Change"
-    echo
-    echo "- timestamp_utc: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-    echo "- changed_tasks: ${change_count}"
-    if [[ -n "$llm_compare_md" && -f "$llm_compare_md" ]]; then
-      echo "- source: llm compare"
-    else
-      echo "- source: deterministic compare"
-    fi
-    echo "- baseline_prompt: prompts/prompts_cohort.toml"
-    echo
-    if [[ -n "$llm_compare_md" && -f "$llm_compare_md" ]]; then
-      cat "$llm_compare_md"
-    else
-      cat "$deterministic_compare_md"
-    fi
-  } > "$out_file"
+  if [[ -n "$llm_prompt_diff" && -f "$llm_prompt_diff" ]]; then
+    cp -f "$llm_prompt_diff" "$out_file"
+  else
+    cp -f "$deterministic_prompt_diff" "$out_file"
+  fi
 
   printf '%s\n' "$out_file"
+}
+
+write_prompt_unified_diff() {
+  local old_file="$1"
+  local new_file="$2"
+  local out_file="$3"
+  local old_label="${4:-old_prompt}"
+  local new_label="${5:-new_prompt}"
+
+  python3 - "$old_file" "$new_file" "$out_file" "$old_label" "$new_label" <<'PY'
+import difflib
+import sys
+from pathlib import Path
+
+old_path = Path(sys.argv[1]).resolve()
+new_path = Path(sys.argv[2]).resolve()
+out_path = Path(sys.argv[3]).resolve()
+old_label = sys.argv[4]
+new_label = sys.argv[5]
+
+old_lines = old_path.read_text(encoding="utf-8").splitlines(keepends=True)
+new_lines = new_path.read_text(encoding="utf-8").splitlines(keepends=True)
+diff = difflib.unified_diff(old_lines, new_lines, fromfile=old_label, tofile=new_label)
+out_path.parent.mkdir(parents=True, exist_ok=True)
+out_path.write_text("".join(diff), encoding="utf-8")
+PY
 }
 
 write_tree_manifest() {
@@ -1057,10 +1069,12 @@ if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
     SCHEMA_SYNC_REPORT_JSON="${RUN_DIR}/prompt_schema_sync.report.json"
     SCHEMA_SYNC_COMPARE_JSON="${RUN_DIR}/prompt_schema_sync.compare.json"
     SCHEMA_SYNC_COMPARE_MD="${RUN_DIR}/prompt_schema_sync.compare.md"
+    SCHEMA_SYNC_PROMPT_DIFF="${RUN_DIR}/prompt_schema_sync.prompt.diff"
     SCHEMA_SYNC_LLM_PROMPTS="${RUN_DIR}/prompts.schema_sync.llm.runtime.toml"
     SCHEMA_SYNC_LLM_REPORT_JSON="${RUN_DIR}/prompt_schema_sync.llm_report.json"
     SCHEMA_SYNC_LLM_COMPARE_JSON="${RUN_DIR}/prompt_schema_sync.llm.compare.json"
     SCHEMA_SYNC_LLM_COMPARE_MD="${RUN_DIR}/prompt_schema_sync.llm.compare.md"
+    SCHEMA_SYNC_LLM_PROMPT_DIFF="${RUN_DIR}/prompt_schema_sync.llm.prompt.diff"
     mkdir -p "$COHORT_PROMPT_SCHEMA_STATE_DIR"
     SCHEMA_SYNC_STATE_SCHEMA="${COHORT_PROMPT_SCHEMA_STATE_DIR}/live_schema.csv"
     SCHEMA_SYNC_STATE_PROMPTS="${COHORT_PROMPT_SCHEMA_STATE_DIR}/prompts.runtime.toml"
@@ -1069,9 +1083,11 @@ if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
     SCHEMA_SYNC_STATE_REPORT_JSON="${COHORT_PROMPT_SCHEMA_STATE_DIR}/report.json"
     SCHEMA_SYNC_STATE_COMPARE_JSON="${COHORT_PROMPT_SCHEMA_STATE_DIR}/compare.json"
     SCHEMA_SYNC_STATE_COMPARE_MD="${COHORT_PROMPT_SCHEMA_STATE_DIR}/compare.md"
+    SCHEMA_SYNC_STATE_PROMPT_DIFF="${COHORT_PROMPT_SCHEMA_STATE_DIR}/prompt.diff"
     SCHEMA_SYNC_STATE_LLM_REPORT_JSON="${COHORT_PROMPT_SCHEMA_STATE_DIR}/llm_report.json"
     SCHEMA_SYNC_STATE_LLM_COMPARE_JSON="${COHORT_PROMPT_SCHEMA_STATE_DIR}/llm_compare.json"
     SCHEMA_SYNC_STATE_LLM_COMPARE_MD="${COHORT_PROMPT_SCHEMA_STATE_DIR}/llm_compare.md"
+    SCHEMA_SYNC_STATE_LLM_PROMPT_DIFF="${COHORT_PROMPT_SCHEMA_STATE_DIR}/llm_prompt.diff"
     SCHEMA_SYNC_SOURCE_MANIFEST="${RUN_DIR}/emx2_sources.manifest.json"
     SCHEMA_SYNC_OLD_LOCAL_ROOT_ARGS=()
     if [[ -d "$SCHEMA_SYNC_STATE_SOURCE_ROOT" ]]; then
@@ -1098,6 +1114,9 @@ if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
         if [[ -f "$SCHEMA_SYNC_STATE_COMPARE_MD" ]]; then
           cp -f "$SCHEMA_SYNC_STATE_COMPARE_MD" "$SCHEMA_SYNC_COMPARE_MD"
         fi
+        if [[ -f "$SCHEMA_SYNC_STATE_PROMPT_DIFF" ]]; then
+          cp -f "$SCHEMA_SYNC_STATE_PROMPT_DIFF" "$SCHEMA_SYNC_PROMPT_DIFF"
+        fi
         if [[ -f "$SCHEMA_SYNC_STATE_LLM_REPORT_JSON" ]]; then
           cp -f "$SCHEMA_SYNC_STATE_LLM_REPORT_JSON" "$SCHEMA_SYNC_LLM_REPORT_JSON"
         fi
@@ -1107,10 +1126,18 @@ if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
         if [[ -f "$SCHEMA_SYNC_STATE_LLM_COMPARE_MD" ]]; then
           cp -f "$SCHEMA_SYNC_STATE_LLM_COMPARE_MD" "$SCHEMA_SYNC_LLM_COMPARE_MD"
         fi
+        if [[ -f "$SCHEMA_SYNC_STATE_LLM_PROMPT_DIFF" ]]; then
+          cp -f "$SCHEMA_SYNC_STATE_LLM_PROMPT_DIFF" "$SCHEMA_SYNC_LLM_PROMPT_DIFF"
+        fi
         export PDF_EXTRACT_PROMPTS="$SCHEMA_SYNC_PROMPTS"
         RUNTIME_PROMPTS="$SCHEMA_SYNC_PROMPTS"
         echo "  Prompt schema sync: geen wijziging in live EMX2 sources; cached prompt gebruikt."
         echo "  Vergelijking: $SCHEMA_SYNC_COMPARE_MD"
+        if [[ -f "$SCHEMA_SYNC_LLM_PROMPT_DIFF" ]]; then
+          echo "  Prompt diff: $SCHEMA_SYNC_LLM_PROMPT_DIFF"
+        elif [[ -f "$SCHEMA_SYNC_PROMPT_DIFF" ]]; then
+          echo "  Prompt diff: $SCHEMA_SYNC_PROMPT_DIFF"
+        fi
         status_event "prompt_schema_sync_cached" "live EMX2 sources unchanged; reused cached prompt sync"
       elif python3 src/cohort_prompt_schema_updater.py \
         --base-prompts "$SCHEMA_SYNC_BASE_PROMPTS" \
@@ -1139,11 +1166,19 @@ print(count)
 PY
         )"
 
+        write_prompt_unified_diff \
+          "$SCHEMA_SYNC_BASE_PROMPTS" \
+          "$SCHEMA_SYNC_PROMPTS" \
+          "$SCHEMA_SYNC_PROMPT_DIFF" \
+          "prompts/prompts_cohort.toml" \
+          "prompts.schema_sync.runtime.toml"
+
         export PDF_EXTRACT_PROMPTS="$SCHEMA_SYNC_PROMPTS"
         RUNTIME_PROMPTS="$SCHEMA_SYNC_PROMPTS"
         echo "  Prompt schema sync: changed_tasks=${SCHEMA_SYNC_CHANGED_TASKS}"
         echo "  PDF_EXTRACT_PROMPTS=$PDF_EXTRACT_PROMPTS"
         echo "  Vergelijking: $SCHEMA_SYNC_COMPARE_MD"
+        echo "  Prompt diff: $SCHEMA_SYNC_PROMPT_DIFF"
         status_event "prompt_schema_sync_ready" "prompt schema sync ready with ${SCHEMA_SYNC_CHANGED_TASKS} changed task(s)"
 
         if [[ "${SCHEMA_SYNC_CHANGED_TASKS:-0}" -gt 0 ]] && flag_enabled "$COHORT_PROMPT_SCHEMA_SYNC_LLM"; then
@@ -1163,8 +1198,15 @@ PY
             --comparison-md "$SCHEMA_SYNC_LLM_COMPARE_MD" >/dev/null; then
             export PDF_EXTRACT_PROMPTS="$SCHEMA_SYNC_LLM_PROMPTS"
             RUNTIME_PROMPTS="$SCHEMA_SYNC_LLM_PROMPTS"
+            write_prompt_unified_diff \
+              "$SCHEMA_SYNC_BASE_PROMPTS" \
+              "$SCHEMA_SYNC_LLM_PROMPTS" \
+              "$SCHEMA_SYNC_LLM_PROMPT_DIFF" \
+              "prompts/prompts_cohort.toml" \
+              "prompts.schema_sync.llm.runtime.toml"
             echo "  LLM prompt sync actief: $PDF_EXTRACT_PROMPTS"
             echo "  LLM vergelijking: $SCHEMA_SYNC_LLM_COMPARE_MD"
+            echo "  LLM prompt diff: $SCHEMA_SYNC_LLM_PROMPT_DIFF"
             status_event "prompt_schema_sync_llm_done" "Qwen rewrote changed prompt tasks"
           else
             echo "⚠️  Qwen prompt sync mislukte; fallback naar deterministische schema-sync prompt."
@@ -1177,9 +1219,8 @@ PY
         SCHEMA_SYNC_HISTORY_SAVED_AT="$(
           archive_prompt_schema_diff \
             "$COHORT_PROMPT_SCHEMA_HISTORY_DIR" \
-            "$SCHEMA_SYNC_COMPARE_MD" \
-            "$SCHEMA_SYNC_LLM_COMPARE_MD" \
-            "$SCHEMA_SYNC_CHANGED_TASKS"
+            "$SCHEMA_SYNC_PROMPT_DIFF" \
+            "$SCHEMA_SYNC_LLM_PROMPT_DIFF"
         )"
         echo "  Prompt diff opgeslagen: $SCHEMA_SYNC_HISTORY_SAVED_AT"
         status_event "prompt_schema_sync_archived" "prompt diff archived at ${SCHEMA_SYNC_HISTORY_SAVED_AT}"
@@ -1197,6 +1238,11 @@ PY
         if [[ -f "$SCHEMA_SYNC_COMPARE_MD" ]]; then
           cp -f "$SCHEMA_SYNC_COMPARE_MD" "$SCHEMA_SYNC_STATE_COMPARE_MD"
         fi
+        if [[ -f "$SCHEMA_SYNC_PROMPT_DIFF" ]]; then
+          cp -f "$SCHEMA_SYNC_PROMPT_DIFF" "$SCHEMA_SYNC_STATE_PROMPT_DIFF"
+        else
+          rm -f "$SCHEMA_SYNC_STATE_PROMPT_DIFF"
+        fi
         if [[ -f "$SCHEMA_SYNC_LLM_REPORT_JSON" ]]; then
           cp -f "$SCHEMA_SYNC_LLM_REPORT_JSON" "$SCHEMA_SYNC_STATE_LLM_REPORT_JSON"
         else
@@ -1211,6 +1257,11 @@ PY
           cp -f "$SCHEMA_SYNC_LLM_COMPARE_MD" "$SCHEMA_SYNC_STATE_LLM_COMPARE_MD"
         else
           rm -f "$SCHEMA_SYNC_STATE_LLM_COMPARE_MD"
+        fi
+        if [[ -f "$SCHEMA_SYNC_LLM_PROMPT_DIFF" ]]; then
+          cp -f "$SCHEMA_SYNC_LLM_PROMPT_DIFF" "$SCHEMA_SYNC_STATE_LLM_PROMPT_DIFF"
+        else
+          rm -f "$SCHEMA_SYNC_STATE_LLM_PROMPT_DIFF"
         fi
       else
         echo "⚠️  Prompt schema sync mislukte; doorgaan met bestaande runtime prompt."

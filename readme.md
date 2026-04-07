@@ -322,6 +322,7 @@ This means you can always go back and inspect:
 - which tasks changed
 - whether the archived diff came from the deterministic sync or the Qwen-polished sync
 - which baseline prompt it was based on
+- the exact old-to-new prompt diff in unified diff format
 
 ### Step 5: `main_cohort.py` uses that runtime prompt
 
@@ -395,6 +396,8 @@ Show what changed in the prompt:
 LATEST_RUN="$(ls -td logs/runs/* | head -n 1)"
 cat "$LATEST_RUN/prompt_schema_sync.compare.md"
 cat "$LATEST_RUN/prompt_schema_sync.llm.compare.md"
+less "$LATEST_RUN/prompt_schema_sync.prompt.diff"
+less "$LATEST_RUN/prompt_schema_sync.llm.prompt.diff"
 ```
 
 ## Prompt Demo Route
