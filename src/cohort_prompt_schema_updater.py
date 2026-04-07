@@ -800,6 +800,10 @@ def _extract_field_block(instructions: str | None, field_path: str) -> str:
     return block
 
 
+def _normalize_block_text(text: str | None) -> str:
+    return re.sub(r"\s+", " ", str(text or "").strip())
+
+
 def _render_before_after_markdown(comparison: Dict[str, Any]) -> str:
     lines: List[str] = ["# Prompt Schema Before/After", ""]
     tasks = comparison.get("tasks") or {}
@@ -814,14 +818,13 @@ def _render_before_after_markdown(comparison: Dict[str, Any]) -> str:
         if not isinstance(payload, dict):
             continue
         schema_diff = payload.get("schema_diff") or {}
-        changed_fields = []
-        for key in ("added_fields", "removed_fields", "changed_fields"):
-            for field_path in list(schema_diff.get(key) or []):
-                if field_path not in changed_fields:
-                    changed_fields.append(field_path)
-
         old_instructions = str(payload.get("old_instructions") or "")
         final_instructions = str(payload.get("final_instructions") or "")
+        changed_fields = _changed_field_paths(
+            {"instructions": old_instructions},
+            {"instructions": final_instructions},
+            schema_diff,
+        )
         task_lines: List[str] = [f"## {task_name}", ""]
         rendered_any = False
 
@@ -829,6 +832,8 @@ def _render_before_after_markdown(comparison: Dict[str, Any]) -> str:
             before_block = _extract_field_block(old_instructions, field_path)
             after_block = _extract_field_block(final_instructions, field_path)
             if not before_block and not after_block:
+                continue
+            if _normalize_block_text(before_block) == _normalize_block_text(after_block):
                 continue
             rendered_any = True
             task_lines.append(f"### `{field_path}`")
@@ -847,19 +852,7 @@ def _render_before_after_markdown(comparison: Dict[str, Any]) -> str:
             task_lines.append("")
 
         if not rendered_any:
-            task_lines.append("### Full Task")
-            task_lines.append("")
-            task_lines.append("Before")
-            task_lines.append("")
-            task_lines.append("```text")
-            task_lines.append(old_instructions)
-            task_lines.append("```")
-            task_lines.append("")
-            task_lines.append("After")
-            task_lines.append("")
-            task_lines.append("```text")
-            task_lines.append(final_instructions)
-            task_lines.append("```")
+            task_lines.append("No field-level prompt deltas could be isolated for this task.")
             task_lines.append("")
 
         lines.extend(task_lines)

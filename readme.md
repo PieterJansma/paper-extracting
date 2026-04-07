@@ -46,6 +46,27 @@ LATEST_RUN="$(ls -td logs/runs/* | head -n 1)"
 cat "$LATEST_RUN/prompt_schema_sync.before_after.md"
 ```
 
+## Prompt history
+
+De blijvende promptgeschiedenis staat onder `prompts/history/`:
+
+```text
+prompts/history/
+  baseline/
+    prompts_cohort.toml
+  2026/
+    2026-04-07/
+      20260407T153012_run7067294.prompt_change.md
+      20260407T181500_run7067451.prompt_change.md
+```
+
+Regels:
+
+- de baseline wordt eenmalig vastgelegd vanuit de huidige `prompts/prompts_cohort.toml`
+- daarna wordt per wijziging alleen de compacte `before/after` markdown opgeslagen
+- meerdere wijzigingen op dezelfde dag komen in dezelfde datummap
+- datummappen zitten per jaar gegroepeerd
+
 ## Ontology normalisatie
 
 De cohortflow doet nu twee lagen normalisatie:

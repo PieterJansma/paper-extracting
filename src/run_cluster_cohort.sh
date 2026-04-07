@@ -81,9 +81,9 @@ COHORT_PROMPT_SCHEMA_SYNC="${COHORT_PROMPT_SCHEMA_SYNC:-1}"
 COHORT_PROMPT_SCHEMA_SYNC_LLM="${COHORT_PROMPT_SCHEMA_SYNC_LLM:-1}"
 COHORT_PROMPT_SCHEMA_BASE_CSV="${COHORT_PROMPT_SCHEMA_BASE_CSV:-${PWD}/schemas/molgenis_UMCGCohortsStaging.csv}"
 COHORT_PROMPT_SCHEMA_STATE_DIR="${COHORT_PROMPT_SCHEMA_STATE_DIR:-${PWD}/tmp/cohort_prompt_schema_sync_state}"
-COHORT_PROMPT_SCHEMA_HISTORY_DIR="${COHORT_PROMPT_SCHEMA_HISTORY_DIR:-${COHORT_PROMPT_SCHEMA_STATE_DIR}/history}"
+COHORT_PROMPT_SCHEMA_HISTORY_DIR="${COHORT_PROMPT_SCHEMA_HISTORY_DIR:-${PWD}/prompts/history}"
 COHORT_PROMPT_SCHEMA_PUSH_GIT="${COHORT_PROMPT_SCHEMA_PUSH_GIT:-0}"
-COHORT_PROMPT_SCHEMA_PUSH_DIR="${COHORT_PROMPT_SCHEMA_PUSH_DIR:-reports/prompt_schema_history}"
+COHORT_PROMPT_SCHEMA_PUSH_DIR="${COHORT_PROMPT_SCHEMA_PUSH_DIR:-prompts/history}"
 COHORT_PROMPT_SCHEMA_PUSH_REMOTE="${COHORT_PROMPT_SCHEMA_PUSH_REMOTE:-origin}"
 COHORT_PROMPT_SCHEMA_PUSH_BRANCH="${COHORT_PROMPT_SCHEMA_PUSH_BRANCH:-}"
 
@@ -176,22 +176,42 @@ flag_enabled() {
   esac
 }
 
-archive_prompt_schema_diff() {
+ensure_prompt_history_baseline() {
   local history_root="$1"
-  local deterministic_prompt_diff="$2"
-  local llm_prompt_diff="${3:-}"
+  local baseline_source="$2"
 
-  local stamp
-  stamp="$(date -u +"%Y%m%dT%H%M%SZ")"
-  local out_file="${history_root}/${stamp}.prompt_change.diff"
-  mkdir -p "$history_root"
-
-  if [[ -n "$llm_prompt_diff" && -f "$llm_prompt_diff" ]]; then
-    cp -f "$llm_prompt_diff" "$out_file"
-  else
-    cp -f "$deterministic_prompt_diff" "$out_file"
+  if [[ -z "$baseline_source" || ! -f "$baseline_source" ]]; then
+    return 0
   fi
 
+  local baseline_dir="${history_root}/baseline"
+  local baseline_file="${baseline_dir}/prompts_cohort.toml"
+  mkdir -p "$baseline_dir"
+
+  if [[ ! -f "$baseline_file" ]]; then
+    cp -f "$baseline_source" "$baseline_file"
+  fi
+}
+
+archive_prompt_schema_change() {
+  local history_root="$1"
+  local before_after_md="$2"
+
+  if [[ -z "$before_after_md" || ! -f "$before_after_md" ]]; then
+    return 1
+  fi
+
+  local year_dir
+  local date_dir
+  local stamp
+  year_dir="$(date +"%Y")"
+  date_dir="$(date +"%Y-%m-%d")"
+  stamp="$(date +"%Y%m%dT%H%M%S")"
+
+  local out_dir="${history_root}/${year_dir}/${date_dir}"
+  local out_file="${out_dir}/${stamp}_run${RUN_ID}.prompt_change.md"
+  mkdir -p "$out_dir"
+  cp -f "$before_after_md" "$out_file"
   printf '%s\n' "$out_file"
 }
 
@@ -301,33 +321,54 @@ push_prompt_schema_diff_to_git() {
 
   local push_dir_abs="${repo_root}/${COHORT_PROMPT_SCHEMA_PUSH_DIR}"
   mkdir -p "$push_dir_abs"
-  local base_name
-  base_name="$(basename "$diff_file")"
-  local push_file_abs="${push_dir_abs}/${base_name}"
-  local latest_file_abs="${push_dir_abs}/latest.prompt_change.md"
-  cp -f "$diff_file" "$push_file_abs"
-  cp -f "$diff_file" "$latest_file_abs"
+  local diff_file_abs
+  diff_file_abs="$(cd "$(dirname "$diff_file")" && pwd -P)/$(basename "$diff_file")"
+  local push_file_abs="$diff_file_abs"
+  local push_rel=""
+  if [[ "$diff_file_abs" == "${repo_root}/"* ]]; then
+    push_rel="${diff_file_abs#${repo_root}/}"
+  else
+    local base_name
+    base_name="$(basename "$diff_file")"
+    push_file_abs="${push_dir_abs}/${base_name}"
+    cp -f "$diff_file" "$push_file_abs"
+    push_rel="${COHORT_PROMPT_SCHEMA_PUSH_DIR}/${base_name}"
+  fi
 
-  local push_rel="${COHORT_PROMPT_SCHEMA_PUSH_DIR}/${base_name}"
-  local latest_rel="${COHORT_PROMPT_SCHEMA_PUSH_DIR}/latest.prompt_change.md"
-  local commit_msg="Archive prompt diff ${base_name} (${changed_tasks} changed tasks)"
+  local baseline_abs="${repo_root}/${COHORT_PROMPT_SCHEMA_PUSH_DIR}/baseline/prompts_cohort.toml"
+  local baseline_rel=""
+  if [[ -f "$baseline_abs" ]]; then
+    baseline_rel="${baseline_abs#${repo_root}/}"
+  fi
+  local commit_msg="Archive prompt change $(basename "$push_file_abs") (${changed_tasks} changed tasks)"
 
   (
     cd "$repo_root"
-    git add -- "$push_rel" "$latest_rel"
-    if git diff --cached --quiet -- "$push_rel" "$latest_rel"; then
-      echo "  Git push: geen nieuwe wijzigingen voor ${push_rel}"
-      exit 0
+    if [[ -n "$baseline_rel" ]]; then
+      git add -- "$baseline_rel"
     fi
-    git commit --only -m "$commit_msg" -- "$push_rel" "$latest_rel" >/dev/null
+    git add -- "$push_rel"
+    if [[ -n "$baseline_rel" ]]; then
+      if git diff --cached --quiet -- "$push_rel" "$baseline_rel"; then
+        echo "  Git push: geen nieuwe wijzigingen voor ${push_rel}"
+        exit 0
+      fi
+      git commit -m "$commit_msg" -- "$push_rel" "$baseline_rel" >/dev/null
+    else
+      if git diff --cached --quiet -- "$push_rel"; then
+        echo "  Git push: geen nieuwe wijzigingen voor ${push_rel}"
+        exit 0
+      fi
+      git commit -m "$commit_msg" -- "$push_rel" >/dev/null
+    fi
     if [[ -n "$COHORT_PROMPT_SCHEMA_PUSH_BRANCH" ]]; then
       git push "$COHORT_PROMPT_SCHEMA_PUSH_REMOTE" "HEAD:${COHORT_PROMPT_SCHEMA_PUSH_BRANCH}" >/dev/null
     else
       git push "$COHORT_PROMPT_SCHEMA_PUSH_REMOTE" HEAD >/dev/null
     fi
   )
-  echo "  Prompt diff gepusht naar git: ${push_rel}"
-  status_event "prompt_schema_sync_git_pushed" "prompt diff pushed to git at ${push_rel}"
+  echo "  Prompt wijziging gepusht naar git: ${push_rel}"
+  status_event "prompt_schema_sync_git_pushed" "prompt change pushed to git at ${push_rel}"
 }
 
 fetch_emx2_csv() {
@@ -1096,6 +1137,7 @@ if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
       SCHEMA_SYNC_OLD_LOCAL_ROOT_ARGS=(--old-local-root "$SCHEMA_SYNC_STATE_SOURCE_ROOT")
     fi
     mkdir -p "$COHORT_PROMPT_SCHEMA_HISTORY_DIR"
+    ensure_prompt_history_baseline "$COHORT_PROMPT_SCHEMA_HISTORY_DIR" "$SCHEMA_SYNC_BASE_PROMPTS"
     status_event "prompt_schema_sync_started" "checking EMX2 schema against base prompt"
 
     if python3 src/emx2_dynamic_runtime.py export-schema-csv \
@@ -1228,17 +1270,21 @@ PY
 
         refresh_tree_snapshot "$EMX2_REPO_ROOT" "$SCHEMA_SYNC_STATE_SOURCE_ROOT"
         cp -f "$SCHEMA_SYNC_SOURCE_MANIFEST" "$SCHEMA_SYNC_STATE_SOURCE_MANIFEST"
-        SCHEMA_SYNC_HISTORY_SAVED_AT="$(
-          archive_prompt_schema_diff \
+        SCHEMA_SYNC_HISTORY_SAVED_AT=""
+        if SCHEMA_SYNC_HISTORY_SAVED_AT="$(
+          archive_prompt_schema_change \
             "$COHORT_PROMPT_SCHEMA_HISTORY_DIR" \
-            "$SCHEMA_SYNC_PROMPT_DIFF" \
-            "$SCHEMA_SYNC_LLM_PROMPT_DIFF"
-        )"
-        echo "  Prompt diff opgeslagen: $SCHEMA_SYNC_HISTORY_SAVED_AT"
-        status_event "prompt_schema_sync_archived" "prompt diff archived at ${SCHEMA_SYNC_HISTORY_SAVED_AT}"
-        if ! push_prompt_schema_diff_to_git "$SCHEMA_SYNC_HISTORY_SAVED_AT" "$SCHEMA_SYNC_CHANGED_TASKS"; then
-          echo "⚠️  Git push van prompt diff mislukte; lokale diff blijft behouden."
-          status_event "warning" "git push of prompt diff failed; local diff retained"
+            "$SCHEMA_SYNC_BEFORE_AFTER_MD"
+        )"; then
+          echo "  Prompt wijziging opgeslagen: $SCHEMA_SYNC_HISTORY_SAVED_AT"
+          status_event "prompt_schema_sync_archived" "prompt change archived at ${SCHEMA_SYNC_HISTORY_SAVED_AT}"
+          if ! push_prompt_schema_diff_to_git "$SCHEMA_SYNC_HISTORY_SAVED_AT" "$SCHEMA_SYNC_CHANGED_TASKS"; then
+            echo "⚠️  Git push van prompt wijziging mislukte; lokale wijziging blijft behouden."
+            status_event "warning" "git push of prompt change failed; local change retained"
+          fi
+        else
+          echo "⚠️  Prompt wijziging kon niet worden opgeslagen; before/after bestand ontbreekt."
+          status_event "warning" "prompt change archive skipped; before/after file missing"
         fi
 
         cp -f "$LIVE_SCHEMA_CSV" "$SCHEMA_SYNC_STATE_SCHEMA"
