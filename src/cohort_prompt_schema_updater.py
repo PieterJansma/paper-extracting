@@ -121,6 +121,16 @@ def _extract_original_field_blocks(instructions: str | None) -> Dict[str, str]:
     return out
 
 
+def _heading_aliases(heading: str) -> set[str]:
+    heading_key = re.sub(r"\s*\(.*?\)\s*$", "", str(heading or "")).strip()
+    aliases = {_normalize(heading_key)}
+    for part in re.split(r"\s*/\s*", heading_key):
+        part_key = _normalize(part)
+        if part_key:
+            aliases.add(part_key)
+    return {alias for alias in aliases if alias}
+
+
 def _parse_instruction_segments(instructions: str | None) -> List[Dict[str, Any]]:
     lines = str(instructions or "").splitlines()
     segments: List[Dict[str, Any]] = []
@@ -131,39 +141,70 @@ def _parse_instruction_segments(instructions: str | None) -> List[Dict[str, Any]
         stripped = lines[idx].strip()
         return len(stripped) >= 10 and set(stripped) == {"-"}
 
+    def is_top_level_bullet(idx: int) -> bool:
+        if idx < 0 or idx >= len(lines):
+            return False
+        line = lines[idx]
+        return line.startswith("- ") and not line.startswith("  ")
+
     cursor = 0
     i = 0
-    while i + 2 < len(lines):
-        if not (is_divider(i) and is_divider(i + 2)):
-            i += 1
-            continue
-        if cursor < i:
+    while i < len(lines):
+        if i + 2 < len(lines) and is_divider(i) and is_divider(i + 2):
+            if cursor < i:
+                segments.append({
+                    "kind": "text",
+                    "text": "\n".join(lines[cursor:i]).rstrip(),
+                })
+            heading = lines[i + 1].strip()
+            heading_key = re.sub(r"\s*\(.*?\)\s*$", "", heading).strip()
+            j = i + 3
+            while j < len(lines):
+                if j + 2 < len(lines) and is_divider(j) and is_divider(j + 2):
+                    break
+                j += 1
+            block = "\n".join(lines[i + 1:j]).strip()
             segments.append({
-                "kind": "text",
-                "text": "\n".join(lines[cursor:i]).rstrip(),
+                "kind": "field_block",
+                "style": "divider",
+                "heading": heading,
+                "heading_key": heading_key,
+                "aliases": _heading_aliases(heading_key),
+                "block": block,
             })
-        heading = lines[i + 1].strip()
-        heading_key = re.sub(r"\s*\(.*?\)\s*$", "", heading).strip()
-        j = i + 3
-        while j + 2 < len(lines) and not (is_divider(j) and is_divider(j + 2)):
-            j += 1
-        if j + 2 >= len(lines):
-            j = len(lines)
-        block = "\n".join(lines[i + 1:j]).strip()
-        aliases = {_normalize(heading_key)}
-        for part in heading_key.split("/"):
-            part_key = _normalize(part)
-            if part_key:
-                aliases.add(part_key)
-        segments.append({
-            "kind": "field_block",
-            "heading": heading,
-            "heading_key": heading_key,
-            "aliases": aliases,
-            "block": block,
-        })
-        cursor = j
-        i = j
+            cursor = j
+            i = j
+            continue
+
+        if is_top_level_bullet(i):
+            if cursor < i:
+                segments.append({
+                    "kind": "text",
+                    "text": "\n".join(lines[cursor:i]).rstrip(),
+                })
+            j = i + 1
+            while j < len(lines):
+                if is_top_level_bullet(j):
+                    break
+                if j + 2 < len(lines) and is_divider(j) and is_divider(j + 2):
+                    break
+                j += 1
+            first_line = lines[i][2:]
+            heading = first_line.split(":", 1)[0].strip()
+            block = "\n".join(lines[i:j]).rstrip()
+            segments.append({
+                "kind": "field_block",
+                "style": "bullet",
+                "heading": heading,
+                "heading_key": heading,
+                "aliases": _heading_aliases(heading),
+                "block": block,
+            })
+            cursor = j
+            i = j
+            continue
+
+        i += 1
     if cursor < len(lines):
         segments.append({
             "kind": "text",
@@ -183,7 +224,10 @@ def _render_instruction_segments(segments: List[Dict[str, Any]]) -> str:
         if seg.get("kind") == "field_block":
             block = str(seg.get("block") or "").strip()
             if block:
-                parts.append("--------------------------------------------------\n" + block)
+                if seg.get("style") == "divider":
+                    parts.append("--------------------------------------------------\n" + block)
+                else:
+                    parts.append(block)
     return "\n\n".join(part for part in parts if part).rstrip()
 
 
@@ -233,11 +277,23 @@ def _insert_segment_for_field(
 
     heading = _field_path_leaf(field_path)
     heading = heading.replace("_", " ")
+    style = "divider"
+    neighbor_indices = []
+    if insert_at - 1 >= 0:
+        neighbor_indices.append(insert_at - 1)
+    if insert_at < len(segments):
+        neighbor_indices.append(insert_at)
+    for neighbor_idx in neighbor_indices:
+        neighbor = segments[neighbor_idx]
+        if neighbor.get("kind") == "field_block":
+            style = str(neighbor.get("style") or style)
+            break
     segments.insert(insert_at, {
         "kind": "field_block",
+        "style": style,
         "heading": heading,
         "heading_key": heading,
-        "aliases": {_normalize(heading)},
+        "aliases": _heading_aliases(heading),
         "block": str(new_block or "").strip(),
     })
 
@@ -434,12 +490,15 @@ def _build_field_rewrite_messages(
         "Update one field block inside an existing extraction prompt.\n"
         "Goals:\n"
         "- Preserve the original field-block style, detail, examples and edge-case rules whenever still valid.\n"
+        "- Preserve existing lines verbatim unless they directly conflict with the new schema.\n"
         "- Change only what is required by the new schema.\n"
         "- Do not rewrite the whole task.\n"
         "- Do not collapse a rich field block into a generic one-line rule.\n"
         "- If action=replace: minimally edit the old block.\n"
         "- If action=add: write a new field block in the same style and detail level as neighboring blocks.\n"
         "- If action=remove: return action=remove and an empty block.\n"
+        "- If the change is only an enum/value-list update, keep the old explanatory rules and only update the affected allowed-values and directly dependent rule lines.\n"
+        "- Keep unaffected examples, caveats and rule bullets from the old block.\n"
         "- Use the exact current schema values from new_generated_rule when relevant.\n"
         "- Do not mention removed schema values in the final block.\n"
         "- Return JSON only: {\"action\":\"replace|add|remove\",\"block\":\"...\"}\n\n"
