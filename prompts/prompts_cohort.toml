@@ -302,33 +302,42 @@ template_json = """
 """
 
 instructions = """
-Extract explicitly defined subpopulations only (arms/subcohorts/strata/case-control/derivation-validation). Do NOT infer.
+Extract explicitly defined subpopulations only (arms/subcohorts/strata/case-control/derivation-validation/named disease groups or other named participant subsets). Do NOT infer.
 If none are explicitly defined -> {"subpopulations": []}.
 
 Rules:
 - Evidence threshold: only output a subpopulation when the paper explicitly frames a distinct subgroup
   (e.g., "subpopulation", "arm", "group", "stratum", "intervention arm", "control arm", "derivation/validation cohort").
+- Treat explicitly named disease groups, tumor/tumour working groups, clinic groups, registry-defined groups, or other named participant subsets as valid subpopulations when the paper gives them their own row, count, percentage, or subgroup description.
+- An explicit table row or figure row with a subgroup label plus subgroup-specific participant count is sufficient evidence for a subpopulation row.
+- Do NOT reject a subgroup only because it appears in a participant table rather than in the narrative text.
 - Do NOT create subpopulations from generic site lists, acknowledgements, or overall trial logistics.
 
 - name (required):
   Use an explicit subgroup label from the paper whenever available
-  (e.g., "cases", "controls", "derivation cohort", "validation cohort", "intervention arm", "usual care arm").
+  (e.g., "cases", "controls", "derivation cohort", "validation cohort", "intervention arm", "usual care arm", "lung oncology", "hereditary breast-ovarian cancer").
   If the subgroup is clearly defined but not formally named, you MAY create a short label using ONLY explicit wording from the paper.
   If you cannot produce a stable label from explicit wording -> do not output that row.
 
 - pid: only if explicitly stated for the subpopulation; else null. Do NOT invent.
-- description (required): 1–3 sentences describing the subpopulation using paper wording; no inference.
-- keywords (required): 5–12 terms to improve findability; try NOT to reuse words from description; no generic filler.
+- description:
+  use explicit subgroup wording only; no inference.
+  If the subgroup is only defined by a table row, heading, or short label/count entry, use a short phrase copied from that wording rather than inventing a narrative sentence.
+- keywords:
+  return explicit retrieval keywords only.
+  If the paper only gives a label/heading, you MAY reuse exact words from that label/heading; otherwise [].
 
 - number_of_participants:
   fill when a subgroup N is explicitly stated OR explicitly approximated
   (e.g., "about", "around", "approximately", "circa", "~", "ca.").
   If approximated, convert to the nearest integer and keep it as an estimate-derived value.
+  A named subgroup row in a participant table with its own N counts as explicit subgroup evidence.
   If no explicit or approximate N is given -> null.
 
 - counts:
   return [] if no explicit subpopulation count breakdown is given.
   Otherwise return one row per explicitly reported count row for this subpopulation.
+  A subgroup can still be valid even when counts=[]; do NOT drop a named subgroup just because the paper gives only one overall N.
   Target shape follows the cohort workbook:
     - age_group (STRICT dropdown; single select):
       Allowed values (exact strings only):

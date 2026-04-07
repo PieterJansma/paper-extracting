@@ -93,11 +93,12 @@ COHORT_PROMPT_SCHEMA_PUSH_BRANCH="${COHORT_PROMPT_SCHEMA_PUSH_BRANCH:-}"
 # - run with args    => forwards args to main_cohort.py
 # - extra script-only flags:
 #     --ocr        force OCR prefetch for all selected PDFs
+#     --ocr-force-use  force OCR prefetch and prefer OCR text over pypdf text
 #     --ocr-dump   write pypdf/ocr/diff/summary text files per paper
 # Example:
 #   bash src/run_cluster_cohort.sh
 #   bash src/run_cluster_cohort.sh -p A -o out.xlsx --pdfs data/concrete.pdf data/oncolifes.pdf
-#   bash src/run_cluster_cohort.sh --ocr --ocr-dump -p A --pdfs data/concrete.pdf -o out.xlsx
+#   bash src/run_cluster_cohort.sh --ocr-force-use --ocr-dump -p A --pdfs data/concrete.pdf -o out.xlsx
 # ------------------------------------------------------------------------------
 DEFAULT_ARGS=(-p all -o final_result_cohort.xlsx)
 if [[ $# -gt 0 ]]; then
@@ -107,6 +108,7 @@ else
 fi
 
 OCR_FORCE_ALL="${OCR_FORCE_ALL:-0}"
+OCR_FORCE_USE_PREFETCH="${OCR_FORCE_USE_PREFETCH:-0}"
 OCR_DUMP_COMPARE=0
 OCR_DUMP_DIR="${OCR_DUMP_DIR:-}"
 RUN_ARGS=()
@@ -115,6 +117,10 @@ for ((i=0; i<${#INPUT_ARGS[@]}; i++)); do
   case "$arg" in
     --ocr)
       OCR_FORCE_ALL=1
+      ;;
+    --ocr-force-use)
+      OCR_FORCE_ALL=1
+      OCR_FORCE_USE_PREFETCH=1
       ;;
     --ocr-dump)
       OCR_DUMP_COMPARE=1
@@ -537,6 +543,7 @@ export COHORT_PROMPT_SCHEMA_SYNC
 export COHORT_PROMPT_SCHEMA_SYNC_LLM
 export MOLGENIS_EMX2_LOCAL_ROOT="$EMX2_REPO_ROOT"
 export STRIP_REFERENCES
+export OCR_FORCE_USE_PREFETCH
 status_event "runtime_config_ready" "runtime config prepared"
 
 if [[ "$OCR_DUMP_COMPARE" == "1" ]]; then
@@ -546,6 +553,10 @@ if [[ "$OCR_DUMP_COMPARE" == "1" ]]; then
   mkdir -p "$OCR_DUMP_DIR"
   export OCR_COMPARE_DUMP_DIR="$OCR_DUMP_DIR"
   echo "[OCR] Compare dumps enabled: $OCR_COMPARE_DUMP_DIR"
+fi
+
+if [[ "$OCR_FORCE_USE_PREFETCH" == "1" ]]; then
+  echo "[OCR] OCR_FORCE_USE_PREFETCH=1: prefetched OCR text krijgt voorrang op pypdf."
 fi
 
 pids=()
