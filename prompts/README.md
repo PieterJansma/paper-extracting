@@ -1,7 +1,7 @@
 # Prompts
 
-- `prompts.toml`: baseline promptset voor de algemene/final pipeline.
-- `prompts_cohort.toml`: cohort-specifieke baseline promptset.
-- `archive/`: oudere of experimentele promptvarianten die niet de standaard runtime vormen.
+De runtime gebruikt nog maar één baseline promptset:
 
-De dynamische cohort-route gebruikt `prompts/prompts_cohort.toml` als startpunt en past alleen de tasks aan die geraakt worden door schema- of ontology-wijzigingen.
+- `prompts_cohort.toml`: cohort baseline promptset
+
+`archive/` bevat oudere cohortvarianten voor vergelijking of herstel, maar is geen runtime-entrypoint.

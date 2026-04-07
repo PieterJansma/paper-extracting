@@ -75,10 +75,10 @@ MOLGENIS_EMX2_REPO="${MOLGENIS_EMX2_REPO:-molgenis/molgenis-emx2}"
 MOLGENIS_EMX2_REF="${MOLGENIS_EMX2_REF:-main}"
 EMX2_CACHE_DIR="${EMX2_CACHE_DIR:-${RUN_DIR}/emx2_cache}"
 EMX2_REPO_ROOT="${EMX2_REPO_ROOT:-${EMX2_CACHE_DIR}/repo}"
-COHORT_DYNAMIC_EMX2_RUNTIME="${COHORT_DYNAMIC_EMX2_RUNTIME:-0}"
+COHORT_DYNAMIC_EMX2_RUNTIME="${COHORT_DYNAMIC_EMX2_RUNTIME:-1}"
 COHORT_DYNAMIC_PROMPTS="${COHORT_DYNAMIC_PROMPTS:-0}"
-COHORT_PROMPT_SCHEMA_SYNC="${COHORT_PROMPT_SCHEMA_SYNC:-0}"
-COHORT_PROMPT_SCHEMA_SYNC_LLM="${COHORT_PROMPT_SCHEMA_SYNC_LLM:-0}"
+COHORT_PROMPT_SCHEMA_SYNC="${COHORT_PROMPT_SCHEMA_SYNC:-1}"
+COHORT_PROMPT_SCHEMA_SYNC_LLM="${COHORT_PROMPT_SCHEMA_SYNC_LLM:-1}"
 COHORT_PROMPT_SCHEMA_BASE_CSV="${COHORT_PROMPT_SCHEMA_BASE_CSV:-${PWD}/schemas/molgenis_UMCGCohortsStaging.csv}"
 COHORT_PROMPT_SCHEMA_STATE_DIR="${COHORT_PROMPT_SCHEMA_STATE_DIR:-${PWD}/tmp/cohort_prompt_schema_sync_state}"
 COHORT_PROMPT_SCHEMA_HISTORY_DIR="${COHORT_PROMPT_SCHEMA_HISTORY_DIR:-${COHORT_PROMPT_SCHEMA_STATE_DIR}/history}"
@@ -89,17 +89,17 @@ COHORT_PROMPT_SCHEMA_PUSH_BRANCH="${COHORT_PROMPT_SCHEMA_PUSH_BRANCH:-}"
 
 # ------------------------------------------------------------------------------
 # CLI passthrough:
-# - run without args => defaults to main_cohort.py -p all -o final_result.xlsx
+# - run without args => defaults to main_cohort.py -p all -o final_result_cohort.xlsx
 # - run with args    => forwards args to main_cohort.py
 # - extra script-only flags:
 #     --ocr        force OCR prefetch for all selected PDFs
 #     --ocr-dump   write pypdf/ocr/diff/summary text files per paper
 # Example:
-#   bash src/run_cluster_final.sh
-#   bash src/run_cluster_final.sh -p A -o out.xlsx --pdfs data/concrete.pdf data/oncolifes.pdf
-#   bash src/run_cluster_final.sh --ocr --ocr-dump -p A --pdfs data/concrete.pdf -o out.xlsx
+#   bash src/run_cluster_cohort.sh
+#   bash src/run_cluster_cohort.sh -p A -o out.xlsx --pdfs data/concrete.pdf data/oncolifes.pdf
+#   bash src/run_cluster_cohort.sh --ocr --ocr-dump -p A --pdfs data/concrete.pdf -o out.xlsx
 # ------------------------------------------------------------------------------
-DEFAULT_ARGS=(-p all -o final_result.xlsx)
+DEFAULT_ARGS=(-p all -o final_result_cohort.xlsx)
 if [[ $# -gt 0 ]]; then
   INPUT_ARGS=("$@")
 else
@@ -134,11 +134,11 @@ for ((i=0; i<${#INPUT_ARGS[@]}; i++)); do
   esac
 done
 
-OUTPUT_FILE="final_result.xlsx"
+OUTPUT_FILE="final_result_cohort.xlsx"
 for ((i=0; i<${#RUN_ARGS[@]}; i++)); do
   case "${RUN_ARGS[$i]}" in
     -o|--output)
-      OUTPUT_FILE="${RUN_ARGS[$((i+1))]:-final_result.xlsx}"
+      OUTPUT_FILE="${RUN_ARGS[$((i+1))]:-final_result_cohort.xlsx}"
       ;;
   esac
 done
@@ -430,9 +430,9 @@ if [[ ! -x "$LLAMA_BIN" ]]; then
   exit 1
 fi
 
-if [[ ! -f "config.final.toml" ]]; then
-  echo "❌ ERROR: config.final.toml ontbreekt in ${PWD}"
-  echo "   main_cohort.py verwacht standaard config.final.toml (of zet PDF_EXTRACT_CONFIG)"
+if [[ ! -f "config.cohort.toml" ]]; then
+  echo "❌ ERROR: config.cohort.toml ontbreekt in ${PWD}"
+  echo "   main_cohort.py verwacht standaard config.cohort.toml (of zet PDF_EXTRACT_CONFIG)"
   exit 1
 fi
 
@@ -458,7 +458,7 @@ fi
 
 echo "[0/4] Runtime config maken met base_url via Load Balancer..."
 RUNTIME_CFG="${RUN_DIR}/config.runtime.toml"
-cp -f "config.final.toml" "$RUNTIME_CFG"
+cp -f "config.cohort.toml" "$RUNTIME_CFG"
 RUNTIME_PROMPTS=""
 SCHEMA_SYNC_BASE_PROMPTS=""
 SCHEMA_SYNC_ACTIVE=0
@@ -733,7 +733,7 @@ try:
 except ModuleNotFoundError:
     import tomli as toml
 
-cfg = os.environ.get("PDF_EXTRACT_CONFIG", "config.final.toml")
+cfg = os.environ.get("PDF_EXTRACT_CONFIG", "config.cohort.toml")
 with open(cfg, "rb") as f:
     data = toml.load(f)
 path = ((data.get("pdf") or {}).get("path") or "").strip()
@@ -1070,6 +1070,7 @@ if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
     SCHEMA_SYNC_COMPARE_JSON="${RUN_DIR}/prompt_schema_sync.compare.json"
     SCHEMA_SYNC_COMPARE_MD="${RUN_DIR}/prompt_schema_sync.compare.md"
     SCHEMA_SYNC_PROMPT_DIFF="${RUN_DIR}/prompt_schema_sync.prompt.diff"
+    SCHEMA_SYNC_BEFORE_AFTER_MD="${RUN_DIR}/prompt_schema_sync.before_after.md"
     SCHEMA_SYNC_LLM_PROMPTS="${RUN_DIR}/prompts.schema_sync.llm.runtime.toml"
     SCHEMA_SYNC_LLM_REPORT_JSON="${RUN_DIR}/prompt_schema_sync.llm_report.json"
     SCHEMA_SYNC_LLM_COMPARE_JSON="${RUN_DIR}/prompt_schema_sync.llm.compare.json"
@@ -1084,6 +1085,7 @@ if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
     SCHEMA_SYNC_STATE_COMPARE_JSON="${COHORT_PROMPT_SCHEMA_STATE_DIR}/compare.json"
     SCHEMA_SYNC_STATE_COMPARE_MD="${COHORT_PROMPT_SCHEMA_STATE_DIR}/compare.md"
     SCHEMA_SYNC_STATE_PROMPT_DIFF="${COHORT_PROMPT_SCHEMA_STATE_DIR}/prompt.diff"
+    SCHEMA_SYNC_STATE_BEFORE_AFTER_MD="${COHORT_PROMPT_SCHEMA_STATE_DIR}/before_after.md"
     SCHEMA_SYNC_STATE_LLM_REPORT_JSON="${COHORT_PROMPT_SCHEMA_STATE_DIR}/llm_report.json"
     SCHEMA_SYNC_STATE_LLM_COMPARE_JSON="${COHORT_PROMPT_SCHEMA_STATE_DIR}/llm_compare.json"
     SCHEMA_SYNC_STATE_LLM_COMPARE_MD="${COHORT_PROMPT_SCHEMA_STATE_DIR}/llm_compare.md"
@@ -1117,6 +1119,9 @@ if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
         if [[ -f "$SCHEMA_SYNC_STATE_PROMPT_DIFF" ]]; then
           cp -f "$SCHEMA_SYNC_STATE_PROMPT_DIFF" "$SCHEMA_SYNC_PROMPT_DIFF"
         fi
+        if [[ -f "$SCHEMA_SYNC_STATE_BEFORE_AFTER_MD" ]]; then
+          cp -f "$SCHEMA_SYNC_STATE_BEFORE_AFTER_MD" "$SCHEMA_SYNC_BEFORE_AFTER_MD"
+        fi
         if [[ -f "$SCHEMA_SYNC_STATE_LLM_REPORT_JSON" ]]; then
           cp -f "$SCHEMA_SYNC_STATE_LLM_REPORT_JSON" "$SCHEMA_SYNC_LLM_REPORT_JSON"
         fi
@@ -1138,6 +1143,9 @@ if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
         elif [[ -f "$SCHEMA_SYNC_PROMPT_DIFF" ]]; then
           echo "  Prompt diff: $SCHEMA_SYNC_PROMPT_DIFF"
         fi
+        if [[ -f "$SCHEMA_SYNC_BEFORE_AFTER_MD" ]]; then
+          echo "  Prompt before/after: $SCHEMA_SYNC_BEFORE_AFTER_MD"
+        fi
         status_event "prompt_schema_sync_cached" "live EMX2 sources unchanged; reused cached prompt sync"
       elif python3 src/cohort_prompt_schema_updater.py \
         --base-prompts "$SCHEMA_SYNC_BASE_PROMPTS" \
@@ -1148,7 +1156,8 @@ if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
         --output "$SCHEMA_SYNC_PROMPTS" \
         --report-json "$SCHEMA_SYNC_REPORT_JSON" \
         --comparison-json "$SCHEMA_SYNC_COMPARE_JSON" \
-        --comparison-md "$SCHEMA_SYNC_COMPARE_MD" >/dev/null; then
+        --comparison-md "$SCHEMA_SYNC_COMPARE_MD" \
+        --before-after-md "$SCHEMA_SYNC_BEFORE_AFTER_MD" >/dev/null; then
 
         SCHEMA_SYNC_CHANGED_TASKS="$(
           python3 - "$SCHEMA_SYNC_REPORT_JSON" <<'PY'
@@ -1179,6 +1188,7 @@ PY
         echo "  PDF_EXTRACT_PROMPTS=$PDF_EXTRACT_PROMPTS"
         echo "  Vergelijking: $SCHEMA_SYNC_COMPARE_MD"
         echo "  Prompt diff: $SCHEMA_SYNC_PROMPT_DIFF"
+        echo "  Prompt before/after: $SCHEMA_SYNC_BEFORE_AFTER_MD"
         status_event "prompt_schema_sync_ready" "prompt schema sync ready with ${SCHEMA_SYNC_CHANGED_TASKS} changed task(s)"
 
         if [[ "${SCHEMA_SYNC_CHANGED_TASKS:-0}" -gt 0 ]] && flag_enabled "$COHORT_PROMPT_SCHEMA_SYNC_LLM"; then
@@ -1195,7 +1205,8 @@ PY
             --llm-config "$RUNTIME_CFG" \
             --llm-report-json "$SCHEMA_SYNC_LLM_REPORT_JSON" \
             --comparison-json "$SCHEMA_SYNC_LLM_COMPARE_JSON" \
-            --comparison-md "$SCHEMA_SYNC_LLM_COMPARE_MD" >/dev/null; then
+            --comparison-md "$SCHEMA_SYNC_LLM_COMPARE_MD" \
+            --before-after-md "$SCHEMA_SYNC_BEFORE_AFTER_MD" >/dev/null; then
             export PDF_EXTRACT_PROMPTS="$SCHEMA_SYNC_LLM_PROMPTS"
             RUNTIME_PROMPTS="$SCHEMA_SYNC_LLM_PROMPTS"
             write_prompt_unified_diff \
@@ -1207,6 +1218,7 @@ PY
             echo "  LLM prompt sync actief: $PDF_EXTRACT_PROMPTS"
             echo "  LLM vergelijking: $SCHEMA_SYNC_LLM_COMPARE_MD"
             echo "  LLM prompt diff: $SCHEMA_SYNC_LLM_PROMPT_DIFF"
+            echo "  Prompt before/after: $SCHEMA_SYNC_BEFORE_AFTER_MD"
             status_event "prompt_schema_sync_llm_done" "Qwen rewrote changed prompt tasks"
           else
             echo "⚠️  Qwen prompt sync mislukte; fallback naar deterministische schema-sync prompt."
@@ -1242,6 +1254,11 @@ PY
           cp -f "$SCHEMA_SYNC_PROMPT_DIFF" "$SCHEMA_SYNC_STATE_PROMPT_DIFF"
         else
           rm -f "$SCHEMA_SYNC_STATE_PROMPT_DIFF"
+        fi
+        if [[ -f "$SCHEMA_SYNC_BEFORE_AFTER_MD" ]]; then
+          cp -f "$SCHEMA_SYNC_BEFORE_AFTER_MD" "$SCHEMA_SYNC_STATE_BEFORE_AFTER_MD"
+        else
+          rm -f "$SCHEMA_SYNC_STATE_BEFORE_AFTER_MD"
         fi
         if [[ -f "$SCHEMA_SYNC_LLM_REPORT_JSON" ]]; then
           cp -f "$SCHEMA_SYNC_LLM_REPORT_JSON" "$SCHEMA_SYNC_STATE_LLM_REPORT_JSON"

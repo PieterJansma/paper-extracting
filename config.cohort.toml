@@ -18,8 +18,8 @@ path = "data/concrete.pdf"
 # 0 = read all pages
 max_pages = 0
 
-# Prompt/templates moved to prompts.toml.
+# Prompt/templates moved to prompts_cohort.toml.
 # Override paths with:
 #   PDF_EXTRACT_CONFIG=/path/to/config.toml
-#   PDF_EXTRACT_PROMPTS=/path/to/prompts.toml
+#   PDF_EXTRACT_PROMPTS=/path/to/prompts_cohort.toml
 

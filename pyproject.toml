@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pdf-extract"
 version = "0.1.0"
-description = "PDF → NuExtract (OpenAI-compatible) JSON extraction pipeline"
+description = "PDF → cohort workbook extraction pipeline"
 readme = "readme.md"
 authors = [{name = "you"}]
 requires-python = ">=3.10"
@@ -18,14 +18,22 @@ dependencies = [
 ]
 
 [project.scripts]
-pdf-extract = "main_final:cli"
+pdf-extract = "main_cohort:cli"
 
 [tool.setuptools]
 py-modules = [
-  "main_final",
+  "cohort_dynamic_prompts",
+  "cohort_prompt_schema_updater",
+  "cohort_runtime_utils",
+  "emx2_dynamic_runtime",
   "extract_pipeline",
+  "fix_molgenis_staging_types_callable",
+  "fix_molgenis_staging_types_dynamic",
   "llm_client",
   "llm_grammar",
+  "main_cohort",
+  "map_countries_ontology",
+  "map_regions_ontology",
 ]
 
 [tool.setuptools.package-dir]

@@ -31,7 +31,7 @@ from fix_molgenis_staging_types_dynamic import fix_workbook_dynamic
 from map_countries_ontology import map_workbook_countries
 from map_regions_ontology import map_workbook_regions
 
-from main_final import (
+from cohort_runtime_utils import (
     setup_logging,
     load_config,
     _load_toml_file,
@@ -274,6 +274,14 @@ def _resolve_ref_organisations_csv(explicit_path: str | None = None) -> str | No
 
 def _env_flag(name: str, default: str = "1") -> bool:
     return str(os.environ.get(name, default)).strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = str(os.environ.get(name, str(default))).strip()
+    try:
+        return int(raw)
+    except Exception:
+        return default
 
 
 def _resource_row_from_sections(
@@ -573,7 +581,7 @@ def cli() -> None:
 
     dynamic_runtime_enabled = _env_flag("COHORT_DYNAMIC_EMX2_RUNTIME", "1")
     dynamic_prompt_generation_enabled = _env_flag("COHORT_DYNAMIC_PROMPTS", "1")
-    cfg_path = os.environ.get("PDF_EXTRACT_CONFIG", "config.final.toml")
+    cfg_path = os.environ.get("PDF_EXTRACT_CONFIG", "config.cohort.toml")
     prompts_path = (os.environ.get("PDF_EXTRACT_PROMPTS") or "").strip() or None
     if dynamic_runtime_enabled and dynamic_prompt_generation_enabled and not prompts_path:
         cfg = _load_toml_file(cfg_path)
@@ -1118,6 +1126,10 @@ def cli() -> None:
 
     if dynamic_runtime_enabled and dynamic_registry:
         try:
+            dynamic_ontology_llm_fallback = _env_flag("DYNAMIC_ONTOLOGY_LLM_FALLBACK", "1")
+            dynamic_ontology_llm_threshold = _env_int("DYNAMIC_ONTOLOGY_LLM_FALLBACK_THRESHOLD", 30)
+            dynamic_ontology_llm_max_candidates = _env_int("DYNAMIC_ONTOLOGY_LLM_MAX_CANDIDATES", 5)
+            dynamic_ontology_llm_max_lookups = _env_int("DYNAMIC_ONTOLOGY_LLM_MAX_LOOKUPS", 50)
             fix_workbook_dynamic(
                 input_path=args.output,
                 output_path=args.output,
@@ -1126,8 +1138,16 @@ def cli() -> None:
                 local_root=os.environ.get("MOLGENIS_EMX2_LOCAL_ROOT"),
                 fallback_schema_csv=os.environ.get("EMX2_RUNTIME_SCHEMA_CSV"),
                 cache_dir=os.environ.get("EMX2_CACHE_DIR"),
+                llm_client=client if dynamic_ontology_llm_fallback else None,
+                llm_choice_threshold=dynamic_ontology_llm_threshold,
+                llm_max_candidates=dynamic_ontology_llm_max_candidates,
+                llm_max_lookups=dynamic_ontology_llm_max_lookups,
             )
-            log.info("Applied dynamic EMX2 datatype normalization.")
+            log.info(
+                "Applied dynamic EMX2 datatype normalization (llm_fallback=%s, threshold=%d).",
+                "on" if dynamic_ontology_llm_fallback else "off",
+                dynamic_ontology_llm_threshold,
+            )
         except Exception as e:
             log.warning("Could not normalize workbook with dynamic EMX2 runtime: %s", e)
             schema_xlsx = _resolve_schema_xlsx(args.schema_xlsx)

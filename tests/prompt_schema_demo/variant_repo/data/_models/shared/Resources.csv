@@ -1,9 +1,0 @@
-tableName,tableExtends,columnName,columnType,key,required,refSchema,refTable,refLink,refBack,validation,semantics,description,profiles,visible,label,computed,refLabel,defaultValue
-Resources,,name,text,,TRUE,,,,,,,Name used in international projects,UMCGCohortsStaging,,,,,
-Resources,,type,ontology_array,,TRUE,CatalogueOntologies,Resource types,,,,,Type of resource used for the cohort,UMCGCohortsStaging,,,,,
-Resources,,website,hyperlink,,,,,,,,,Link to the resource website,UMCGCohortsStaging,,,,,
-Resources,,description,text,,,,,,,,,Short description of the resource,UMCGCohortsStaging,,,,,
-Resources,,access rights,ontology,,,CatalogueOntologies,Access rights,,,,,Access status of the resource,UMCGCohortsStaging,,,,,"= {name: 'Non public'}"
-Resources,,release type,ontology,,,CatalogueOntologies,Release types,,,,,Release cadence of the resource,UMCGCohortsStaging,,,,,
-Resources,,data access fee,bool,,,,,,,,,Whether a fee applies to access the data,UMCGCohortsStaging,,,,,
-Resources,,data access url,hyperlink,,,,,,,,,URL where users can request or access resource data,UMCGCohortsStaging,,,,,

@@ -791,6 +791,81 @@ def _render_comparison_markdown(comparison: Dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _extract_field_block(instructions: str | None, field_path: str) -> str:
+    segments = _parse_instruction_segments(instructions)
+    idx = _find_segment_index_for_field(segments, field_path)
+    if idx < 0:
+        return ""
+    block = str(segments[idx].get("block") or "").strip()
+    return block
+
+
+def _render_before_after_markdown(comparison: Dict[str, Any]) -> str:
+    lines: List[str] = ["# Prompt Schema Before/After", ""]
+    tasks = comparison.get("tasks") or {}
+    if not tasks:
+        lines.extend([
+            "No changed tasks detected.",
+            "",
+        ])
+        return "\n".join(lines)
+
+    for task_name, payload in sorted(tasks.items()):
+        if not isinstance(payload, dict):
+            continue
+        schema_diff = payload.get("schema_diff") or {}
+        changed_fields = []
+        for key in ("added_fields", "removed_fields", "changed_fields"):
+            for field_path in list(schema_diff.get(key) or []):
+                if field_path not in changed_fields:
+                    changed_fields.append(field_path)
+
+        old_instructions = str(payload.get("old_instructions") or "")
+        final_instructions = str(payload.get("final_instructions") or "")
+        task_lines: List[str] = [f"## {task_name}", ""]
+        rendered_any = False
+
+        for field_path in changed_fields:
+            before_block = _extract_field_block(old_instructions, field_path)
+            after_block = _extract_field_block(final_instructions, field_path)
+            if not before_block and not after_block:
+                continue
+            rendered_any = True
+            task_lines.append(f"### `{field_path}`")
+            task_lines.append("")
+            task_lines.append("Before")
+            task_lines.append("")
+            task_lines.append("```text")
+            task_lines.append(before_block or "(not present)")
+            task_lines.append("```")
+            task_lines.append("")
+            task_lines.append("After")
+            task_lines.append("")
+            task_lines.append("```text")
+            task_lines.append(after_block or "(not present)")
+            task_lines.append("```")
+            task_lines.append("")
+
+        if not rendered_any:
+            task_lines.append("### Full Task")
+            task_lines.append("")
+            task_lines.append("Before")
+            task_lines.append("")
+            task_lines.append("```text")
+            task_lines.append(old_instructions)
+            task_lines.append("```")
+            task_lines.append("")
+            task_lines.append("After")
+            task_lines.append("")
+            task_lines.append("```text")
+            task_lines.append(final_instructions)
+            task_lines.append("```")
+            task_lines.append("")
+
+        lines.extend(task_lines)
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Update cohort prompts from an EMX2 schema diff while keeping unchanged prompt sections from the current TOML.")
     parser.add_argument("--base-prompts", required=True)
@@ -802,11 +877,12 @@ def main() -> None:
     parser.add_argument("--report-json", default=None)
     parser.add_argument("--profile", default="UMCGCohortsStaging")
     parser.add_argument("--rewrite-changed-with-llm", action="store_true")
-    parser.add_argument("--llm-config", default="config.final.toml")
+    parser.add_argument("--llm-config", default="config.cohort.toml")
     parser.add_argument("--llm-model", default=None)
     parser.add_argument("--llm-report-json", default=None)
     parser.add_argument("--comparison-json", default=None)
     parser.add_argument("--comparison-md", default=None)
+    parser.add_argument("--before-after-md", default=None)
     args = parser.parse_args()
 
     base_cfg = _task_sections(_load_toml(Path(args.base_prompts).expanduser().resolve()))
@@ -860,6 +936,10 @@ def main() -> None:
         out_path = Path(args.comparison_md).expanduser().resolve()
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(_render_comparison_markdown(comparison), encoding="utf-8")
+    if args.before_after_md:
+        out_path = Path(args.before_after_md).expanduser().resolve()
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(_render_before_after_markdown(comparison), encoding="utf-8")
     print(args.output)
 
 
