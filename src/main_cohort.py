@@ -195,9 +195,24 @@ def _registry_field_meta(
     table_name: str,
     column_name: str,
 ) -> Dict[str, Any]:
-    return (
-        ((registry or {}).get("tables", {}).get(table_name, {}) or {}).get("fields", {}) or {}
-    ).get(column_name, {}) or {}
+    tables = ((registry or {}).get("tables", {}) or {})
+    visited: set[str] = set()
+    current_table = table_name
+
+    while current_table and current_table not in visited:
+        visited.add(current_table)
+        table_meta = (tables.get(current_table) or {})
+        fields = (table_meta.get("fields") or {})
+        meta = fields.get(column_name)
+        if meta:
+            return meta
+        parent = str(table_meta.get("extends") or "").strip()
+        if parent:
+            current_table = parent
+            continue
+        current_table = str(legacy_types.INHERITED_TABLE_SCHEMAS.get(current_table) or "").strip()
+
+    return {}
 
 
 def _registry_allowed_values(meta: Dict[str, Any]) -> set[str]:
