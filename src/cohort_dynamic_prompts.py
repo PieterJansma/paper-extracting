@@ -777,6 +777,77 @@ def _owner_task_for_field(table_name: str, column_name: str, meta: Dict[str, Any
     return AUTO_OWNER_TASKS.get(table_name, "task_overview")
 
 
+def _auto_generated_task_name(table_name: str) -> str:
+    return f"task_{_snake_case(table_name)}_auto_generated"
+
+
+def _auto_generated_list_key(_table_name: str) -> str:
+    return "rows"
+
+
+def _build_auto_generated_task_section(table_name: str, registry: Dict[str, Any]) -> Dict[str, Any] | None:
+    table_meta = registry.get("tables", {}).get(table_name, {})
+    fields_meta = table_meta.get("fields", {})
+    if not fields_meta:
+        return None
+
+    field_specs: List[Dict[str, Any]] = []
+    field_map: Dict[str, str] = {}
+    existing_keys: set[str] = set()
+    for column_name, meta in fields_meta.items():
+        if column_name in AUTO_SKIP_COLUMNS.get(table_name, set()):
+            continue
+        if str(meta.get("column_type") or "").strip() == "refback":
+            continue
+        enriched_meta = dict(meta)
+        enriched_meta["_table_name"] = table_name
+        field_spec = _auto_field_from_meta(column_name, enriched_meta, existing_keys)
+        field_specs.append(field_spec)
+        field_map[str(field_spec.get("key") or "").strip()] = column_name
+
+    if not field_specs:
+        return None
+
+    list_key = _auto_generated_list_key(table_name)
+    template_specs = [
+        _list_object(
+            list_key,
+            field_specs,
+            note=(
+                f"Return one object per explicit row, entity or item for table `{table_name}`. "
+                f"If none are explicit, return []."
+            ),
+        )
+    ]
+    lines = [
+        "Return ONLY valid JSON matching the template. No extra text.",
+        "",
+        "TASK",
+        f"- Extract explicit rows for auto-generated table `{table_name}`.",
+        f"- Use this task only for information that belongs in `{table_name}`.",
+        "",
+        "GLOBAL RULES",
+        f"- Return one object per explicit row, entity or item for `{table_name}`.",
+        "- Use null for missing scalar fields and [] for missing lists.",
+        "- Do not invent rows, identifiers or labels.",
+        "- If no explicit rows exist, return the empty list for this table.",
+        "",
+        "FIELDS",
+    ]
+    for field_spec in template_specs:
+        lines.extend(_render_field_lines(field_spec, registry))
+
+    return {
+        "template_json": _render_template(template_specs, registry),
+        "instructions": "\n".join(lines).strip(),
+        "auto_generated": True,
+        "task_table": table_name,
+        "task_list_key": list_key,
+        "task_sheet_name": table_name,
+        "task_field_map_json": json.dumps(field_map, ensure_ascii=False, sort_keys=True),
+    }
+
+
 def _materialize_spec(spec: Dict[str, Any], registry: Dict[str, Any]) -> Dict[str, Any] | None:
     if "placeholder" in spec:
         return dict(spec)
@@ -859,6 +930,8 @@ def build_dynamic_task_sections(registry: Dict[str, Any]) -> Dict[str, Dict[str,
             _spec_coverage(field_spec, global_covered)
 
     for table_name, table_meta in (registry.get("tables") or {}).items():
+        if table_name not in COHORT_RUNTIME_TABLES:
+            continue
         for column_name, meta in (table_meta.get("fields") or {}).items():
             if column_name in global_covered.get(table_name, set()):
                 continue
@@ -908,6 +981,14 @@ def build_dynamic_task_sections(registry: Dict[str, Any]) -> Dict[str, Dict[str,
             "template_json": _render_template(fields, registry),
             "instructions": "\n".join(lines).strip(),
         }
+
+    for table_name in sorted(registry.get("tables") or {}):
+        if table_name in COHORT_RUNTIME_TABLES:
+            continue
+        section = _build_auto_generated_task_section(table_name, registry)
+        if not section:
+            continue
+        cfg[_auto_generated_task_name(table_name)] = section
 
     return cfg
 

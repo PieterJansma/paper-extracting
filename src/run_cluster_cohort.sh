@@ -379,10 +379,10 @@ push_prompt_schema_diff_to_git() {
 
 fetch_emx2_csv() {
   local rel_path="$1"
-  local target_var="$2"
+  local target_var="${2:-}"
   local current_val="${!target_var:-}"
 
-  if [[ -n "$current_val" && -f "$current_val" ]]; then
+  if [[ -n "$target_var" && -n "$current_val" && -f "$current_val" ]]; then
     return 0
   fi
   if [[ "$AUTO_FETCH_EMX2_ONTOLOGIES" != "1" ]]; then
@@ -413,14 +413,70 @@ fetch_emx2_csv() {
       mkdir -p "$(dirname "$repo_file")"
       cp "$tmp_file" "$out_file"
       mv "$tmp_file" "$repo_file"
-      export "$target_var=$repo_file"
-      echo "  ${target_var}=${repo_file} (fetched ${ref}:${rel_path})"
-      status_event "ontology_fetched" "${target_var} fetched from ${ref}:${rel_path}"
+      if [[ -n "$target_var" ]]; then
+        export "$target_var=$repo_file"
+        echo "  ${target_var}=${repo_file} (fetched ${ref}:${rel_path})"
+        status_event "ontology_fetched" "${target_var} fetched from ${ref}:${rel_path}"
+      else
+        status_event "model_fetched" "${rel_path} fetched from ${ref}:${rel_path}"
+      fi
       return 0
     fi
   done
 
   rm -f "$tmp_file" 2>/dev/null || true
+  return 0
+}
+
+sync_emx2_shared_model_dir() {
+  if [[ "$AUTO_FETCH_EMX2_ONTOLOGIES" != "1" ]]; then
+    return 0
+  fi
+  if ! command -v curl >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local refs=("$MOLGENIS_EMX2_REF" "main" "master")
+  local seen="|"
+  local ref=""
+  local tmp_json="${EMX2_CACHE_DIR}/shared_models_index.json.tmp"
+  mkdir -p "$EMX2_CACHE_DIR"
+
+  for ref in "${refs[@]}"; do
+    [[ -z "$ref" ]] && continue
+    if [[ "$seen" == *"|${ref}|"* ]]; then
+      continue
+    fi
+    seen="${seen}${ref}|"
+    local api_url="https://api.github.com/repos/${MOLGENIS_EMX2_REPO}/contents/data/_models/shared?ref=${ref}"
+    if ! curl -fsSL "$api_url" -o "$tmp_json" 2>/dev/null; then
+      continue
+    fi
+    python3 - "$tmp_json" <<'PY' | while IFS= read -r rel_path; do
+import json
+import sys
+from pathlib import Path
+
+payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+if isinstance(payload, list):
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("type") or "").strip() != "file":
+            continue
+        path = str(item.get("path") or "").strip()
+        if path.endswith(".csv"):
+            print(path)
+PY
+      [[ -z "$rel_path" ]] && continue
+      fetch_emx2_csv "$rel_path"
+    done
+    rm -f "$tmp_json" 2>/dev/null || true
+    status_event "shared_model_sync" "shared model directory synced from ${MOLGENIS_EMX2_REPO}@${ref}"
+    return 0
+  done
+
+  rm -f "$tmp_json" 2>/dev/null || true
   return 0
 }
 
@@ -1088,6 +1144,7 @@ echo "  EMX2 source=${MOLGENIS_EMX2_REPO}@${MOLGENIS_EMX2_REF}"
 status_event "emx2_source_selected" "using EMX2 source ${MOLGENIS_EMX2_REPO}@${MOLGENIS_EMX2_REF}"
 
 # Attempt to fetch latest ontology/model sources from molgenis-emx2.
+sync_emx2_shared_model_dir
 fetch_emx2_csv "data/_ontologies/Countries.csv" COUNTRY_ONTOLOGY_CSV
 fetch_emx2_csv "data/_ontologies/Regions.csv" REGION_ONTOLOGY_CSV
 fetch_emx2_csv "data/_ontologies/Resources.csv" REF_RESOURCES_CSV

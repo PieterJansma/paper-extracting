@@ -12,7 +12,7 @@ except ModuleNotFoundError:
     import tomli as toml
 
 from cohort_dynamic_prompts import build_dynamic_task_sections
-from emx2_dynamic_runtime import COHORT_RUNTIME_TABLES, build_runtime_registry, write_json, write_task_prompts_toml
+from emx2_dynamic_runtime import build_runtime_registry, write_json, write_task_prompts_toml
 from llm_client import OpenAICompatibleClient
 
 
@@ -659,6 +659,13 @@ def rewrite_changed_tasks_with_llm(
         base_section = base_prompts.get(task_name)
         old_section = old_generated.get(task_name, {})
         new_section = updated_cfg.get(task_name) or new_generated.get(task_name, {})
+        if not base_section:
+            rewrite_report[task_name] = {
+                "rewritten": False,
+                "mode": "deterministic_only",
+                "reason": "no_base_section",
+            }
+            continue
         field_rewrite, field_report = _rewrite_task_field_blocks_with_llm(
             client=client,
             llm_cfg=llm_cfg,
@@ -881,13 +888,13 @@ def main() -> None:
     base_cfg = _task_sections(_load_toml(Path(args.base_prompts).expanduser().resolve()))
     old_registry = build_runtime_registry(
         args.profile,
-        tables=COHORT_RUNTIME_TABLES,
+        tables=None,
         local_root=args.old_local_root,
         fallback_schema_csv=args.old_schema_csv,
     )
     new_registry = build_runtime_registry(
         args.profile,
-        tables=COHORT_RUNTIME_TABLES,
+        tables=None,
         local_root=args.new_local_root,
         fallback_schema_csv=args.new_schema_csv,
     )
