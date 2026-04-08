@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 import pandas as pd
+from openpyxl import Workbook, load_workbook
 
 INPUT_WORKBOOK_NAME = "alle_data_tabs_leesbaar.xlsx"
 SELECTION_WORKBOOK_NAME = "selectie patienten.xlsx"
@@ -238,87 +239,162 @@ def prepare_selection(
     return selection, filtered_selection, patient_id_width or 0
 
 
-def collect_sheet_columns(path: Path, sheet_names: list[str]) -> dict[str, list[str]]:
+def build_column_index(header: list[object] | tuple[object, ...]) -> dict[str, int]:
     return {
-        sheet_name: pd.read_excel(path, sheet_name=sheet_name, nrows=0).columns.tolist()
-        for sheet_name in sheet_names
+        str(column_name): index
+        for index, column_name in enumerate(header)
+        if column_name is not None
     }
 
 
-def build_subject_lookup(
-    path: Path,
-    columns_by_sheet: dict[str, list[str]],
-) -> pd.DataFrame:
-    if PRIMARY_SUBJECT_LOOKUP_SHEET in columns_by_sheet:
-        primary_columns = columns_by_sheet[PRIMARY_SUBJECT_LOOKUP_SHEET]
-        if STUDY_ID_COLUMN in primary_columns and SUBJECT_ID_COLUMN in primary_columns:
-            frame = pd.read_excel(
-                path,
-                sheet_name=PRIMARY_SUBJECT_LOOKUP_SHEET,
-                usecols=[STUDY_ID_COLUMN, SUBJECT_ID_COLUMN],
-                dtype="object",
-            )
-            frame[STUDY_ID_COLUMN] = normalize_series(frame[STUDY_ID_COLUMN])
-            frame[SUBJECT_ID_COLUMN] = normalize_series(frame[SUBJECT_ID_COLUMN])
-            return frame.dropna(
-                subset=[STUDY_ID_COLUMN, SUBJECT_ID_COLUMN]
-            ).drop_duplicates()
+def extract_eligible_subject_ids_from_sheet(
+    worksheet,
+    eligible_study_ids: set[str],
+) -> set[str]:
+    row_iterator = worksheet.iter_rows(values_only=True)
+    try:
+        header = next(row_iterator)
+    except StopIteration:
+        return set()
 
-    lookup_frames: list[pd.DataFrame] = []
-    for sheet_name, columns in columns_by_sheet.items():
-        if STUDY_ID_COLUMN not in columns or SUBJECT_ID_COLUMN not in columns:
+    column_index = build_column_index(header)
+    study_index = column_index.get(STUDY_ID_COLUMN)
+    subject_index = column_index.get(SUBJECT_ID_COLUMN)
+    if study_index is None or subject_index is None:
+        return set()
+
+    eligible_subject_ids: set[str] = set()
+    for row in row_iterator:
+        study_id = normalize_identifier(row[study_index])
+        if study_id not in eligible_study_ids:
             continue
 
-        frame = pd.read_excel(
-            path,
-            sheet_name=sheet_name,
-            usecols=[STUDY_ID_COLUMN, SUBJECT_ID_COLUMN],
-            dtype="object",
-        )
-        frame[STUDY_ID_COLUMN] = normalize_series(frame[STUDY_ID_COLUMN])
-        frame[SUBJECT_ID_COLUMN] = normalize_series(frame[SUBJECT_ID_COLUMN])
-        frame = frame.dropna(subset=[STUDY_ID_COLUMN, SUBJECT_ID_COLUMN]).drop_duplicates()
-        if not frame.empty:
-            lookup_frames.append(frame)
+        subject_id = normalize_identifier(row[subject_index])
+        if subject_id is not None:
+            eligible_subject_ids.add(subject_id)
 
-    if not lookup_frames:
-        return pd.DataFrame(columns=[STUDY_ID_COLUMN, SUBJECT_ID_COLUMN])
-
-    return pd.concat(lookup_frames, ignore_index=True).drop_duplicates()
+    return eligible_subject_ids
 
 
-def filter_sheet(
+def build_eligible_subject_ids(path: Path, eligible_study_ids: set[str]) -> set[str]:
+    workbook = load_workbook(path, read_only=True, data_only=True)
+    try:
+        if PRIMARY_SUBJECT_LOOKUP_SHEET in workbook.sheetnames:
+            subject_ids = extract_eligible_subject_ids_from_sheet(
+                workbook[PRIMARY_SUBJECT_LOOKUP_SHEET],
+                eligible_study_ids,
+            )
+            if subject_ids:
+                return subject_ids
+
+        eligible_subject_ids: set[str] = set()
+        for worksheet in workbook.worksheets:
+            eligible_subject_ids.update(
+                extract_eligible_subject_ids_from_sheet(worksheet, eligible_study_ids)
+            )
+        return eligible_subject_ids
+    finally:
+        workbook.close()
+
+
+def output_value(value: object) -> object:
+    if pd.isna(value):
+        return None
+    if isinstance(value, pd.Timestamp):
+        return value.to_pydatetime()
+    return value
+
+
+def append_dataframe_sheet(
+    workbook: Workbook,
+    sheet_name: str,
     frame: pd.DataFrame,
+) -> None:
+    worksheet = workbook.create_sheet(title=sheet_name)
+    worksheet.append(frame.columns.tolist())
+    for row in frame.itertuples(index=False, name=None):
+        worksheet.append([output_value(value) for value in row])
+
+
+def stream_filter_workbook(
+    input_path: Path,
+    output_path: Path,
     eligible_study_ids: set[str],
     eligible_subject_ids: set[str],
-) -> tuple[pd.DataFrame, str]:
-    has_study_id = STUDY_ID_COLUMN in frame.columns
-    has_subject_id = SUBJECT_ID_COLUMN in frame.columns
+    selection_output: pd.DataFrame,
+) -> list[tuple[str, int, int, str]]:
+    input_workbook = load_workbook(input_path, read_only=True, data_only=True)
+    output_workbook = Workbook(write_only=True)
+    sheet_report: list[tuple[str, int, int, str]] = []
 
-    if not has_study_id and not has_subject_id:
-        return frame.copy(), "unfiltered"
+    try:
+        for input_worksheet in input_workbook.worksheets:
+            print(f"Processing sheet: {input_worksheet.title}", flush=True)
 
-    if has_study_id:
-        study_mask = normalize_series(frame[STUDY_ID_COLUMN]).isin(eligible_study_ids)
-    else:
-        study_mask = pd.Series(False, index=frame.index)
+            output_worksheet = output_workbook.create_sheet(title=input_worksheet.title)
+            row_iterator = input_worksheet.iter_rows(values_only=True)
 
-    if has_subject_id:
-        subject_mask = normalize_series(frame[SUBJECT_ID_COLUMN]).isin(eligible_subject_ids)
-    else:
-        subject_mask = pd.Series(False, index=frame.index)
+            try:
+                header = next(row_iterator)
+            except StopIteration:
+                output_worksheet.append([])
+                sheet_report.append((input_worksheet.title, 0, 0, "unfiltered"))
+                continue
 
-    if has_study_id and has_subject_id:
-        mask = study_mask | subject_mask
-        filter_key = f"{STUDY_ID_COLUMN} or {SUBJECT_ID_COLUMN}"
-    elif has_study_id:
-        mask = study_mask
-        filter_key = STUDY_ID_COLUMN
-    else:
-        mask = subject_mask
-        filter_key = SUBJECT_ID_COLUMN
+            header_list = list(header)
+            output_worksheet.append(header_list)
 
-    return frame.loc[mask].copy(), filter_key
+            column_index = build_column_index(header_list)
+            study_index = column_index.get(STUDY_ID_COLUMN)
+            subject_index = column_index.get(SUBJECT_ID_COLUMN)
+            total_rows = 0
+            kept_rows = 0
+
+            if study_index is not None and subject_index is not None:
+                filter_key = f"{STUDY_ID_COLUMN} or {SUBJECT_ID_COLUMN}"
+            elif study_index is not None:
+                filter_key = STUDY_ID_COLUMN
+            elif subject_index is not None:
+                filter_key = SUBJECT_ID_COLUMN
+            else:
+                filter_key = "unfiltered"
+
+            for row in row_iterator:
+                total_rows += 1
+
+                if study_index is None and subject_index is None:
+                    keep_row = True
+                else:
+                    keep_row = False
+                    if study_index is not None:
+                        study_id = normalize_identifier(row[study_index])
+                        keep_row = study_id in eligible_study_ids
+                    if not keep_row and subject_index is not None:
+                        subject_id = normalize_identifier(row[subject_index])
+                        keep_row = subject_id in eligible_subject_ids
+
+                if keep_row:
+                    output_worksheet.append(list(row))
+                    kept_rows += 1
+
+            sheet_report.append(
+                (input_worksheet.title, total_rows, kept_rows, filter_key)
+            )
+
+        append_dataframe_sheet(output_workbook, SELECTION_OUTPUT_SHEET, selection_output)
+        append_dataframe_sheet(
+            output_workbook,
+            SUMMARY_OUTPUT_SHEET,
+            pd.DataFrame(
+                sheet_report,
+                columns=["sheet_name", "rows_input", "rows_kept", "filter_key"],
+            ),
+        )
+        output_workbook.save(output_path)
+    finally:
+        input_workbook.close()
+
+    return sheet_report
 
 
 def main() -> None:
@@ -359,48 +435,24 @@ def main() -> None:
         filtered_selection[STUDY_ID_NEW_COLUMN].dropna().astype(str).tolist()
     )
 
-    workbook = pd.ExcelFile(input_path)
-    columns_by_sheet = collect_sheet_columns(input_path, workbook.sheet_names)
-    subject_lookup = build_subject_lookup(input_path, columns_by_sheet)
-    eligible_subject_ids = set(
-        subject_lookup.loc[
-            subject_lookup[STUDY_ID_COLUMN].isin(eligible_study_ids), SUBJECT_ID_COLUMN
-        ]
-        .dropna()
-        .astype(str)
-        .tolist()
+    eligible_subject_ids = build_eligible_subject_ids(input_path, eligible_study_ids)
+
+    selection_output = filtered_selection.copy()
+    if patient_id_width > 0:
+        selection_output[AZGNR_COLUMN] = normalize_series(
+            selection_output[AZGNR_COLUMN], width=patient_id_width
+        )
+    selection_output = selection_output.drop(
+        columns=["patient_identifier_normalized"], errors="ignore"
     )
 
-    sheet_report: list[tuple[str, int, int, str]] = []
-    with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
-        for sheet_name in workbook.sheet_names:
-            print(f"Processing sheet: {sheet_name}", flush=True)
-            frame = pd.read_excel(input_path, sheet_name=sheet_name, dtype="object")
-            filtered_frame, filter_key = filter_sheet(
-                frame, eligible_study_ids, eligible_subject_ids
-            )
-            filtered_frame.to_excel(writer, sheet_name=sheet_name, index=False)
-            sheet_report.append((sheet_name, len(frame), len(filtered_frame), filter_key))
-
-        selection_output = filtered_selection.copy()
-        if patient_id_width > 0:
-            selection_output[AZGNR_COLUMN] = normalize_series(
-                selection_output[AZGNR_COLUMN], width=patient_id_width
-            )
-        selection_output = selection_output.drop(
-            columns=["patient_identifier_normalized"], errors="ignore"
-        )
-        selection_output.to_excel(
-            writer,
-            sheet_name=SELECTION_OUTPUT_SHEET,
-            index=False,
-        )
-
-        summary_frame = pd.DataFrame(
-            sheet_report,
-            columns=["sheet_name", "rows_input", "rows_kept", "filter_key"],
-        )
-        summary_frame.to_excel(writer, sheet_name=SUMMARY_OUTPUT_SHEET, index=False)
+    sheet_report = stream_filter_workbook(
+        input_path,
+        output_path,
+        eligible_study_ids,
+        eligible_subject_ids,
+        selection_output,
+    )
 
     print(f"Input workbook:             {input_path}")
     print(f"Selection workbook:         {selection_path} [{selection_sheet_name}]")
