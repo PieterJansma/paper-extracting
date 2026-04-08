@@ -406,7 +406,7 @@ def _constraint_line(path: str, meta: Dict[str, Any]) -> str | None:
     ref_table = str(meta.get("ref_table") or "").strip()
 
     if column_type in {"ontology", "ontology_array"} and values:
-        if len(values) <= 20:
+        if len(values) <= 16:
             return f"- `{path}`: allowed values are {', '.join(values)}."
         return (
             f"- `{path}`: validated against current `{ref_table}.csv` "

@@ -1127,7 +1127,7 @@ def cli() -> None:
     if dynamic_runtime_enabled and dynamic_registry:
         try:
             dynamic_ontology_llm_fallback = _env_flag("DYNAMIC_ONTOLOGY_LLM_FALLBACK", "1")
-            dynamic_ontology_llm_threshold = _env_int("DYNAMIC_ONTOLOGY_LLM_FALLBACK_THRESHOLD", 30)
+            dynamic_ontology_llm_threshold = _env_int("DYNAMIC_ONTOLOGY_LLM_FALLBACK_THRESHOLD", 16)
             dynamic_ontology_llm_max_candidates = _env_int("DYNAMIC_ONTOLOGY_LLM_MAX_CANDIDATES", 5)
             dynamic_ontology_llm_max_lookups = _env_int("DYNAMIC_ONTOLOGY_LLM_MAX_LOOKUPS", 50)
             fix_workbook_dynamic(
