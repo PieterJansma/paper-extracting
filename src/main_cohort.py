@@ -15,7 +15,6 @@ from llm_client import OpenAICompatibleClient
 from extract_pipeline import load_pdf_text, build_context_prefix_messages
 
 from emx2_dynamic_runtime import (
-    COHORT_RUNTIME_TABLES,
     apply_dynamic_constraints_to_config,
     build_runtime_registry,
     write_json,
@@ -147,6 +146,61 @@ def _normalize_identifier_value(value: Any) -> str:
     if re.fullmatch(r"10\.\d{4,9}/[-._;()/:A-Za-z0-9]+", normalized):
         return normalized
     return s
+
+
+def _task_cfg_flag(task_cfg: Dict[str, Any], key: str) -> bool:
+    raw = task_cfg.get(key)
+    if isinstance(raw, bool):
+        return raw
+    return str(raw or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _task_cfg_json_map(task_cfg: Dict[str, Any], key: str) -> Dict[str, str]:
+    raw = task_cfg.get(key)
+    if isinstance(raw, dict):
+        return {str(k): str(v) for k, v in raw.items()}
+    text = str(raw or "").strip()
+    if not text:
+        return {}
+    try:
+        parsed = json.loads(text)
+    except Exception:
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    return {str(k): str(v) for k, v in parsed.items()}
+
+
+def _registry_table_columns(registry: Dict[str, Any] | None, table_name: str) -> List[str]:
+    fields = ((registry or {}).get("tables", {}).get(table_name, {}) or {}).get("fields", {}) or {}
+    return [str(column_name) for column_name in fields.keys()]
+
+
+def _normalize_dynamic_item_to_row(
+    *,
+    columns: List[str],
+    item: Dict[str, Any],
+    field_map: Dict[str, str],
+    resource_ref: str,
+) -> Dict[str, Any]:
+    row = _blank_row(columns)
+    normalized_columns = {
+        re.sub(r"[^a-z0-9]+", "", str(column_name).lower()): column_name
+        for column_name in columns
+    }
+
+    for key, value in item.items():
+        column_name = field_map.get(str(key))
+        if not column_name:
+            column_name = normalized_columns.get(re.sub(r"[^a-z0-9]+", "", str(key).lower()), "")
+        if not column_name or column_name not in row:
+            continue
+        row[column_name] = _serialize_value(value)
+
+    if "resource" in row and not str(row.get("resource") or "").strip():
+        row["resource"] = resource_ref
+
+    return row
 
 
 def _is_organisation_contributor(item: Dict[str, Any]) -> bool:
@@ -597,7 +651,7 @@ def cli() -> None:
         try:
             dynamic_registry = build_runtime_registry(
                 "UMCGCohortsStaging",
-                tables=COHORT_RUNTIME_TABLES,
+                tables=None,
                 local_root=os.environ.get("MOLGENIS_EMX2_LOCAL_ROOT"),
                 fallback_schema_csv=os.environ.get("EMX2_RUNTIME_SCHEMA_CSV"),
                 cache_dir=os.environ.get("EMX2_CACHE_DIR"),
@@ -646,6 +700,18 @@ def cli() -> None:
         "task_collection_events_core" in cfg
         and "task_collection_events_enrichment" in cfg
     )
+    auto_generated_task_defs: List[Tuple[str, str]] = []
+    for task_name, task_cfg in sorted(
+        (str(name), value)
+        for name, value in cfg.items()
+        if str(name).startswith("task_") and isinstance(value, dict)
+    ):
+        if not _task_cfg_flag(task_cfg, "auto_generated"):
+            continue
+        table_name = str(task_cfg.get("task_table") or task_cfg.get("task_sheet_name") or "").strip()
+        if not table_name:
+            continue
+        auto_generated_task_defs.append((task_name, table_name))
 
     pass_defs = [
         ("A", "PASS A: Overview", "task_overview"),
@@ -674,6 +740,8 @@ def cli() -> None:
         ("G", "PASS G: Access conditions", "task_access_conditions"),
         ("H", "PASS H: Information", "task_information"),
     ])
+    for idx, (task_name, table_name) in enumerate(auto_generated_task_defs, start=1):
+        pass_defs.append((f"AG{idx}", f"PASS AG{idx}: Auto-generated {table_name}", task_name))
 
     section_orders: Dict[str, List[str]] = {}
     for _, _, section_key in pass_defs:
@@ -713,6 +781,11 @@ def cli() -> None:
     contact_rows: List[Dict[str, Any]] = []
     publication_rows: List[Dict[str, Any]] = []
     documentation_rows: List[Dict[str, Any]] = []
+    dynamic_table_rows: Dict[str, List[Dict[str, Any]]] = {
+        table_name: []
+        for _, table_name in auto_generated_task_defs
+        if table_name not in COHORT_SHEETS
+    }
     run_issues: List[Dict[str, Any]] = []
 
     issue_file = os.environ.get("PIPELINE_ISSUES_FILE", "").strip() or f"{args.output}.issues.json"
@@ -945,6 +1018,30 @@ def cli() -> None:
             })
             collection_event_rows.append(row)
 
+        for task_name, table_name in auto_generated_task_defs:
+            if table_name in COHORT_SHEETS:
+                continue
+            task_cfg = cfg.get(task_name, {}) or {}
+            list_key = str(task_cfg.get("task_list_key") or "rows").strip() or "rows"
+            items = (per_section_results.get(task_name, {}) or {}).get(list_key, []) or []
+            if not isinstance(items, list):
+                continue
+            columns = _registry_table_columns(dynamic_registry, table_name)
+            if not columns:
+                continue
+            field_map = _task_cfg_json_map(task_cfg, "task_field_map_json")
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                row = _normalize_dynamic_item_to_row(
+                    columns=columns,
+                    item=item,
+                    field_map=field_map,
+                    resource_ref=resource_ref,
+                )
+                if any(str(row.get(column, "")).strip() for column in columns if column != "resource"):
+                    dynamic_table_rows.setdefault(table_name, []).append(row)
+
         contributors = per_section_results.get("task_contributors", {}) or {}
         organisations = contributors.get("organisations_involved", []) or []
         people = contributors.get("people_involved", []) or []
@@ -1043,6 +1140,11 @@ def cli() -> None:
         "Publications": pd.DataFrame(publication_rows, columns=COHORT_SHEETS["Publications"]),
         "Documentation": pd.DataFrame(documentation_rows, columns=COHORT_SHEETS["Documentation"]),
     }
+    for table_name, rows in dynamic_table_rows.items():
+        columns = _registry_table_columns(dynamic_registry, table_name)
+        if not columns:
+            continue
+        frames[table_name] = pd.DataFrame(rows, columns=columns)
 
     with pd.ExcelWriter(args.output, engine=excel_engine) as writer:
         for sheet_name, frame in frames.items():

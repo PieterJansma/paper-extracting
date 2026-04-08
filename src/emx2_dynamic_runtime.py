@@ -81,6 +81,49 @@ def cohort_model_paths() -> List[str]:
     return paths
 
 
+def profile_table_names(
+    profile: str = DEFAULT_PROFILE,
+    *,
+    local_root: str | None = None,
+    fallback_schema_csv: str | None = None,
+) -> List[str]:
+    rows, _ = load_profile_model_rows(
+        profile,
+        local_root=local_root,
+        fallback_schema_csv=fallback_schema_csv,
+    )
+    names: List[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        table_name = str(row.get("tableName") or "").strip()
+        if not table_name or table_name in seen:
+            continue
+        seen.add(table_name)
+        names.append(table_name)
+    return names
+
+
+def profile_model_paths(
+    profile: str = DEFAULT_PROFILE,
+    *,
+    local_root: str | None = None,
+    fallback_schema_csv: str | None = None,
+) -> List[str]:
+    paths: List[str] = []
+    seen: set[str] = set()
+    for table_name in profile_table_names(
+        profile,
+        local_root=local_root,
+        fallback_schema_csv=fallback_schema_csv,
+    ):
+        rel_path = f"data/_models/shared/{table_name}.csv"
+        if rel_path in seen:
+            continue
+        seen.add(rel_path)
+        paths.append(rel_path)
+    return paths
+
+
 def _normalize_key(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", "", str(value or "").strip().lower())
 
@@ -271,6 +314,10 @@ def build_runtime_registry(
                 "ref_back": str(row.get("refBack") or "").strip(),
                 "required": str(row.get("required") or "").strip(),
                 "default_value": str(row.get("defaultValue") or "").strip(),
+                "description": str(row.get("description") or "").strip(),
+                "label": str(row.get("label") or "").strip(),
+                "semantics": str(row.get("semantics") or "").strip(),
+                "validation": str(row.get("validation") or "").strip(),
             }
         )
 
@@ -372,8 +419,7 @@ def _iter_template_paths(node: Any, prefix: str = "") -> Iterable[Tuple[str, str
                 yield new_prefix, key
 
 
-def _resolve_task_table(task_name: str, path: str) -> str:
-    target_map = COHORT_TASK_TEMPLATE_TARGETS.get(task_name, {})
+def _resolve_task_table(path: str, target_map: Dict[str, str]) -> str:
     best_prefix = ""
     best_table = ""
     for prefix, table in target_map.items():
@@ -428,17 +474,26 @@ def build_dynamic_prompt_constraints(
 ) -> Dict[str, List[str]]:
     summary: Dict[str, List[str]] = {}
 
-    for task_name, target_map in COHORT_TASK_TEMPLATE_TARGETS.items():
-        if task_name not in cfg or not target_map:
+    for task_name, task_cfg in (
+        (str(name), value)
+        for name, value in cfg.items()
+        if str(name).startswith("task_") and isinstance(value, dict)
+    ):
+        target_map = COHORT_TASK_TEMPLATE_TARGETS.get(task_name, {})
+        task_table = str(task_cfg.get("task_table") or "").strip()
+        task_list_key = str(task_cfg.get("task_list_key") or "").strip()
+        if task_table and task_list_key:
+            target_map = {f"{task_list_key}[]": task_table}
+        if not target_map:
             continue
-        template = _parse_template_json(cfg[task_name].get("template_json"))
+        template = _parse_template_json(task_cfg.get("template_json"))
         if not template:
             continue
 
         lines: List[str] = []
         seen: set[str] = set()
         for path, leaf_name in _iter_template_paths(template):
-            table_name = _resolve_task_table(task_name, path)
+            table_name = _resolve_task_table(path, target_map)
             if not table_name:
                 continue
             meta = _lookup_field_meta(registry, table_name, leaf_name)
@@ -557,6 +612,8 @@ def main() -> None:
     model = sub.add_parser("model-paths", help="Print shared model CSV paths needed for a mode/profile.")
     model.add_argument("--profile", default=DEFAULT_PROFILE)
     model.add_argument("--mode", default="cohort", choices=["cohort"])
+    model.add_argument("--local-root", default=None)
+    model.add_argument("--fallback-schema-csv", default=None)
 
     dump = sub.add_parser("dump-registry", help="Write resolved runtime registry as JSON.")
     dump.add_argument("--profile", default=DEFAULT_PROFILE)
@@ -574,7 +631,7 @@ def main() -> None:
 
     args = parser.parse_args()
     mode = getattr(args, "mode", "cohort")
-    tables = COHORT_RUNTIME_TABLES if mode == "cohort" else ()
+    tables = None if mode == "cohort" else ()
 
     if args.cmd == "required-paths":
         for rel_path in required_fetch_paths(
@@ -587,7 +644,11 @@ def main() -> None:
         return
 
     if args.cmd == "model-paths":
-        for rel_path in cohort_model_paths():
+        for rel_path in profile_model_paths(
+            args.profile,
+            local_root=args.local_root,
+            fallback_schema_csv=args.fallback_schema_csv,
+        ):
             print(rel_path)
         return
 
