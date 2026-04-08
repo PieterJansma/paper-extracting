@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import re
+from pathlib import Path
 from typing import Any, Dict, List
 
 from emx2_dynamic_runtime import (
     COHORT_RUNTIME_TABLES,
+    DEFAULT_PROFILE,
+    DEFAULT_SCHEMA_CSV,
     build_runtime_registry,
     load_profile_model_rows,
     write_task_prompts_toml,
@@ -82,6 +86,7 @@ RESOURCE_TASK_HINTS: List[tuple[str, tuple[str, ...]]] = [
 
 INLINE_ALLOWED_VALUES_MAX = 8
 INLINE_ALLOWED_VALUES_MEDIUM_MAX = 16
+_BASELINE_PROFILE_TABLES: set[str] | None = None
 
 
 def _normalize_key(value: Any) -> str:
@@ -653,6 +658,27 @@ def _allowed_values_note(meta: Dict[str, Any]) -> str:
     return f"Use only exact values from {label} ({count} current values)."
 
 
+def _auto_allowed_values_note(meta: Dict[str, Any]) -> str:
+    column_type = str(meta.get("column_type") or "").strip()
+    if column_type not in {"ontology", "ontology_array"}:
+        return ""
+
+    values = [str(v or "").strip() for v in list(meta.get("allowed_values") or [])]
+    values = [v for v in values if v]
+    if not values:
+        return ""
+
+    ref_table = str(meta.get("ref_table") or "").strip()
+    label = f"`{ref_table}.csv`" if ref_table else "the current schema list"
+    count = len(values)
+
+    if count <= INLINE_ALLOWED_VALUES_MAX:
+        return f"Allowed values (exact strings only): {', '.join(values)}."
+    if count <= INLINE_ALLOWED_VALUES_MEDIUM_MAX:
+        return f"Allowed values (exact strings only, {count}): {', '.join(values)}."
+    return f"Validate against current {label} ({count} allowed values)."
+
+
 def _field_reference(spec: Dict[str, Any]) -> str:
     if "placeholder" in spec or spec.get("kind") == "list":
         return ""
@@ -688,6 +714,32 @@ def _render_field_lines(spec: Dict[str, Any], registry: Dict[str, Any], prefix: 
     ref = _field_reference(spec)
     if ref:
         parts.append(f"Source: {ref}")
+    return [f"- `{full_key}`: {' '.join(parts)}"]
+
+
+def _render_auto_generated_field_lines(spec: Dict[str, Any], registry: Dict[str, Any], prefix: str = "") -> List[str]:
+    key = spec["key"]
+    full_key = f"{prefix}{key}"
+    if spec.get("kind") == "list":
+        lines = [f"- `{full_key}[]`: {spec.get('note') or 'Return a list of explicit rows only.'}"]
+        for child in spec.get("item_fields", []):
+            child_prefix = f"{full_key}[]."
+            for child_line in _render_auto_generated_field_lines(child, registry, prefix=child_prefix):
+                lines.append(f"  {child_line}")
+        return lines
+
+    note = str(spec.get("note") or "").strip()
+    if "placeholder" in spec:
+        return [f"- `{full_key}`: {note}"]
+
+    meta = _lookup_field_meta(registry, spec["table"], spec["column"]) or {}
+    parts: List[str] = []
+    if note:
+        parts.append(note)
+    allowed_note = _auto_allowed_values_note(meta)
+    if allowed_note:
+        parts.append(allowed_note)
+    parts.append(_generic_rule_from_meta(meta, nullable=bool(spec.get("nullable", True))))
     return [f"- `{full_key}`: {' '.join(parts)}"]
 
 
@@ -746,9 +798,6 @@ def _tables_in_spec(spec: Dict[str, Any], out: set[str]) -> None:
 
 def _auto_field_from_meta(column_name: str, meta: Dict[str, Any], existing_keys: set[str] | None = None) -> Dict[str, Any]:
     description = str(meta.get("description") or "").strip()
-    note = "Auto-added from the current schema."
-    if description:
-        note += f" {description}"
     table_name = str(meta.get("_table_name") or "").strip()
     key = _snake_case(column_name)
     if existing_keys is not None:
@@ -758,7 +807,7 @@ def _auto_field_from_meta(column_name: str, meta: Dict[str, Any], existing_keys:
         key,
         table_name,
         column_name,
-        note=note,
+        note=description,
         nullable=str(meta.get("required") or "").strip().upper() != "TRUE",
     )
 
@@ -783,6 +832,31 @@ def _auto_generated_task_name(table_name: str) -> str:
 
 def _auto_generated_list_key(_table_name: str) -> str:
     return "rows"
+
+
+def _baseline_profile_tables() -> set[str]:
+    global _BASELINE_PROFILE_TABLES
+    if _BASELINE_PROFILE_TABLES is not None:
+        return _BASELINE_PROFILE_TABLES
+
+    schema_path = (Path(__file__).resolve().parent.parent / DEFAULT_SCHEMA_CSV).resolve()
+    tables: set[str] = set()
+    if schema_path.is_file():
+        with schema_path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            for row in reader:
+                profiles = {
+                    part.strip()
+                    for part in str(row.get("profiles") or "").split(",")
+                    if part.strip()
+                }
+                if DEFAULT_PROFILE not in profiles:
+                    continue
+                table_name = str(row.get("tableName") or "").strip()
+                if table_name:
+                    tables.add(table_name)
+    _BASELINE_PROFILE_TABLES = tables
+    return tables
 
 
 def _build_auto_generated_task_section(table_name: str, registry: Dict[str, Any]) -> Dict[str, Any] | None:
@@ -814,28 +888,30 @@ def _build_auto_generated_task_section(table_name: str, registry: Dict[str, Any]
             list_key,
             field_specs,
             note=(
-                f"Return one object per explicit row, entity or item for table `{table_name}`. "
+                f"Return one object per explicit `{table_name}` row. "
                 f"If none are explicit, return []."
             ),
         )
     ]
     lines = [
-        "Return ONLY valid JSON matching the template. No extra text.",
+        "Return ONLY valid JSON matching the template. No extra text. Do NOT infer.",
         "",
-        "TASK",
-        f"- Extract explicit rows for auto-generated table `{table_name}`.",
+        "SCOPE",
+        f"- Extract ONLY explicit rows for `{table_name}`.",
         f"- Use this task only for information that belongs in `{table_name}`.",
+        f"- If the PDF does not explicitly describe any `{table_name}` rows -> {{\"{list_key}\": []}}.",
         "",
         "GLOBAL RULES",
-        f"- Return one object per explicit row, entity or item for `{table_name}`.",
+        "- Use only explicit statements from the PDF.",
         "- Use null for missing scalar fields and [] for missing lists.",
-        "- Do not invent rows, identifiers or labels.",
-        "- If no explicit rows exist, return the empty list for this table.",
+        "- Do not invent rows, identifiers, labels or relationships.",
+        "- Keep wording verbatim or near-verbatim where possible.",
+        "- For reference fields, return the explicit label or name from the PDF; matching happens later in the pipeline.",
         "",
         "FIELDS",
     ]
     for field_spec in template_specs:
-        lines.extend(_render_field_lines(field_spec, registry))
+        lines.extend(_render_auto_generated_field_lines(field_spec, registry))
 
     return {
         "template_json": _render_template(template_specs, registry),
@@ -982,8 +1058,11 @@ def build_dynamic_task_sections(registry: Dict[str, Any]) -> Dict[str, Dict[str,
             "instructions": "\n".join(lines).strip(),
         }
 
+    baseline_tables = _baseline_profile_tables()
     for table_name in sorted(registry.get("tables") or {}):
         if table_name in COHORT_RUNTIME_TABLES:
+            continue
+        if table_name in baseline_tables:
             continue
         section = _build_auto_generated_task_section(table_name, registry)
         if not section:
