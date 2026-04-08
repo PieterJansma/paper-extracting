@@ -380,7 +380,10 @@ push_prompt_schema_diff_to_git() {
 fetch_emx2_csv() {
   local rel_path="$1"
   local target_var="${2:-}"
-  local current_val="${!target_var:-}"
+  local current_val=""
+  if [[ -n "$target_var" ]]; then
+    current_val="${!target_var:-}"
+  fi
 
   if [[ -n "$target_var" && -n "$current_val" && -f "$current_val" ]]; then
     return 0
