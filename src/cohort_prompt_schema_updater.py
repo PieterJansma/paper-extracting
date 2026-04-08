@@ -288,14 +288,38 @@ def _insert_segment_for_field(
         if neighbor.get("kind") == "field_block":
             style = str(neighbor.get("style") or style)
             break
+    normalized_block = _coerce_block_style(new_block, style, field_path)
     segments.insert(insert_at, {
         "kind": "field_block",
         "style": style,
         "heading": heading,
         "heading_key": heading,
         "aliases": _heading_aliases(heading),
-        "block": str(new_block or "").strip(),
+        "block": normalized_block,
     })
+
+
+def _coerce_block_style(block: str | None, style: str, field_path: str) -> str:
+    text = str(block or "").strip()
+    if not text:
+        return ""
+    if style != "divider":
+        return text
+
+    lines = text.splitlines()
+    first = lines[0] if lines else ""
+    match = FIELD_LINE_RE.match(first)
+    if not match:
+        return text
+
+    heading = _field_path_leaf(field_path).replace("_", " ")
+    rendered: List[str] = [heading]
+    body = match.group(2).strip()
+    if body:
+        rendered.append(body)
+    for raw in lines[1:]:
+        rendered.append(raw[2:] if raw.startswith("  ") else raw)
+    return "\n".join(part for part in rendered if part).strip()
 
 
 def _changed_field_paths(
@@ -352,6 +376,84 @@ def _prepend_schema_change_notice(task_name: str, section: Dict[str, Any], diff:
     return updated
 
 
+def _merge_changed_task_into_base(
+    *,
+    task_name: str,
+    base_section: Dict[str, Any],
+    old_section: Dict[str, Any],
+    new_section: Dict[str, Any],
+    diff: Dict[str, List[str]],
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    updated = dict(base_section)
+    if new_section.get("template_json"):
+        updated["template_json"] = new_section.get("template_json")
+
+    base_instructions = str(base_section.get("instructions") or "").strip()
+    if not base_instructions:
+        updated["instructions"] = str(new_section.get("instructions") or "").strip()
+        return updated, {
+            "mode": "replace_no_base_instructions",
+            "fields": [],
+        }
+
+    segments = _parse_instruction_segments(base_section.get("instructions"))
+    if not any(seg.get("kind") == "field_block" for seg in segments):
+        updated["instructions"] = base_instructions
+        return updated, {
+            "mode": "preserve_unstructured_base",
+            "fields": [],
+        }
+
+    old_lines = _field_lines(old_section.get("instructions"))
+    new_lines = _field_lines(new_section.get("instructions"))
+    changed_fields = _changed_field_paths(old_section, new_section, diff)
+    field_actions: List[Dict[str, str]] = []
+
+    for field_path in changed_fields:
+        idx = _find_segment_index_for_field(segments, field_path)
+        new_exists = field_path in new_lines
+        old_exists = field_path in old_lines
+
+        if old_exists and not new_exists:
+            if idx >= 0:
+                segments.pop(idx)
+                field_actions.append({"field_path": field_path, "action": "removed"})
+            continue
+
+        if new_exists and not old_exists:
+            new_block = _extract_field_block(new_section.get("instructions"), field_path)
+            if new_block:
+                _insert_segment_for_field(
+                    segments,
+                    field_path=field_path,
+                    new_block=new_block,
+                    new_generated_section=new_section,
+                )
+                field_actions.append({"field_path": field_path, "action": "added"})
+            continue
+
+        if idx >= 0:
+            field_actions.append({"field_path": field_path, "action": "preserved_existing_block"})
+        else:
+            new_block = _extract_field_block(new_section.get("instructions"), field_path)
+            if new_block:
+                _insert_segment_for_field(
+                    segments,
+                    field_path=field_path,
+                    new_block=new_block,
+                    new_generated_section=new_section,
+                )
+                field_actions.append({"field_path": field_path, "action": "added_missing_block"})
+
+    merged_instructions = _render_instruction_segments(segments).strip()
+    updated["instructions"] = merged_instructions or base_instructions
+    return updated, {
+        "mode": "field_merge",
+        "fields": field_actions,
+        "task_name": task_name,
+    }
+
+
 def build_updated_prompt_cfg(
     *,
     base_prompts: Dict[str, Dict[str, Any]],
@@ -384,7 +486,20 @@ def build_updated_prompt_cfg(
         if not changed and base_section is not None:
             out[task_name] = dict(base_section)
             continue
-        out[task_name] = _prepend_schema_change_notice(task_name, new_section, diff)
+        if base_section is not None:
+            merged_section, merge_report = _merge_changed_task_into_base(
+                task_name=task_name,
+                base_section=base_section,
+                old_section=old_section,
+                new_section=new_section,
+                diff=diff,
+            )
+            out[task_name] = merged_section
+            report["tasks"][task_name]["merge_mode"] = merge_report.get("mode")
+            report["tasks"][task_name]["field_actions"] = list(merge_report.get("fields") or [])
+            continue
+        out[task_name] = dict(new_section)
+        report["tasks"][task_name]["merge_mode"] = "new_task_generated"
 
     return out, report
 
