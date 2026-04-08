@@ -667,11 +667,16 @@ def coerce_hyperlink(table: str, column: str, value: Any) -> Any:
     if not s:
         return ""
 
-    # DOI column should stay as the bare DOI string, not a resolver URL.
+    # Publications.doi is typed as hyperlink in the live EMX2 schema.
+    # Accept a bare DOI or DOI URL as input, but always normalize to a
+    # canonical DOI resolver URL so downstream imports pass hyperlink validation.
     if table == "Publications" and column == "doi":
         s = re.sub(r"^(?:https?://)?(?:dx\.)?doi\.org/", "", s, flags=re.IGNORECASE)
         s = re.sub(r"^doi:\s*", "", s, flags=re.IGNORECASE)
-        return s.rstrip(".,;:)")
+        s = s.rstrip(".,;:)")
+        if re.fullmatch(r"10\.\d{4,9}/[-._;()/:A-Za-z0-9]+", s):
+            return f"https://doi.org/{s}"
+        return ""
 
     # User rule: hyperlinks should be a real site, starting with http or www.
     if _DOMAIN_RE.match(s):

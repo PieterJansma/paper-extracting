@@ -148,6 +148,18 @@ def _normalize_identifier_value(value: Any) -> str:
     return s
 
 
+def _normalize_publication_doi(value: Any) -> str:
+    s = str(value or "").strip()
+    if not s:
+        return ""
+    normalized = re.sub(r"^(?:https?://)?(?:dx\.)?doi\.org/", "", s, flags=re.IGNORECASE)
+    normalized = re.sub(r"^doi:\s*", "", normalized, flags=re.IGNORECASE)
+    normalized = normalized.rstrip(".,;:)")
+    if re.fullmatch(r"10\.\d{4,9}/[-._;()/:A-Za-z0-9]+", normalized):
+        return f"https://doi.org/{normalized}"
+    return s
+
+
 def _task_cfg_flag(task_cfg: Dict[str, Any], key: str) -> bool:
     raw = task_cfg.get(key)
     if isinstance(raw, bool):
@@ -1093,7 +1105,7 @@ def cli() -> None:
             row = _blank_row(COHORT_SHEETS["Publications"])
             row.update({
                 "resource": resource_ref,
-                "doi": _normalize_identifier_value(item.get("doi")),
+                "doi": _normalize_publication_doi(item.get("doi")),
                 "title": _serialize_value(item.get("title")),
                 "is design publication": _serialize_value(item.get("is_design_publication")),
             })
