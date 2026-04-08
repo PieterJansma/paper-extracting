@@ -311,6 +311,8 @@ Rules:
 - Treat explicitly named disease groups, tumor/tumour working groups, clinic groups, registry-defined groups, or other named participant subsets as valid subpopulations when the paper gives them their own row, count, percentage, or subgroup description.
 - An explicit table row or figure row with a subgroup label plus subgroup-specific participant count is sufficient evidence for a subpopulation row.
 - Do NOT reject a subgroup only because it appears in a participant table rather than in the narrative text.
+- If a participant/composition table lists multiple eligible subgroup rows, return all eligible named subgroup rows, not only the largest or narratively discussed examples.
+- Exclude rows that are clearly sites, hospitals, departments, authors, staff roles, or logistics rather than patient subsets.
 - Do NOT create subpopulations from generic site lists, acknowledgements, or overall trial logistics.
 
 - name (required):
@@ -332,12 +334,18 @@ Rules:
   (e.g., "about", "around", "approximately", "circa", "~", "ca.").
   If approximated, convert to the nearest integer and keep it as an estimate-derived value.
   A named subgroup row in a participant table with its own N counts as explicit subgroup evidence.
+  If a participant/composition table lists one total N for the subgroup, copy that N here.
   If no explicit or approximate N is given -> null.
 
 - counts:
   return [] if no explicit subpopulation count breakdown is given.
   Otherwise return one row per explicitly reported count row for this subpopulation.
   A subgroup can still be valid even when counts=[]; do NOT drop a named subgroup just because the paper gives only one overall N.
+  If the paper gives exactly one explicit subgroup total N and no finer breakdown, you MAY return one count row with:
+    - age_group = null
+    - n_total = that subgroup total
+    - n_female = null
+    - n_male = null
   Target shape follows the cohort workbook:
     - age_group (STRICT dropdown; single select):
       Allowed values (exact strings only):
@@ -390,7 +398,7 @@ Rules:
   - If not explicit -> [].
 - age_min/age_max: integers only if explicit; “≥X” -> age_min=X, age_max=null.
 - main_medical_condition/comorbidity: list explicit disease groups/codes or named comorbidities only; no code inference.
-- countries/regions: only if explicitly tied to this subpopulation; normalize "The Netherlands"->"Netherlands".
+- countries/regions: only if explicitly tied to this subpopulation; normalize "The Netherlands"->"Netherlands". Do NOT inherit study-level countries/regions unless the subgroup itself is explicitly geographically defined.
 - inclusion_criteria / exclusion_criteria (STRICT dropdown values):
   These are checkbox categories, not free-text criteria.
   Only output items that are explicitly stated for this subpopulation
@@ -425,6 +433,7 @@ Rules:
   - "Restricted access"
   - "Non public"
   Rules:
+  - Do NOT copy study-level access statements into a subgroup row unless the paper explicitly applies them to that subgroup or to all subgroup data.
   - "Open access" ONLY if explicitly public.
   - "Restricted access" ONLY if explicitly controlled/restricted (including "available on request").
   - Otherwise default "Non public".
