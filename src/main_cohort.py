@@ -13,6 +13,7 @@ import pandas as pd
 
 from llm_client import OpenAICompatibleClient
 from extract_pipeline import load_pdf_text, build_context_prefix_messages
+import fix_molgenis_staging_types_callable as legacy_types
 
 from emx2_dynamic_runtime import (
     apply_dynamic_constraints_to_config,
@@ -187,6 +188,138 @@ def _task_cfg_json_map(task_cfg: Dict[str, Any], key: str) -> Dict[str, str]:
 def _registry_table_columns(registry: Dict[str, Any] | None, table_name: str) -> List[str]:
     fields = ((registry or {}).get("tables", {}).get(table_name, {}) or {}).get("fields", {}) or {}
     return [str(column_name) for column_name in fields.keys()]
+
+
+def _registry_field_meta(
+    registry: Dict[str, Any] | None,
+    table_name: str,
+    column_name: str,
+) -> Dict[str, Any]:
+    return (
+        ((registry or {}).get("tables", {}).get(table_name, {}) or {}).get("fields", {}) or {}
+    ).get(column_name, {}) or {}
+
+
+def _registry_allowed_values(meta: Dict[str, Any]) -> set[str]:
+    raw_values = meta.get("allowed_values")
+    if not isinstance(raw_values, list):
+        return set()
+    values: set[str] = set()
+    for raw in raw_values:
+        s = str(raw or "").strip()
+        if s:
+            values.add(s)
+    return values
+
+
+def _serialize_runtime_array_value(
+    table_name: str,
+    column_name: str,
+    meta: Dict[str, Any],
+    value: Any,
+) -> str:
+    raw_items = legacy_types._parse_array_items(value)
+    if raw_items is None:
+        return _serialize_value(value)
+
+    column_type = str(meta.get("column_type") or "").strip()
+    allowed_values = _registry_allowed_values(meta)
+    items: List[str] = []
+    seen: set[str] = set()
+    for raw in raw_items:
+        if column_type == "ref_array":
+            scalar = legacy_types._extract_ref_scalar(raw)
+        else:
+            scalar = legacy_types._extract_ontology_scalar(raw)
+            if not scalar:
+                scalar = str(raw or "").strip()
+        if not scalar or scalar in seen:
+            continue
+        if allowed_values and scalar not in allowed_values:
+            continue
+        seen.add(scalar)
+        items.append(scalar)
+
+    return ",".join(items)
+
+
+def _serialize_runtime_scalar_value(
+    table_name: str,
+    column_name: str,
+    meta: Dict[str, Any],
+    value: Any,
+) -> Any:
+    column_type = str(meta.get("column_type") or "").strip()
+    if column_type == "refback":
+        return ""
+    if column_type == "ref":
+        return legacy_types._extract_ref_scalar(value)
+    if column_type == "ontology":
+        scalar = legacy_types._extract_ontology_scalar(value)
+        if not scalar:
+            return ""
+        allowed_values = _registry_allowed_values(meta)
+        if allowed_values and scalar not in allowed_values:
+            return ""
+        return legacy_types.coerce_ontology(table_name, column_name, scalar)
+    if column_type == "heading":
+        return legacy_types.coerce_heading(value)
+    if column_type == "date":
+        return legacy_types.coerce_date(value)
+    if column_type == "datetime":
+        return legacy_types.coerce_datetime(value)
+    if column_type == "email":
+        return legacy_types.coerce_email(value)
+    if column_type == "file":
+        return legacy_types.coerce_file(value)
+    if column_type == "int":
+        return legacy_types.coerce_int(value, non_negative=False)
+    if column_type == "non_negative_int":
+        return legacy_types.coerce_int(value, non_negative=True)
+    if column_type == "hyperlink":
+        return legacy_types.coerce_hyperlink(table_name, column_name, value)
+    if column_type == "bool":
+        return legacy_types.coerce_bool(value)
+    if column_type == "text":
+        return legacy_types.coerce_passthrough_text(value)
+    if column_type in legacy_types.PASSTHROUGH_TYPES:
+        return legacy_types.coerce_passthrough(value)
+    return _serialize_value(value)
+
+
+def _normalize_row_with_runtime_schema(
+    row: Dict[str, Any],
+    *,
+    table_name: str,
+    registry: Dict[str, Any] | None,
+) -> Dict[str, Any]:
+    if not registry:
+        return row
+
+    for column_name, value in list(row.items()):
+        meta = _registry_field_meta(registry, table_name, column_name)
+        if not meta:
+            continue
+        column_type = str(meta.get("column_type") or "").strip()
+        if column_type in legacy_types.ARRAY_TYPES:
+            row[column_name] = _serialize_runtime_array_value(table_name, column_name, meta, value)
+        else:
+            row[column_name] = _serialize_runtime_scalar_value(table_name, column_name, meta, value)
+    return row
+
+
+def _normalize_rows_with_runtime_schema(
+    rows: List[Dict[str, Any]],
+    *,
+    table_name: str,
+    registry: Dict[str, Any] | None,
+) -> List[Dict[str, Any]]:
+    if not registry:
+        return rows
+    return [
+        _normalize_row_with_runtime_schema(dict(row), table_name=table_name, registry=registry)
+        for row in rows
+    ]
 
 
 def _normalize_dynamic_item_to_row(
@@ -1129,6 +1262,71 @@ def cli() -> None:
             documentation_rows.append(row)
 
     log.info("--- DONE EXTRACTING ---")
+
+    if dynamic_registry:
+        resource_rows = _normalize_rows_with_runtime_schema(
+            resource_rows,
+            table_name="Resources",
+            registry=dynamic_registry,
+        )
+        subpopulation_rows = _normalize_rows_with_runtime_schema(
+            subpopulation_rows,
+            table_name="Subpopulations",
+            registry=dynamic_registry,
+        )
+        count_rows = _normalize_rows_with_runtime_schema(
+            count_rows,
+            table_name="Subpopulation counts",
+            registry=dynamic_registry,
+        )
+        external_identifier_rows = _normalize_rows_with_runtime_schema(
+            external_identifier_rows,
+            table_name="External identifiers",
+            registry=dynamic_registry,
+        )
+        internal_identifier_rows = _normalize_rows_with_runtime_schema(
+            internal_identifier_rows,
+            table_name="Internal identifiers",
+            registry=dynamic_registry,
+        )
+        collection_event_rows = _normalize_rows_with_runtime_schema(
+            collection_event_rows,
+            table_name="Collection events",
+            registry=dynamic_registry,
+        )
+        agent_rows = _normalize_rows_with_runtime_schema(
+            agent_rows,
+            table_name="Agents",
+            registry=dynamic_registry,
+        )
+        organisation_extension_rows = _normalize_rows_with_runtime_schema(
+            organisation_extension_rows,
+            table_name="Organisations",
+            registry=dynamic_registry,
+        )
+        contact_rows = _normalize_rows_with_runtime_schema(
+            contact_rows,
+            table_name="Contacts",
+            registry=dynamic_registry,
+        )
+        publication_rows = _normalize_rows_with_runtime_schema(
+            publication_rows,
+            table_name="Publications",
+            registry=dynamic_registry,
+        )
+        documentation_rows = _normalize_rows_with_runtime_schema(
+            documentation_rows,
+            table_name="Documentation",
+            registry=dynamic_registry,
+        )
+        dynamic_table_rows = {
+            table_name: _normalize_rows_with_runtime_schema(
+                rows,
+                table_name=table_name,
+                registry=dynamic_registry,
+            )
+            for table_name, rows in dynamic_table_rows.items()
+        }
 
     if importlib.util.find_spec("xlsxwriter") is not None:
         excel_engine = "xlsxwriter"
