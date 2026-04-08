@@ -679,6 +679,120 @@ def _auto_allowed_values_note(meta: Dict[str, Any]) -> str:
     return f"Validate against current {label} ({count} allowed values)."
 
 
+def _auto_generated_prompt_context(table_name: str, fields_meta: Dict[str, Any]) -> str:
+    norm_fields = {_normalize_key(name) for name in fields_meta}
+    if {"mainmedicalcondition", "comorbidity", "numberofparticipants", "countries", "regions"} & norm_fields:
+        return "subgroup_like"
+    if {"areasofinformation", "datacategories", "samplecategories", "standardizedtools"} & norm_fields:
+        return "event_like"
+    if table_name == "Resources":
+        return "resource_like"
+    return "generic"
+
+
+def _reused_auto_generated_rules(context: str, field_key: str) -> List[str]:
+    subgroup_rules = {
+        "mainmedicalcondition": [
+            "List explicit disease groups, codes or named conditions only; no code inference.",
+        ],
+        "countries": [
+            'Only if explicitly tied to this subgroup or pathway group.',
+            'Normalize "The Netherlands" -> "Netherlands".',
+            "Do NOT inherit study-level countries unless the row itself is explicitly geographically defined.",
+            "If none are explicit -> [].",
+        ],
+        "regions": [
+            "Only if explicitly tied to this subgroup or pathway group.",
+            "Do NOT inherit study-level regions unless the row itself is explicitly geographically defined.",
+            "If none are explicit -> [].",
+        ],
+        "accessrights": [
+            "Do NOT copy study-level access statements into this row unless the paper explicitly applies them to that subgroup or to all subgroup data.",
+            '"Open access" ONLY if explicitly public.',
+            '"Restricted access" ONLY if explicitly controlled/restricted (including "available on request").',
+            'Otherwise default "Non public".',
+            'IMPORTANT: article license text (e.g., "Open access article", CC-BY) is NOT evidence for dataset access_rights.',
+        ],
+        "applicablelegislation": [
+            'Add labels ONLY if explicitly stated in the PDF as applicable or mandating legislation.',
+            "Otherwise -> [].",
+            "Do NOT auto-add defaults.",
+        ],
+    }
+    resource_rules = {
+        "accessrights": [
+            '"Open access" ONLY if explicitly stated data are publicly accessible without restrictions.',
+            '"Restricted access" ONLY if explicitly stated access requires approval/application/DAC/contract.',
+            '"Non public" ONLY if explicitly stated as not publicly accessible or closed.',
+            'Statements like "data available on/upon request" or "available from corresponding author on reasonable request" count as "Restricted access".',
+            "If not explicitly stated -> null.",
+            "NOTE: The UI may default to non-public, but extraction must not default; only extract explicit statements.",
+            'IMPORTANT: publication status text (e.g., "Open access article", CC-BY license for the paper) is NOT evidence for resource data access_rights.',
+        ],
+        "applicablelegislation": [
+            'Add labels ONLY if explicitly stated in the PDF as applicable or mandating legislation.',
+            "Otherwise -> [].",
+            "Do NOT auto-add defaults.",
+        ],
+        "countries": [
+            "Include ONLY countries explicitly stated as origin of data/samples for this resource.",
+            'Normalize "The Netherlands" -> "Netherlands".',
+            "If none are explicit -> [].",
+        ],
+        "regions": [
+            "Include ONLY explicitly stated geographical regions/provinces/cities relevant to where data/samples originate.",
+            "Use verbatim wording (no harmonization beyond obvious Netherlands normalization above).",
+            "If none are explicit -> [].",
+        ],
+    }
+    event_rules = {
+        "accessrights": [
+            '"Open access" ONLY if data are explicitly publicly available.',
+            '"Restricted access" ONLY if explicitly stated controlled/restricted.',
+            'Otherwise default "Non public".',
+            'IMPORTANT: article-level "Open access" publication status is NOT evidence that event-level data are open.',
+        ],
+        "applicablelegislation": [
+            'Add labels ONLY if explicitly named as applicable to this event.',
+            "Otherwise -> [].",
+            "Do NOT auto-add defaults.",
+            "Do NOT include ethics guidelines.",
+        ],
+    }
+    by_context = {
+        "subgroup_like": subgroup_rules,
+        "resource_like": resource_rules,
+        "event_like": event_rules,
+    }
+    return list(by_context.get(context, {}).get(field_key, []))
+
+
+def _render_reused_auto_generated_field_lines(
+    full_key: str,
+    spec: Dict[str, Any],
+    meta: Dict[str, Any],
+    *,
+    table_name: str,
+    fields_meta: Dict[str, Any],
+) -> List[str]:
+    context = _auto_generated_prompt_context(table_name, fields_meta)
+    field_key = _normalize_key(spec.get("key"))
+    rules = _reused_auto_generated_rules(context, field_key)
+    if not rules:
+        return []
+
+    lines = [f"- `{full_key}`: {str(spec.get('note') or '').strip()}"]
+    allowed_note = _auto_allowed_values_note(meta)
+    if allowed_note:
+        lines.append(f"  {allowed_note}")
+    lines.append("  Rules:")
+    for rule in rules:
+        lines.append(f"  - {rule}")
+    if field_key not in {"accessrights", "applicablelegislation"}:
+        lines.append(f"  - {_generic_rule_from_meta(meta, nullable=bool(spec.get('nullable', True)))}")
+    return lines
+
+
 def _field_reference(spec: Dict[str, Any]) -> str:
     if "placeholder" in spec or spec.get("kind") == "list":
         return ""
@@ -717,14 +831,27 @@ def _render_field_lines(spec: Dict[str, Any], registry: Dict[str, Any], prefix: 
     return [f"- `{full_key}`: {' '.join(parts)}"]
 
 
-def _render_auto_generated_field_lines(spec: Dict[str, Any], registry: Dict[str, Any], prefix: str = "") -> List[str]:
+def _render_auto_generated_field_lines(
+    spec: Dict[str, Any],
+    registry: Dict[str, Any],
+    prefix: str = "",
+    *,
+    table_name: str = "",
+    fields_meta: Dict[str, Any] | None = None,
+) -> List[str]:
     key = spec["key"]
     full_key = f"{prefix}{key}"
     if spec.get("kind") == "list":
         lines = [f"- `{full_key}[]`: {spec.get('note') or 'Return a list of explicit rows only.'}"]
         for child in spec.get("item_fields", []):
             child_prefix = f"{full_key}[]."
-            for child_line in _render_auto_generated_field_lines(child, registry, prefix=child_prefix):
+            for child_line in _render_auto_generated_field_lines(
+                child,
+                registry,
+                prefix=child_prefix,
+                table_name=table_name,
+                fields_meta=fields_meta,
+            ):
                 lines.append(f"  {child_line}")
         return lines
 
@@ -733,6 +860,15 @@ def _render_auto_generated_field_lines(spec: Dict[str, Any], registry: Dict[str,
         return [f"- `{full_key}`: {note}"]
 
     meta = _lookup_field_meta(registry, spec["table"], spec["column"]) or {}
+    reused = _render_reused_auto_generated_field_lines(
+        full_key,
+        spec,
+        meta,
+        table_name=table_name or str(spec.get("table") or "").strip(),
+        fields_meta=fields_meta or {},
+    )
+    if reused:
+        return reused
     parts: List[str] = []
     if note:
         parts.append(note)
@@ -911,7 +1047,14 @@ def _build_auto_generated_task_section(table_name: str, registry: Dict[str, Any]
         "FIELDS",
     ]
     for field_spec in template_specs:
-        lines.extend(_render_auto_generated_field_lines(field_spec, registry))
+        lines.extend(
+            _render_auto_generated_field_lines(
+                field_spec,
+                registry,
+                table_name=table_name,
+                fields_meta=fields_meta,
+            )
+        )
 
     return {
         "template_json": _render_template(template_specs, registry),
