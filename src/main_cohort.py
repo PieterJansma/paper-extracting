@@ -21,6 +21,7 @@ from emx2_dynamic_runtime import (
     write_task_prompts_toml,
 )
 from cohort_dynamic_prompts import (
+    AUTO_GENERATED_TABLES_DISABLED,
     build_dynamic_task_sections,
     postprocess_section_results_dynamic,
     replace_task_sections,
@@ -722,6 +723,8 @@ def cli() -> None:
             continue
         table_name = str(task_cfg.get("task_table") or task_cfg.get("task_sheet_name") or "").strip()
         if not table_name:
+            continue
+        if table_name in AUTO_GENERATED_TABLES_DISABLED:
             continue
         auto_generated_task_defs.append((task_name, table_name))
 

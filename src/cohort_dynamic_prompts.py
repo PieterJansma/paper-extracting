@@ -18,6 +18,14 @@ from emx2_dynamic_runtime import (
 
 
 TASK_PREFIX = "task_"
+AUTO_GENERATED_TABLES_DISABLED: set[str] = {
+    "Datasets",
+    "Variables",
+    "Variable mappings",
+    "Variable values",
+    "Profiles",
+}
+
 AUTO_SKIP_COLUMNS: Dict[str, set[str]] = {
     "Resources": {
         "overview",
@@ -1206,6 +1214,8 @@ def build_dynamic_task_sections(registry: Dict[str, Any]) -> Dict[str, Dict[str,
         if table_name in COHORT_RUNTIME_TABLES:
             continue
         if table_name in baseline_tables:
+            continue
+        if table_name in AUTO_GENERATED_TABLES_DISABLED:
             continue
         section = _build_auto_generated_task_section(table_name, registry)
         if not section:
