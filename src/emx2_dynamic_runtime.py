@@ -644,11 +644,15 @@ def main() -> None:
         return
 
     if args.cmd == "model-paths":
-        for rel_path in profile_model_paths(
-            args.profile,
-            local_root=args.local_root,
-            fallback_schema_csv=args.fallback_schema_csv,
-        ):
+        if mode == "cohort":
+            paths = cohort_model_paths()
+        else:
+            paths = profile_model_paths(
+                args.profile,
+                local_root=args.local_root,
+                fallback_schema_csv=args.fallback_schema_csv,
+            )
+        for rel_path in paths:
             print(rel_path)
         return
 

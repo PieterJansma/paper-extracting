@@ -509,14 +509,14 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str((Path.cwd() / "src").resolve()))
-from emx2_dynamic_runtime import build_runtime_registry
+from emx2_dynamic_runtime import build_runtime_registry, COHORT_RUNTIME_TABLES
 
 report_json = Path(sys.argv[1]).resolve()
 report_txt = Path(sys.argv[2]).resolve()
 
 registry = build_runtime_registry(
     "UMCGCohortsStaging",
-    tables=None,
+    tables=COHORT_RUNTIME_TABLES,
     local_root=os.environ.get("MOLGENIS_EMX2_LOCAL_ROOT"),
     fallback_schema_csv=os.environ.get("EMX2_RUNTIME_SCHEMA_CSV"),
     cache_dir=os.environ.get("EMX2_CACHE_DIR"),
