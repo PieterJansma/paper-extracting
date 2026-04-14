@@ -496,35 +496,96 @@ validate_emx2_required_paths() {
   if ! command -v python3 >/dev/null 2>&1; then
     return 0
   fi
-  if ! python3 src/emx2_dynamic_runtime.py required-paths --mode cohort >/dev/null 2>&1; then
+  local report_json="${RUN_DIR}/emx2_missing_required_paths.json"
+  local report_txt="${RUN_DIR}/emx2_missing_required_paths.txt"
+  local rc=0
+  python3 - "$report_json" "$report_txt" <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str((Path.cwd() / "src").resolve()))
+from emx2_dynamic_runtime import build_runtime_registry
+
+report_json = Path(sys.argv[1]).resolve()
+report_txt = Path(sys.argv[2]).resolve()
+
+registry = build_runtime_registry(
+    "UMCGCohortsStaging",
+    tables=None,
+    local_root=os.environ.get("MOLGENIS_EMX2_LOCAL_ROOT"),
+    fallback_schema_csv=os.environ.get("EMX2_RUNTIME_SCHEMA_CSV"),
+    cache_dir=os.environ.get("EMX2_CACHE_DIR"),
+)
+
+missing_ontology = []
+for table_name, table_meta in (registry.get("tables") or {}).items():
+    fields = table_meta.get("fields") or {}
+    for column_name, meta in fields.items():
+        column_type = str(meta.get("column_type") or "").strip()
+        if column_type not in {"ontology", "ontology_array"}:
+            continue
+        ref_table = str(meta.get("ref_table") or "").strip()
+        if not ref_table:
+            continue
+        allowed_values = [str(v).strip() for v in list(meta.get("allowed_values") or []) if str(v).strip()]
+        if allowed_values:
+            continue
+        source_rel = str(meta.get("source_rel_path") or "").strip() or None
+        source_path = str(meta.get("source_path") or "").strip() or None
+        missing_ontology.append(
+            {
+                "table": table_name,
+                "column": column_name,
+                "ref_table": ref_table,
+                "source_rel_path": source_rel,
+                "source_path": source_path,
+            }
+        )
+
+payload = {
+    "missing_ontology_fields": missing_ontology,
+    "count_missing_ontology_fields": len(missing_ontology),
+}
+report_json.parent.mkdir(parents=True, exist_ok=True)
+report_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+report_txt.write_text(
+    "\n".join(
+        f"{row['table']}.{row['column']} -> {row['ref_table']} "
+        f"(source_rel_path={row.get('source_rel_path')}, source_path={row.get('source_path')})"
+        for row in missing_ontology
+    )
+    + ("\n" if missing_ontology else ""),
+    encoding="utf-8",
+)
+
+if missing_ontology:
+    sys.exit(2)
+PY
+  rc=$?
+
+  if [[ "$rc" == "0" ]]; then
+    status_event "emx2_required_paths_ok" "all required ontology sources resolved (${MOLGENIS_EMX2_REPO}@${MOLGENIS_EMX2_REF})"
     return 0
   fi
 
-  local missing=()
-  local rel_path=""
-  while IFS= read -r rel_path; do
-    [[ -z "$rel_path" ]] && continue
-    local candidate="${EMX2_REPO_ROOT}/${rel_path}"
-    if [[ ! -f "$candidate" ]]; then
-      missing+=("$rel_path")
+  if [[ "$rc" == "2" ]]; then
+    echo "❌ Ontbrekende ontology allowed-values gedetecteerd. Zie: $report_txt"
+    status_event "warning" "missing ontology allowed-values detected"
+    if [[ "$EMX2_REQUIRED_PATHS_STRICT" == "1" ]]; then
+      status_event "failed" "missing ontology allowed-values; aborting run"
+      return 1
     fi
-  done < <(python3 src/emx2_dynamic_runtime.py required-paths --mode cohort)
-
-  if (( ${#missing[@]} == 0 )); then
-    status_event "emx2_required_paths_ok" "all required EMX2 paths available (${MOLGENIS_EMX2_REPO}@${MOLGENIS_EMX2_REF})"
     return 0
   fi
 
-  local missing_file="${RUN_DIR}/emx2_missing_required_paths.txt"
-  printf "%s\n" "${missing[@]}" > "$missing_file"
-  echo "❌ Ontbrekende EMX2 required paths (${#missing[@]}). Zie: $missing_file"
-  status_event "warning" "missing EMX2 required paths (${#missing[@]})"
-
+  echo "⚠️  EMX2 preflight check kon niet worden uitgevoerd (exit=$rc)."
+  status_event "warning" "emx2 preflight check failed (exit=${rc})"
   if [[ "$EMX2_REQUIRED_PATHS_STRICT" == "1" ]]; then
-    status_event "failed" "missing EMX2 required paths; aborting run"
+    status_event "failed" "emx2 preflight check failed; aborting run"
     return 1
   fi
-
   return 0
 }
 
