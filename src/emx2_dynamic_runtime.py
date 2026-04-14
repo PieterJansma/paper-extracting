@@ -631,7 +631,7 @@ def main() -> None:
 
     args = parser.parse_args()
     mode = getattr(args, "mode", "cohort")
-    tables = None if mode == "cohort" else ()
+    tables = COHORT_RUNTIME_TABLES if mode == "cohort" else ()
 
     if args.cmd == "required-paths":
         for rel_path in required_fetch_paths(

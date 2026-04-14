@@ -23,6 +23,9 @@ SLOTS="${SLOTS:-1}"
 NGL="${NGL:-999}"
 LLM_DISABLE_THINKING="${LLM_DISABLE_THINKING:-0}"
 LLM_REASONING_BUDGET="${LLM_REASONING_BUDGET:-4096}"
+SUBPOPULATION_TWO_STAGE="${SUBPOPULATION_TWO_STAGE:-1}"
+SUBPOPULATION_TWO_STAGE_WORKERS="${SUBPOPULATION_TWO_STAGE_WORKERS:-2}"
+COHORT_PROMPT_SCHEMA_SYNC_LLM_WORKERS="${COHORT_PROMPT_SCHEMA_SYNC_LLM_WORKERS:-2}"
 
 # Optional runtime overrides for [llm] config values (applied to config.runtime.toml).
 LLM_MAX_TOKENS="${LLM_MAX_TOKENS:-}"
@@ -737,6 +740,9 @@ export COHORT_DYNAMIC_EMX2_RUNTIME
 export COHORT_DYNAMIC_PROMPTS
 export COHORT_PROMPT_SCHEMA_SYNC
 export COHORT_PROMPT_SCHEMA_SYNC_LLM
+export COHORT_PROMPT_SCHEMA_SYNC_LLM_WORKERS
+export SUBPOPULATION_TWO_STAGE
+export SUBPOPULATION_TWO_STAGE_WORKERS
 export MOLGENIS_EMX2_LOCAL_ROOT="$EMX2_REPO_ROOT"
 export LLM_PARALLEL_BASE_URLS
 export STRIP_REFERENCES
@@ -1289,8 +1295,8 @@ status_event "emx2_source_selected" "using EMX2 source ${MOLGENIS_EMX2_REPO}@${M
 
 # Attempt to fetch latest ontology/model sources from molgenis-emx2.
 sync_emx2_shared_model_dir
-fetch_emx2_csv "data/_ontologies/Countries.csv" COUNTRY_ONTOLOGY_CSV
-fetch_emx2_csv "data/_ontologies/Regions.csv" REGION_ONTOLOGY_CSV
+# Resources lives in _models/shared in current molgenis-emx2; keep ontology path as legacy fallback.
+fetch_emx2_csv "data/_models/shared/Resources.csv" REF_RESOURCES_CSV
 fetch_emx2_csv "data/_ontologies/Resources.csv" REF_RESOURCES_CSV
 fetch_emx2_csv "data/_ontologies/Organisations.csv" REF_ORGANISATIONS_CSV
 fetch_emx2_csv "data/_models/shared/Subpopulations.csv" REF_SUBPOPULATIONS_CSV
@@ -1549,52 +1555,6 @@ PY
       status_event "warning" "live schema export failed; using existing runtime prompt"
     fi
   fi
-fi
-
-if [[ -z "${COUNTRY_ONTOLOGY_CSV:-}" ]]; then
-  for c in \
-    "${PWD}/Countries.csv" \
-    "${PWD}/data/ontologies/Countries.csv" \
-    "/Users/p.jansma/Downloads/Countries.csv"
-  do
-    if [[ -f "$c" ]]; then
-      export COUNTRY_ONTOLOGY_CSV="$c"
-      break
-    fi
-  done
-fi
-if [[ -n "${COUNTRY_ONTOLOGY_CSV:-}" ]]; then
-  echo "  COUNTRY_ONTOLOGY_CSV=$COUNTRY_ONTOLOGY_CSV"
-  if [[ -z "${COUNTRY_MAPPING_LLM_FALLBACK:-}" ]]; then
-    export COUNTRY_MAPPING_LLM_FALLBACK="1"
-  fi
-  echo "  COUNTRY_MAPPING_LLM_FALLBACK=$COUNTRY_MAPPING_LLM_FALLBACK"
-  status_event "countries_mapping_enabled" "country ontology mapping enabled"
-else
-  echo "  COUNTRY_ONTOLOGY_CSV=(not set; country mapping skipped)"
-fi
-
-if [[ -z "${REGION_ONTOLOGY_CSV:-}" ]]; then
-  for r in \
-    "${PWD}/Regions.csv" \
-    "${PWD}/data/ontologies/Regions.csv" \
-    "/Users/p.jansma/Downloads/Regions.csv"
-  do
-    if [[ -f "$r" ]]; then
-      export REGION_ONTOLOGY_CSV="$r"
-      break
-    fi
-  done
-fi
-if [[ -n "${REGION_ONTOLOGY_CSV:-}" ]]; then
-  echo "  REGION_ONTOLOGY_CSV=$REGION_ONTOLOGY_CSV"
-  if [[ -z "${REGION_MAPPING_LLM_FALLBACK:-}" ]]; then
-    export REGION_MAPPING_LLM_FALLBACK="1"
-  fi
-  echo "  REGION_MAPPING_LLM_FALLBACK=$REGION_MAPPING_LLM_FALLBACK"
-  status_event "regions_mapping_enabled" "region ontology mapping enabled"
-else
-  echo "  REGION_ONTOLOGY_CSV=(not set; region mapping skipped)"
 fi
 
 if [[ -n "${REF_RESOURCES_CSV:-}" ]]; then

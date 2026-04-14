@@ -29,8 +29,6 @@ from cohort_dynamic_prompts import (
 )
 from fix_molgenis_staging_types_callable import fix_workbook
 from fix_molgenis_staging_types_dynamic import fix_workbook_dynamic
-from map_countries_ontology import map_workbook_countries
-from map_regions_ontology import map_workbook_regions
 
 from cohort_runtime_utils import (
     setup_logging,
@@ -409,48 +407,6 @@ def _resolve_schema_xlsx(explicit_path: str | None = None) -> str | None:
         os.path.join(repo_root, "schemas", "molgenis_UMCGCohortsStaging.xlsx"),
         os.path.join(os.path.dirname(__file__), "molgenis_UMCGCohortsStaging.xlsx"),
         "/mnt/data/molgenis_UMCGCohortsStaging.xlsx",
-    ]
-    seen: set[str] = set()
-    for candidate in candidates:
-        if not candidate:
-            continue
-        candidate = os.path.abspath(os.path.expanduser(str(candidate)))
-        if candidate in seen:
-            continue
-        seen.add(candidate)
-        if os.path.exists(candidate):
-            return candidate
-    return None
-
-
-def _resolve_countries_csv(explicit_path: str | None = None) -> str | None:
-    candidates = [
-        explicit_path,
-        os.environ.get("COUNTRY_ONTOLOGY_CSV"),
-        os.path.join(os.getcwd(), "Countries.csv"),
-        os.path.join(os.getcwd(), "data", "ontologies", "Countries.csv"),
-        "/Users/p.jansma/Downloads/Countries.csv",
-    ]
-    seen: set[str] = set()
-    for candidate in candidates:
-        if not candidate:
-            continue
-        candidate = os.path.abspath(os.path.expanduser(str(candidate)))
-        if candidate in seen:
-            continue
-        seen.add(candidate)
-        if os.path.exists(candidate):
-            return candidate
-    return None
-
-
-def _resolve_regions_csv(explicit_path: str | None = None) -> str | None:
-    candidates = [
-        explicit_path,
-        os.environ.get("REGION_ONTOLOGY_CSV"),
-        os.path.join(os.getcwd(), "Regions.csv"),
-        os.path.join(os.getcwd(), "data", "ontologies", "Regions.csv"),
-        "/Users/p.jansma/Downloads/Regions.csv",
     ]
     seen: set[str] = set()
     for candidate in candidates:
@@ -1378,82 +1334,6 @@ def cli() -> None:
     with pd.ExcelWriter(args.output, engine=excel_engine) as writer:
         for sheet_name, frame in frames.items():
             frame.to_excel(writer, sheet_name=sheet_name, index=False)
-
-    countries_csv = _resolve_countries_csv()
-    if countries_csv:
-        try:
-            llm_fallback_enabled = str(os.environ.get("COUNTRY_MAPPING_LLM_FALLBACK", "1")).strip().lower() in {
-                "1",
-                "true",
-                "yes",
-                "y",
-                "on",
-            }
-            countries_issues = Path(f"{args.output}.countries_issues.json")
-            map_stats = map_workbook_countries(
-                workbook_path=Path(args.output),
-                ontology_csv=Path(countries_csv),
-                output_path=Path(args.output),
-                issues_json=countries_issues,
-                llm_client=client if llm_fallback_enabled else None,
-            )
-            run_issues.append(
-                {
-                    "paper": "__run__",
-                    "pdf_path": "",
-                    "severity": "info",
-                    "kind": "countries_mapping_applied",
-                    "message": (
-                        f"Applied country mapping using {countries_csv}; "
-                        f"mapped_cells={map_stats.get('mapped_cells', 0)}, "
-                        f"issue_count={map_stats.get('issue_count', 0)}, "
-                        f"llm_fallback={'on' if llm_fallback_enabled else 'off'}"
-                    ),
-                }
-            )
-            log.info("Applied country mapping using %s (mapped_cells=%s)", countries_csv, map_stats.get("mapped_cells", 0))
-        except Exception as e:
-            log.warning("Could not apply country mapping with %s: %s", countries_csv, e)
-    else:
-        log.info("No Countries.csv found; skipping country mapping.")
-
-    regions_csv = _resolve_regions_csv()
-    if regions_csv:
-        try:
-            llm_fallback_enabled = str(os.environ.get("REGION_MAPPING_LLM_FALLBACK", "1")).strip().lower() in {
-                "1",
-                "true",
-                "yes",
-                "y",
-                "on",
-            }
-            regions_issues = Path(f"{args.output}.regions_issues.json")
-            map_stats = map_workbook_regions(
-                workbook_path=Path(args.output),
-                ontology_csv=Path(regions_csv),
-                output_path=Path(args.output),
-                issues_json=regions_issues,
-                llm_client=client if llm_fallback_enabled else None,
-            )
-            run_issues.append(
-                {
-                    "paper": "__run__",
-                    "pdf_path": "",
-                    "severity": "info",
-                    "kind": "regions_mapping_applied",
-                    "message": (
-                        f"Applied region mapping using {regions_csv}; "
-                        f"mapped_cells={map_stats.get('mapped_cells', 0)}, "
-                        f"issue_count={map_stats.get('issue_count', 0)}, "
-                        f"llm_fallback={'on' if llm_fallback_enabled else 'off'}"
-                    ),
-                }
-            )
-            log.info("Applied region mapping using %s (mapped_cells=%s)", regions_csv, map_stats.get("mapped_cells", 0))
-        except Exception as e:
-            log.warning("Could not apply region mapping with %s: %s", regions_csv, e)
-    else:
-        log.info("No Regions.csv found; skipping region mapping.")
 
     if dynamic_runtime_enabled and dynamic_registry:
         try:

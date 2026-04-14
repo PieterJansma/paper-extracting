@@ -189,7 +189,9 @@ def _resolve_choice_with_llm(
                 {"role": "user", "content": user},
             ],
             temperature=0.0,
-            max_tokens=64,
+            max_tokens=256,
+            response_format={"type": "json_object"},
+            max_retries=2,
         )
         payload = json.loads(text.strip())
         choice = payload.get("choice")

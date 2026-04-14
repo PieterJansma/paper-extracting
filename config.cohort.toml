@@ -5,7 +5,7 @@ api_key  = "sk-local"
 use_grammar = false
 prompt_cache = true
 sticky_session = true
-max_tokens = 8000
+max_tokens = 12000
 timeout = 900
 temperature = 0.0
 chunking_enabled = false
@@ -22,4 +22,3 @@ max_pages = 0
 # Override paths with:
 #   PDF_EXTRACT_CONFIG=/path/to/config.toml
 #   PDF_EXTRACT_PROMPTS=/path/to/prompts_cohort.toml
-
