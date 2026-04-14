@@ -4,6 +4,8 @@ import os
 import json
 import logging
 import re
+import time
+from pathlib import Path
 from typing import Any, Dict, List, Iterable, Tuple
 
 try:
@@ -168,6 +170,116 @@ def _serialize_value(val: Any) -> str:
     if isinstance(val, (list, dict)):
         return json.dumps(val, ensure_ascii=False)
     return str(val)
+
+
+def _reasoning_trace_enabled() -> bool:
+    raw = os.getenv("LLM_REASONING_TRACE", "0")
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _reasoning_print_enabled() -> bool:
+    raw = os.getenv("LLM_REASONING_PRINT", "1")
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _reasoning_trace_max_chars() -> int:
+    raw = str(os.getenv("LLM_REASONING_TRACE_MAX_CHARS", "12000")).strip()
+    try:
+        return max(0, int(raw))
+    except Exception:
+        return 12000
+
+
+def _reasoning_print_max_chars() -> int:
+    raw = str(os.getenv("LLM_REASONING_PRINT_MAX_CHARS", "12000")).strip()
+    try:
+        return max(0, int(raw))
+    except Exception:
+        return 12000
+
+
+def _reasoning_trace_dir() -> Path:
+    run_dir = str(os.getenv("RUN_DIR", "")).strip()
+    if run_dir:
+        return Path(run_dir) / "reasoning"
+    return Path("logs") / "reasoning"
+
+
+def _write_pass_reasoning_trace(
+    *,
+    section_key: str | None,
+    pass_label: str,
+    traces: List[Dict[str, Any]],
+    log: logging.Logger,
+) -> None:
+    if not traces:
+        return
+
+    out_dir = _reasoning_trace_dir()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    safe_key = re.sub(r"[^A-Za-z0-9._-]+", "_", section_key or "unknown").strip("._") or "unknown"
+    out_file = out_dir / f"{safe_key}_{int(time.time() * 1000)}.json"
+
+    max_chars = _reasoning_trace_max_chars()
+    total_reasoning_chars = 0
+    payload_traces: List[Dict[str, Any]] = []
+    for idx, trace in enumerate(traces, start=1):
+        reasoning = str(trace.get("reasoning_content") or "")
+        total_reasoning_chars += len(reasoning)
+        if max_chars and len(reasoning) > max_chars:
+            reasoning = reasoning[:max_chars] + "\n...[truncated]..."
+        row = dict(trace)
+        row["call_index"] = idx
+        row["reasoning_content"] = reasoning
+        payload_traces.append(row)
+
+    payload = {
+        "pass_label": pass_label,
+        "section_key": section_key or "",
+        "trace_count": len(payload_traces),
+        "total_reasoning_chars": total_reasoning_chars,
+        "traces": payload_traces,
+    }
+    out_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    log.info(
+        "Reasoning trace saved for %s (%s): %s [calls=%d, reasoning_chars=%d]",
+        pass_label,
+        section_key or "unknown",
+        out_file,
+        len(payload_traces),
+        total_reasoning_chars,
+    )
+
+
+def _print_pass_reasoning(
+    *,
+    section_key: str | None,
+    pass_label: str,
+    traces: List[Dict[str, Any]],
+) -> None:
+    if not traces:
+        return
+
+    max_chars = _reasoning_print_max_chars()
+    sec = section_key or "unknown"
+    print(f"[REASONING] {pass_label} ({sec}) calls={len(traces)}")
+    for idx, trace in enumerate(traces, start=1):
+        finish_reason = str(trace.get("finish_reason") or "")
+        total_tokens = int(trace.get("total_tokens") or 0)
+        completion_tokens = int(trace.get("completion_tokens") or 0)
+        error = str(trace.get("error") or "")
+        reasoning = str(trace.get("reasoning_content") or "")
+        if max_chars and len(reasoning) > max_chars:
+            reasoning = reasoning[:max_chars] + "\n...[truncated]..."
+        print(
+            f"[REASONING] call={idx} finish={finish_reason or '-'} "
+            f"completion_tokens={completion_tokens} total_tokens={total_tokens} error={error or '-'}"
+        )
+        if reasoning.strip():
+            print(reasoning)
+        else:
+            print("[REASONING] (empty)")
+    print(f"[REASONING] end {pass_label} ({sec})")
 
 
 def _subpopulation_two_stage_enabled(task_cfg: Dict[str, Any]) -> bool:
@@ -456,37 +568,64 @@ def _collect_pass_result(
         return {}
 
     log.info("--- Running %s ---", name)
-    if section_key == "task_subpopulations" and _subpopulation_two_stage_enabled(task_cfg):
-        return _extract_subpopulations_two_stage(
+    trace_capture_enabled = hasattr(client, "clear_response_traces") and hasattr(client, "pop_response_traces")
+    if trace_capture_enabled:
+        try:
+            client.clear_response_traces()
+        except Exception:
+            trace_capture_enabled = False
+
+    try:
+        if section_key == "task_subpopulations" and _subpopulation_two_stage_enabled(task_cfg):
+            return _extract_subpopulations_two_stage(
+                client,
+                paper_text,
+                task_cfg,
+                llm_cfg,
+                log,
+                prefix_messages,
+            )
+
+        return extract_fields(
             client,
             paper_text,
-            task_cfg,
-            llm_cfg,
-            log,
-            prefix_messages,
+            template_json=task_cfg.get("template_json"),
+            instructions=task_cfg.get("instructions"),
+            use_grammar=bool(llm_cfg.get("use_grammar", False)),
+            temperature=float(llm_cfg.get("temperature", 0.0)),
+            max_tokens=int(llm_cfg.get("max_tokens", 2048)),
+            prefix_messages=prefix_messages,
+            cache_prompt=bool(llm_cfg.get("prompt_cache", False)),
+            timeout=int(llm_cfg.get("timeout", 600)),
+            chunking_enabled=bool(llm_cfg.get("chunking_enabled", True)),
+            long_text_threshold_chars=int(llm_cfg.get("long_text_threshold_chars", 60000)),
+            chunk_size_chars=int(llm_cfg.get("chunk_size_chars", 45000)),
+            chunk_overlap_chars=int(llm_cfg.get("chunk_overlap_chars", 4000)),
+            max_chunks=(
+                int(llm_cfg["max_chunks"])
+                if llm_cfg.get("max_chunks") is not None
+                else None
+            ),
         )
-
-    return extract_fields(
-        client,
-        paper_text,
-        template_json=task_cfg.get("template_json"),
-        instructions=task_cfg.get("instructions"),
-        use_grammar=bool(llm_cfg.get("use_grammar", False)),
-        temperature=float(llm_cfg.get("temperature", 0.0)),
-        max_tokens=int(llm_cfg.get("max_tokens", 2048)),
-        prefix_messages=prefix_messages,
-        cache_prompt=bool(llm_cfg.get("prompt_cache", False)),
-        timeout=int(llm_cfg.get("timeout", 600)),
-        chunking_enabled=bool(llm_cfg.get("chunking_enabled", True)),
-        long_text_threshold_chars=int(llm_cfg.get("long_text_threshold_chars", 60000)),
-        chunk_size_chars=int(llm_cfg.get("chunk_size_chars", 45000)),
-        chunk_overlap_chars=int(llm_cfg.get("chunk_overlap_chars", 4000)),
-        max_chunks=(
-            int(llm_cfg["max_chunks"])
-            if llm_cfg.get("max_chunks") is not None
-            else None
-        ),
-    )
+    finally:
+        if trace_capture_enabled:
+            try:
+                traces = client.pop_response_traces()
+                if _reasoning_print_enabled():
+                    _print_pass_reasoning(
+                        section_key=section_key,
+                        pass_label=name,
+                        traces=traces,
+                    )
+                if _reasoning_trace_enabled():
+                    _write_pass_reasoning_trace(
+                        section_key=section_key,
+                        pass_label=name,
+                        traces=traces,
+                        log=log,
+                    )
+            except Exception as e:
+                log.warning("Could not write reasoning trace for %s: %s", name, e)
 
 
 def _build_resource_row(
@@ -982,4 +1121,3 @@ def _postprocess_section_results(
                 laws = _as_list_str(item.get("applicable_legislation"))
                 if "data governance act" not in [x.lower() for x in laws]:
                     item["applicable_legislation"] = _dedupe_keep_order(laws + ["Data Governance Act"])
-

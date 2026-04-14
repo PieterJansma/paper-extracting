@@ -52,6 +52,45 @@ class OpenAICompatibleClient:
         self.headers["Connection"] = "keep-alive" if use_session else "close"
         if api_key:
             self.headers["Authorization"] = f"Bearer {api_key}"
+        self._response_traces: List[Dict[str, Any]] = []
+
+    def clear_response_traces(self) -> None:
+        self._response_traces.clear()
+
+    def pop_response_traces(self) -> List[Dict[str, Any]]:
+        out = list(self._response_traces)
+        self._response_traces.clear()
+        return out
+
+    def _append_response_trace(
+        self,
+        *,
+        data: Dict[str, Any],
+        finish_reason: str,
+        reasoning_content: str,
+        content: str,
+        error: str = "",
+    ) -> None:
+        usage = data.get("usage") if isinstance(data, dict) else {}
+        if not isinstance(usage, dict):
+            usage = {}
+        prompt_tokens = int(usage.get("prompt_tokens") or 0)
+        completion_tokens = int(usage.get("completion_tokens") or 0)
+        total_tokens = int(usage.get("total_tokens") or 0)
+        self._response_traces.append(
+            {
+                "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "model": str(data.get("model") or self.model),
+                "finish_reason": finish_reason or "",
+                "content_len": len(content or ""),
+                "reasoning_len": len(reasoning_content or ""),
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": total_tokens,
+                "error": error,
+                "reasoning_content": reasoning_content or "",
+            }
+        )
 
     def chat(
         self,
@@ -144,6 +183,8 @@ class OpenAICompatibleClient:
                 if not choices:
                     raise RuntimeError(f"No choices in response: {data}")
                 msg = choices[0].get("message") or {}
+                finish_reason = str(choices[0].get("finish_reason") or "")
+                reasoning = str(msg.get("reasoning_content") or "")
                 content = msg.get("content", "")
                 if isinstance(content, list):
                     text_parts = []
@@ -155,14 +196,33 @@ class OpenAICompatibleClient:
                             text_parts.append(str(part.get("text") or ""))
                     content = "".join(text_parts)
                 if not content:
-                    finish_reason = str(choices[0].get("finish_reason") or "")
-                    reasoning = str(msg.get("reasoning_content") or "")
                     if reasoning:
+                        self._append_response_trace(
+                            data=data,
+                            finish_reason=finish_reason,
+                            reasoning_content=reasoning,
+                            content="",
+                            error="no_content_reasoning_only",
+                        )
                         raise RuntimeError(
                             "No content in response: model returned reasoning_content "
                             f"(finish_reason={finish_reason or 'unknown'}) without final assistant content."
                         )
+                    self._append_response_trace(
+                        data=data,
+                        finish_reason=finish_reason,
+                        reasoning_content="",
+                        content="",
+                        error="no_content",
+                    )
                     raise RuntimeError(f"No content in response: {data}")
+                self._append_response_trace(
+                    data=data,
+                    finish_reason=finish_reason,
+                    reasoning_content=reasoning,
+                    content=content,
+                    error="",
+                )
                 return content
 
             except (requests.exceptions.ConnectionError, requests.exceptions.ChunkedEncodingError) as e:
