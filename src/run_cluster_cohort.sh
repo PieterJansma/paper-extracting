@@ -1448,7 +1448,7 @@ PY
         status_event "prompt_schema_sync_ready" "prompt schema sync ready with ${SCHEMA_SYNC_CHANGED_TASKS} changed task(s)"
 
         if [[ "${SCHEMA_SYNC_CHANGED_TASKS:-0}" -gt 0 ]] && flag_enabled "$COHORT_PROMPT_SCHEMA_SYNC_LLM"; then
-          echo "  Schema gewijzigd; Qwen herschrijft alleen de changed tasks..."
+          echo "  Schema gewijzigd; LLM herschrijft alleen de changed tasks..."
           if python3 src/cohort_prompt_schema_updater.py \
             --base-prompts "$SCHEMA_SYNC_BASE_PROMPTS" \
             --old-schema-csv "$COHORT_PROMPT_SCHEMA_BASE_CSV" \
@@ -1475,10 +1475,10 @@ PY
             echo "  LLM vergelijking: $SCHEMA_SYNC_LLM_COMPARE_MD"
             echo "  LLM prompt diff: $SCHEMA_SYNC_LLM_PROMPT_DIFF"
             echo "  Prompt before/after: $SCHEMA_SYNC_BEFORE_AFTER_MD"
-            status_event "prompt_schema_sync_llm_done" "Qwen rewrote changed prompt tasks"
+            status_event "prompt_schema_sync_llm_done" "LLM rewrote changed prompt tasks"
           else
-            echo "⚠️  Qwen prompt sync mislukte; fallback naar deterministische schema-sync prompt."
-            status_event "warning" "Qwen prompt sync failed; using deterministic schema-sync prompt"
+            echo "⚠️  LLM prompt sync mislukte; fallback naar deterministische schema-sync prompt."
+            status_event "warning" "LLM prompt sync failed; using deterministic schema-sync prompt"
           fi
         fi
 

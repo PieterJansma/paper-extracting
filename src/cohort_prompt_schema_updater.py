@@ -588,33 +588,11 @@ def _rewrite_single_changed_task(
             "fields": field_report,
         }, field_rewrite
 
-    messages = _build_rewrite_messages(
-        task_name=task_name,
-        base_section=base_section,
-        old_section=old_section,
-        new_section=new_section,
-        diff={
-            "added_fields": list(task_report.get("added_fields") or []),
-            "removed_fields": list(task_report.get("removed_fields") or []),
-            "changed_fields": list(task_report.get("changed_fields") or []),
-        },
-    )
-    raw = client.chat(
-        messages,
-        temperature=float(llm_cfg.get("temperature", 0.0)),
-        max_tokens=int(llm_cfg.get("max_tokens", 8000)),
-        response_format={"type": "json_object"},
-        timeout=int(llm_cfg.get("timeout", 900)),
-    )
-    payload = json.loads(raw)
-    rewritten = str(payload.get("instructions") or "").strip()
-    if not rewritten:
-        raise RuntimeError(f"LLM returned empty instructions for {task_name}")
     return task_name, {
-        "rewritten": True,
-        "mode": "full_task",
-        "instruction_length": len(rewritten),
-    }, rewritten
+        "rewritten": False,
+        "mode": "deterministic_only",
+        "reason": "field_blocks_unavailable_or_rejected",
+    }, None
 
 
 def _build_rewrite_messages(
@@ -739,6 +717,84 @@ def _build_field_rewrite_messages(
     ]
 
 
+def _default_field_block_style(segments: List[Dict[str, Any]]) -> str:
+    for seg in segments:
+        if seg.get("kind") == "field_block":
+            return str(seg.get("style") or "divider")
+    return "divider"
+
+
+def _sanitize_llm_field_block(
+    *,
+    raw_block: str,
+    field_path: str,
+    style: str,
+) -> Tuple[str | None, str]:
+    text = str(raw_block or "").strip()
+    if not text:
+        return None, "empty_block"
+
+    leaf = _field_path_leaf(field_path)
+    target_aliases = _heading_aliases(leaf) | _heading_aliases(leaf.replace("_", " "))
+
+    parsed = _parse_instruction_segments(text)
+    field_segments = [seg for seg in parsed if seg.get("kind") == "field_block"]
+    if field_segments:
+        matched = []
+        for seg in field_segments:
+            aliases = set(seg.get("aliases") or set())
+            if aliases & target_aliases:
+                matched.append(seg)
+        if len(matched) != 1:
+            return None, "target_field_block_not_unique"
+        if len(field_segments) != 1:
+            return None, "contains_additional_field_blocks"
+        cleaned = _coerce_block_style(str(matched[0].get("block") or ""), style, field_path).strip()
+        if not cleaned:
+            return None, "empty_after_coerce"
+        return cleaned, "ok_segment"
+
+    if re.search(r"(?mi)^\s*(SCOPE|GLOBAL RULES)\s*$", text):
+        return None, "task_level_header_detected"
+    if re.search(r"(?mi)^\s*return only valid json\b", text):
+        return None, "task_level_instruction_detected"
+    if "--------------------------------------------------" in text:
+        return None, "unexpected_divider_text"
+
+    candidate = text
+    if style == "divider":
+        first_line = candidate.splitlines()[0].strip() if candidate.splitlines() else ""
+        first_alias = _normalize(re.sub(r"\s*\(.*?\)\s*$", "", first_line).strip())
+        if first_alias not in target_aliases and not FIELD_LINE_RE.match(first_line):
+            heading = leaf.replace("_", " ")
+            candidate = f"{heading}\n{candidate}"
+
+    cleaned = _coerce_block_style(candidate, style, field_path).strip()
+    if not cleaned:
+        return None, "empty_after_style_coerce"
+
+    if style == "divider":
+        heading = cleaned.splitlines()[0].strip() if cleaned.splitlines() else ""
+        heading_alias = _normalize(re.sub(r"\s*\(.*?\)\s*$", "", heading).strip())
+        if heading_alias not in target_aliases:
+            return None, "heading_mismatch"
+    else:
+        lines = cleaned.splitlines()
+        if not lines:
+            return None, "empty_after_style_coerce"
+        first_match = FIELD_LINE_RE.match(lines[0])
+        if not first_match:
+            return None, "missing_field_line"
+        if str(first_match.group(1)) != str(field_path):
+            return None, "field_line_mismatch"
+        for raw in lines[1:]:
+            match = FIELD_LINE_RE.match(raw)
+            if match and str(match.group(1)) != str(field_path):
+                return None, "contains_other_field_line"
+
+    return cleaned, "ok_coerced"
+
+
 def _rewrite_task_field_blocks_with_llm(
     *,
     client: OpenAICompatibleClient,
@@ -798,11 +854,11 @@ def _rewrite_task_field_blocks_with_llm(
                         next_block = str(segments[seg_idx].get("block") or "")
                         break
 
-        action = "replace"
+        expected_action = "replace"
         if field_path in new_lines and field_path not in old_lines:
-            action = "add"
+            expected_action = "add"
         elif field_path in old_lines and field_path not in new_lines:
-            action = "remove"
+            expected_action = "remove"
 
         messages = _build_field_rewrite_messages(
             task_name=task_name,
@@ -812,7 +868,7 @@ def _rewrite_task_field_blocks_with_llm(
             new_generated_rule=new_lines.get(field_path, ""),
             previous_block=previous_block,
             next_block=next_block,
-            action=action,
+            action=expected_action,
         )
         raw = client.chat(
             messages,
@@ -822,30 +878,77 @@ def _rewrite_task_field_blocks_with_llm(
             timeout=int(llm_cfg.get("timeout", 900)),
         )
         payload = json.loads(raw)
-        resolved_action = str(payload.get("action") or action).strip().lower() or action
+        llm_action = str(payload.get("action") or expected_action).strip().lower() or expected_action
         new_block = str(payload.get("block") or "").strip()
+        style = str(segments[idx].get("style") or "divider") if idx >= 0 else _default_field_block_style(segments)
+        use_action = expected_action
         field_report[field_path] = {
-            "action": resolved_action,
+            "action": use_action,
+            "llm_action": llm_action,
             "has_old_block": bool(old_block),
         }
+        if llm_action != expected_action:
+            field_report[field_path]["action_overridden"] = True
 
-        if resolved_action == "remove":
+        if use_action == "remove":
             if idx >= 0:
                 segments.pop(idx)
+                field_report[field_path]["source"] = "deterministic_remove"
+            else:
+                field_report[field_path]["source"] = "noop_missing_for_remove"
             continue
 
-        if resolved_action == "replace" and idx >= 0 and new_block:
+        sanitized_block, sanitize_reason = _sanitize_llm_field_block(
+            raw_block=new_block,
+            field_path=field_path,
+            style=style,
+        )
+        if sanitized_block:
+            candidate_block = sanitized_block
+            field_report[field_path]["source"] = "llm"
+            field_report[field_path]["validation"] = sanitize_reason
+        else:
+            deterministic_block = _extract_field_block(new_section.get("instructions"), field_path).strip()
+            if deterministic_block:
+                candidate_block = _coerce_block_style(deterministic_block, style, field_path).strip()
+                if not candidate_block:
+                    candidate_block = deterministic_block
+                field_report[field_path]["source"] = "deterministic_fallback"
+                field_report[field_path]["validation"] = sanitize_reason
+            else:
+                candidate_block = ""
+                field_report[field_path]["source"] = "keep_existing_no_fallback"
+                field_report[field_path]["validation"] = sanitize_reason
+
+        if not candidate_block:
+            continue
+
+        if use_action == "replace":
+            if idx >= 0:
+                segments[idx] = dict(segments[idx])
+                segments[idx]["block"] = candidate_block
+            else:
+                _insert_segment_for_field(
+                    segments,
+                    field_path=field_path,
+                    new_block=candidate_block,
+                    new_generated_section=new_section,
+                )
+            continue
+
+        # expected add: if field already present in base prompt, replace to prevent duplicates.
+        if idx >= 0:
             segments[idx] = dict(segments[idx])
-            segments[idx]["block"] = new_block
+            segments[idx]["block"] = candidate_block
+            field_report[field_path]["action"] = "replace_existing_for_add"
             continue
 
-        if resolved_action == "add" and new_block:
-            _insert_segment_for_field(
-                segments,
-                field_path=field_path,
-                new_block=new_block,
-                new_generated_section=new_section,
-            )
+        _insert_segment_for_field(
+            segments,
+            field_path=field_path,
+            new_block=candidate_block,
+            new_generated_section=new_section,
+        )
 
     rewritten = _render_instruction_segments(segments)
     return (rewritten or None), field_report
