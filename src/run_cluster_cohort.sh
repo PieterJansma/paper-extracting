@@ -78,6 +78,7 @@ MOLGENIS_EMX2_REPO="${MOLGENIS_EMX2_REPO:-molgenis/molgenis-emx2}"
 MOLGENIS_EMX2_REF="${MOLGENIS_EMX2_REF:-main}"
 EMX2_CACHE_DIR="${EMX2_CACHE_DIR:-${RUN_DIR}/emx2_cache}"
 EMX2_REPO_ROOT="${EMX2_REPO_ROOT:-${EMX2_CACHE_DIR}/repo}"
+EMX2_REQUIRED_PATHS_STRICT="${EMX2_REQUIRED_PATHS_STRICT:-1}"
 COHORT_DYNAMIC_EMX2_RUNTIME="${COHORT_DYNAMIC_EMX2_RUNTIME:-1}"
 COHORT_DYNAMIC_PROMPTS="${COHORT_DYNAMIC_PROMPTS:-0}"
 COHORT_PROMPT_SCHEMA_SYNC="${COHORT_PROMPT_SCHEMA_SYNC:-1}"
@@ -431,6 +432,8 @@ fetch_emx2_csv() {
   done
 
   rm -f "$tmp_file" 2>/dev/null || true
+  status_event "warning" "emx2 fetch failed for ${rel_path} from ${MOLGENIS_EMX2_REPO}@${MOLGENIS_EMX2_REF}"
+  echo "⚠️  EMX2 fetch failed: ${rel_path} (${MOLGENIS_EMX2_REPO}@${MOLGENIS_EMX2_REF})" >&2
   return 0
 }
 
@@ -483,6 +486,45 @@ PY
   done
 
   rm -f "$tmp_json" 2>/dev/null || true
+  return 0
+}
+
+validate_emx2_required_paths() {
+  if [[ "$COHORT_DYNAMIC_EMX2_RUNTIME" != "1" ]]; then
+    return 0
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! python3 src/emx2_dynamic_runtime.py required-paths --mode cohort >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local missing=()
+  local rel_path=""
+  while IFS= read -r rel_path; do
+    [[ -z "$rel_path" ]] && continue
+    local candidate="${EMX2_REPO_ROOT}/${rel_path}"
+    if [[ ! -f "$candidate" ]]; then
+      missing+=("$rel_path")
+    fi
+  done < <(python3 src/emx2_dynamic_runtime.py required-paths --mode cohort)
+
+  if (( ${#missing[@]} == 0 )); then
+    status_event "emx2_required_paths_ok" "all required EMX2 paths available (${MOLGENIS_EMX2_REPO}@${MOLGENIS_EMX2_REF})"
+    return 0
+  fi
+
+  local missing_file="${RUN_DIR}/emx2_missing_required_paths.txt"
+  printf "%s\n" "${missing[@]}" > "$missing_file"
+  echo "❌ Ontbrekende EMX2 required paths (${#missing[@]}). Zie: $missing_file"
+  status_event "warning" "missing EMX2 required paths (${#missing[@]})"
+
+  if [[ "$EMX2_REQUIRED_PATHS_STRICT" == "1" ]]; then
+    status_event "failed" "missing EMX2 required paths; aborting run"
+    return 1
+  fi
+
   return 0
 }
 
@@ -1199,6 +1241,8 @@ if python3 src/emx2_dynamic_runtime.py model-paths --mode cohort >/dev/null 2>&1
     fetch_emx2_csv "$rel_path" "$dyn_var"
   done < <(python3 src/emx2_dynamic_runtime.py model-paths --mode cohort)
 fi
+
+validate_emx2_required_paths
 
 if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
   if [[ ! -f "$COHORT_PROMPT_SCHEMA_BASE_CSV" ]]; then

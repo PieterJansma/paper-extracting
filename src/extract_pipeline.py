@@ -28,19 +28,6 @@ BASE_SYSTEM_EXTRACT_MSG = (
     "You are `Qwen`. Extract structured data as JSON only. "
     "Do not output markdown fences or explanations."
 )
-CAVEMAN_COMPRESSION_MSG = (
-    "You are a caveman-style assistant.\n"
-    "Rules:\n"
-    "- Use short, direct sentences.\n"
-    "- Remove articles and filler words.\n"
-    "- Remove auxiliary verbs when meaning stays clear.\n"
-    "- Keep names, numbers, negations, time words, and technical terms.\n"
-    "- Keep critical prepositions when they change meaning.\n"
-    "- No pleasantries. No fluff. No repetition.\n"
-    "- Output only final answer.\n"
-    "Example style:\n"
-    "\"Need fix bug in login flow. Check token expiry, cookie flags, server logs.\""
-)
 OCR_FALLBACK_MIN_CHARS = 3000
 LOW_QUALITY_ALNUM_RATIO = 0.35
 # 0 means: no page cap (all pages)
@@ -71,13 +58,6 @@ def _env_bool(name: str, default: bool) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
-
-
-def _system_extract_msg() -> str:
-    msg = BASE_SYSTEM_EXTRACT_MSG
-    if _env_bool("LLM_CAVEMAN_COMPRESSION", False):
-        msg = f"{msg} {CAVEMAN_COMPRESSION_MSG}"
-    return msg
 
 
 # ==============================================================================
@@ -845,7 +825,7 @@ def build_context_prefix_messages(paper_text: str) -> List[Dict[str, str]]:
     Prefix messages that can be reused across passes to benefit from prompt caching.
     """
     return [
-        {"role": "system", "content": _system_extract_msg()},
+        {"role": "system", "content": BASE_SYSTEM_EXTRACT_MSG},
         {"role": "user", "content": f"# Context:\n{paper_text}"},
     ]
 
@@ -1138,7 +1118,7 @@ def extract_fields(
             messages = list(prefix_messages) + [{"role": "user", "content": prompt}]
         else:
             messages = [
-                {"role": "system", "content": _system_extract_msg()},
+                {"role": "system", "content": BASE_SYSTEM_EXTRACT_MSG},
                 {"role": "user", "content": prompt},
             ]
 
