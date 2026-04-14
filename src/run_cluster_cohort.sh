@@ -21,6 +21,8 @@ AUTO_PORTS="${AUTO_PORTS:-1}"
 CTX="${CTX:-20000}"
 SLOTS="${SLOTS:-1}"
 NGL="${NGL:-999}"
+LLM_DISABLE_THINKING="${LLM_DISABLE_THINKING:-0}"
+LLM_REASONING_BUDGET="${LLM_REASONING_BUDGET:-0}"
 
 # Optional runtime overrides for [llm] config values (applied to config.runtime.toml).
 LLM_CHUNKING_ENABLED="${LLM_CHUNKING_ENABLED:-}"
@@ -536,6 +538,27 @@ if [[ ! -x "$LLAMA_BIN" ]]; then
   exit 1
 fi
 
+LLAMA_HELP="$("$LLAMA_BIN" --help 2>&1 || true)"
+llama_supports_flag() {
+  local flag="$1"
+  grep -Fq -- "$flag" <<<"$LLAMA_HELP"
+}
+LLM_SERVER_EXTRA_ARGS=()
+if flag_enabled "$LLM_DISABLE_THINKING"; then
+  if llama_supports_flag "--reasoning-budget"; then
+    LLM_SERVER_EXTRA_ARGS+=(--reasoning-budget "$LLM_REASONING_BUDGET")
+    echo "[LLM] Thinking disabled via --reasoning-budget=${LLM_REASONING_BUDGET}"
+  elif llama_supports_flag "--chat-template-kwargs"; then
+    LLM_SERVER_EXTRA_ARGS+=(--chat-template-kwargs '{"enable_thinking":false}')
+    echo "[LLM] Thinking disabled via --chat-template-kwargs enable_thinking=false"
+  elif llama_supports_flag "--reasoning-format"; then
+    LLM_SERVER_EXTRA_ARGS+=(--reasoning-format none)
+    echo "[LLM] Thinking-disable fallback via --reasoning-format none"
+  else
+    echo "[LLM] Waarschuwing: geen bekende thinking-disable flags gevonden in deze llama-server build."
+  fi
+fi
+
 if [[ ! -f "config.cohort.toml" ]]; then
   echo "❌ ERROR: config.cohort.toml ontbreekt in ${PWD}"
   echo "   main_cohort.py verwacht standaard config.cohort.toml (of zet PDF_EXTRACT_CONFIG)"
@@ -648,10 +671,13 @@ trap cleanup EXIT INT TERM
 
 start_server() {
   local gpu="$1" model="$2" port="$3" log="$4"
-  echo "[START] Qwen 32B op GPU ${gpu} (Poort ${port})..."
+  local model_name
+  model_name="$(basename "$model")"
+  echo "[START] Model ${model_name} op GPU ${gpu} (Poort ${port})..."
   CUDA_VISIBLE_DEVICES="$gpu" nohup "$LLAMA_BIN" \
     -m "$model" -fa on \
     -ngl "$NGL" -c "$CTX" --parallel "$SLOTS" \
+    "${LLM_SERVER_EXTRA_ARGS[@]}" \
     --host 127.0.0.1 --port "$port" >>"$log" 2>&1 &
   local pid=$!
   pids+=("$pid")

@@ -170,6 +170,277 @@ def _serialize_value(val: Any) -> str:
     return str(val)
 
 
+def _subpopulation_two_stage_enabled(task_cfg: Dict[str, Any]) -> bool:
+    raw = os.getenv("SUBPOPULATION_TWO_STAGE", "1")
+    enabled = str(raw).strip().lower() not in {"0", "false", "no", "off"}
+    if not enabled:
+        return False
+    # Optional per-task override.
+    local_raw = task_cfg.get("two_stage")
+    if local_raw is None:
+        return True
+    if isinstance(local_raw, bool):
+        return local_raw
+    return str(local_raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _subpopulation_template_from_task(task_cfg: Dict[str, Any]) -> tuple[str, Dict[str, Any], Dict[str, Any]] | None:
+    template_raw = str(task_cfg.get("template_json") or "").strip()
+    if not template_raw:
+        return None
+    try:
+        template_obj = json.loads(template_raw)
+    except Exception:
+        return None
+    if not isinstance(template_obj, dict):
+        return None
+    arr = template_obj.get("subpopulations")
+    if not isinstance(arr, list) or not arr:
+        return None
+    item_template = arr[0]
+    if not isinstance(item_template, dict):
+        return None
+    return template_raw, template_obj, item_template
+
+
+def _build_subpopulation_seed_template(item_template: Dict[str, Any]) -> Dict[str, Any]:
+    # Stage 1 keeps only stable identity/core fields to avoid huge single-pass payloads.
+    preferred_keys = [
+        "name",
+        "pid",
+        "number_of_participants",
+        "main_medical_condition",
+        "description",
+        "keywords",
+    ]
+    seed_item: Dict[str, Any] = {}
+    for key in preferred_keys:
+        if key in item_template:
+            seed_item[key] = item_template[key]
+    if not seed_item:
+        seed_item = {"name": None, "pid": None, "number_of_participants": None}
+    return {"subpopulations": [seed_item]}
+
+
+def _subpopulation_identity_key(item: Dict[str, Any]) -> str:
+    name = str(item.get("name") or "").strip().lower()
+    pid = str(item.get("pid") or "").strip().lower()
+    if pid:
+        return f"pid:{pid}"
+    if name:
+        return f"name:{name}"
+    return ""
+
+
+def _dedupe_subpopulation_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        if not _has_payload_value(item):
+            continue
+        key = _subpopulation_identity_key(item)
+        if key and key in seen:
+            continue
+        if key:
+            seen.add(key)
+        out.append(item)
+    return out
+
+
+def _select_subpopulation_detail(
+    seed_item: Dict[str, Any],
+    detail_items: List[Dict[str, Any]],
+) -> Dict[str, Any] | None:
+    if not detail_items:
+        return None
+
+    seed_name = str(seed_item.get("name") or "").strip().lower()
+    seed_pid = str(seed_item.get("pid") or "").strip().lower()
+    if seed_pid:
+        for item in detail_items:
+            if str(item.get("pid") or "").strip().lower() == seed_pid:
+                return item
+    if seed_name:
+        for item in detail_items:
+            nm = str(item.get("name") or "").strip().lower()
+            if nm == seed_name:
+                return item
+        for item in detail_items:
+            nm = str(item.get("name") or "").strip().lower()
+            if seed_name and nm and (seed_name in nm or nm in seed_name):
+                return item
+
+    for item in detail_items:
+        if _has_payload_value(item):
+            return item
+    return None
+
+
+def _merge_subpopulation_item(seed_item: Dict[str, Any], detail_item: Dict[str, Any] | None) -> Dict[str, Any]:
+    if not detail_item:
+        return dict(seed_item)
+    merged = dict(seed_item)
+    for key, value in detail_item.items():
+        if _has_payload_value(value):
+            merged[key] = value
+    return merged
+
+
+def _extract_subpopulations_two_stage(
+    client: OpenAICompatibleClient,
+    paper_text: str,
+    task_cfg: Dict[str, Any],
+    llm_cfg: Dict[str, Any],
+    log: logging.Logger,
+    prefix_messages: List[Dict[str, str]] | None,
+) -> Dict[str, Any]:
+    parsed = _subpopulation_template_from_task(task_cfg)
+    if parsed is None:
+        # Fallback to legacy one-shot when template is not in expected shape.
+        return extract_fields(
+            client,
+            paper_text,
+            template_json=task_cfg.get("template_json"),
+            instructions=task_cfg.get("instructions"),
+            use_grammar=bool(llm_cfg.get("use_grammar", False)),
+            temperature=float(llm_cfg.get("temperature", 0.0)),
+            max_tokens=int(llm_cfg.get("max_tokens", 2048)),
+            prefix_messages=prefix_messages,
+            cache_prompt=bool(llm_cfg.get("prompt_cache", False)),
+            timeout=int(llm_cfg.get("timeout", 600)),
+            chunking_enabled=bool(llm_cfg.get("chunking_enabled", True)),
+            long_text_threshold_chars=int(llm_cfg.get("long_text_threshold_chars", 60000)),
+            chunk_size_chars=int(llm_cfg.get("chunk_size_chars", 45000)),
+            chunk_overlap_chars=int(llm_cfg.get("chunk_overlap_chars", 4000)),
+            max_chunks=(
+                int(llm_cfg["max_chunks"])
+                if llm_cfg.get("max_chunks") is not None
+                else None
+            ),
+        )
+
+    template_raw, template_obj, item_template = parsed
+    seed_template = _build_subpopulation_seed_template(item_template)
+    base_instructions = str(task_cfg.get("instructions") or "").strip()
+    seed_instructions = (
+        base_instructions
+        + "\n\n"
+        + (
+            "Two-stage mode (stage 1): identify explicit subpopulations only. "
+            "Return compact rows with stable labels and explicit N values when available. "
+            "Do not expand all optional detail fields yet. "
+            "Output valid JSON only."
+        )
+    ).strip()
+
+    seed_result = extract_fields(
+        client,
+        paper_text,
+        template_json=json.dumps(seed_template, ensure_ascii=False),
+        instructions=seed_instructions,
+        use_grammar=bool(llm_cfg.get("use_grammar", False)),
+        temperature=float(llm_cfg.get("temperature", 0.0)),
+        max_tokens=int(llm_cfg.get("max_tokens", 2048)),
+        prefix_messages=prefix_messages,
+        cache_prompt=bool(llm_cfg.get("prompt_cache", False)),
+        timeout=int(llm_cfg.get("timeout", 600)),
+        chunking_enabled=bool(llm_cfg.get("chunking_enabled", True)),
+        long_text_threshold_chars=int(llm_cfg.get("long_text_threshold_chars", 60000)),
+        chunk_size_chars=int(llm_cfg.get("chunk_size_chars", 45000)),
+        chunk_overlap_chars=int(llm_cfg.get("chunk_overlap_chars", 4000)),
+        max_chunks=(
+            int(llm_cfg["max_chunks"])
+            if llm_cfg.get("max_chunks") is not None
+            else None
+        ),
+    )
+    seed_items = seed_result.get("subpopulations")
+    if not isinstance(seed_items, list):
+        seed_items = []
+    seed_items = _dedupe_subpopulation_items([x for x in seed_items if isinstance(x, dict)])
+
+    if not seed_items:
+        log.warning("Two-stage subpopulation extraction found no seed rows; falling back to one-shot pass C.")
+        return extract_fields(
+            client,
+            paper_text,
+            template_json=template_raw,
+            instructions=base_instructions,
+            use_grammar=bool(llm_cfg.get("use_grammar", False)),
+            temperature=float(llm_cfg.get("temperature", 0.0)),
+            max_tokens=int(llm_cfg.get("max_tokens", 2048)),
+            prefix_messages=prefix_messages,
+            cache_prompt=bool(llm_cfg.get("prompt_cache", False)),
+            timeout=int(llm_cfg.get("timeout", 600)),
+            chunking_enabled=bool(llm_cfg.get("chunking_enabled", True)),
+            long_text_threshold_chars=int(llm_cfg.get("long_text_threshold_chars", 60000)),
+            chunk_size_chars=int(llm_cfg.get("chunk_size_chars", 45000)),
+            chunk_overlap_chars=int(llm_cfg.get("chunk_overlap_chars", 4000)),
+            max_chunks=(
+                int(llm_cfg["max_chunks"])
+                if llm_cfg.get("max_chunks") is not None
+                else None
+            ),
+        )
+
+    stage2_items: List[Dict[str, Any]] = []
+    total = len(seed_items)
+    log.info("Two-stage subpopulation extraction: %d seed row(s) found; enriching details per row.", total)
+    for idx, seed_item in enumerate(seed_items, start=1):
+        focus_name = str(seed_item.get("name") or "").strip()
+        focus_pid = str(seed_item.get("pid") or "").strip()
+        focus_label = focus_name or focus_pid or f"subpopulation_{idx}"
+        focus_hint = {
+            "name": focus_name or None,
+            "pid": focus_pid or None,
+            "number_of_participants": seed_item.get("number_of_participants"),
+            "main_medical_condition": seed_item.get("main_medical_condition"),
+        }
+        detail_instructions = (
+            base_instructions
+            + "\n\n"
+            + (
+                f"Two-stage mode (stage 2, target {idx}/{total}): return one detailed row for this target subpopulation: {focus_label}. "
+                f"Seed hint: {json.dumps(focus_hint, ensure_ascii=False)}. "
+                "Return the matching row only (at most one item in subpopulations). "
+                "If target cannot be matched from explicit evidence, return {\"subpopulations\": []}. "
+                "Output valid JSON only."
+            )
+        ).strip()
+
+        detail_result = extract_fields(
+            client,
+            paper_text,
+            template_json=json.dumps(template_obj, ensure_ascii=False),
+            instructions=detail_instructions,
+            use_grammar=bool(llm_cfg.get("use_grammar", False)),
+            temperature=float(llm_cfg.get("temperature", 0.0)),
+            max_tokens=int(llm_cfg.get("max_tokens", 2048)),
+            prefix_messages=prefix_messages,
+            cache_prompt=bool(llm_cfg.get("prompt_cache", False)),
+            timeout=int(llm_cfg.get("timeout", 600)),
+            chunking_enabled=bool(llm_cfg.get("chunking_enabled", True)),
+            long_text_threshold_chars=int(llm_cfg.get("long_text_threshold_chars", 60000)),
+            chunk_size_chars=int(llm_cfg.get("chunk_size_chars", 45000)),
+            chunk_overlap_chars=int(llm_cfg.get("chunk_overlap_chars", 4000)),
+            max_chunks=(
+                int(llm_cfg["max_chunks"])
+                if llm_cfg.get("max_chunks") is not None
+                else None
+            ),
+        )
+        detail_items = detail_result.get("subpopulations")
+        if not isinstance(detail_items, list):
+            detail_items = []
+        detail_items = [x for x in detail_items if isinstance(x, dict)]
+        chosen = _select_subpopulation_detail(seed_item, detail_items)
+        stage2_items.append(_merge_subpopulation_item(seed_item, chosen))
+
+    return {"subpopulations": _dedupe_subpopulation_items(stage2_items)}
+
+
 def _collect_pass_result(
     client: OpenAICompatibleClient,
     paper_text: str,
@@ -177,6 +448,7 @@ def _collect_pass_result(
     llm_cfg: Dict[str, Any],
     log: logging.Logger,
     name: str,
+    section_key: str | None = None,
     prefix_messages: List[Dict[str, str]] | None = None,
 ) -> Dict[str, Any]:
     if not task_cfg:
@@ -184,6 +456,16 @@ def _collect_pass_result(
         return {}
 
     log.info("--- Running %s ---", name)
+    if section_key == "task_subpopulations" and _subpopulation_two_stage_enabled(task_cfg):
+        return _extract_subpopulations_two_stage(
+            client,
+            paper_text,
+            task_cfg,
+            llm_cfg,
+            log,
+            prefix_messages,
+        )
+
     return extract_fields(
         client,
         paper_text,
@@ -700,5 +982,4 @@ def _postprocess_section_results(
                 laws = _as_list_str(item.get("applicable_legislation"))
                 if "data governance act" not in [x.lower() for x in laws]:
                     item["applicable_legislation"] = _dedupe_keep_order(laws + ["Data Governance Act"])
-
 

@@ -145,7 +145,23 @@ class OpenAICompatibleClient:
                     raise RuntimeError(f"No choices in response: {data}")
                 msg = choices[0].get("message") or {}
                 content = msg.get("content", "")
+                if isinstance(content, list):
+                    text_parts = []
+                    for part in content:
+                        if not isinstance(part, dict):
+                            continue
+                        ptype = str(part.get("type") or "").strip().lower()
+                        if ptype in {"text", "output_text"}:
+                            text_parts.append(str(part.get("text") or ""))
+                    content = "".join(text_parts)
                 if not content:
+                    finish_reason = str(choices[0].get("finish_reason") or "")
+                    reasoning = str(msg.get("reasoning_content") or "")
+                    if reasoning:
+                        raise RuntimeError(
+                            "No content in response: model returned reasoning_content "
+                            f"(finish_reason={finish_reason or 'unknown'}) without final assistant content."
+                        )
                     raise RuntimeError(f"No content in response: {data}")
                 return content
 

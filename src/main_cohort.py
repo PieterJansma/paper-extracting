@@ -997,6 +997,7 @@ def cli() -> None:
                 llm_cfg,
                 log,
                 pass_label,
+                section_key=section_key,
                 prefix_messages=prefix_messages if prompt_cache_enabled else None,
             )
             per_section_results[section_key] = result
