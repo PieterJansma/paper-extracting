@@ -22,7 +22,7 @@ CTX="${CTX:-20000}"
 SLOTS="${SLOTS:-1}"
 NGL="${NGL:-999}"
 LLM_DISABLE_THINKING="${LLM_DISABLE_THINKING:-0}"
-LLM_REASONING_BUDGET="${LLM_REASONING_BUDGET:-0}"
+LLM_REASONING_BUDGET="${LLM_REASONING_BUDGET:-4096}"
 
 # Optional runtime overrides for [llm] config values (applied to config.runtime.toml).
 LLM_MAX_TOKENS="${LLM_MAX_TOKENS:-}"
@@ -617,6 +617,8 @@ echo "[Run] Ports LB/GPU0/GPU1/OCR: $PORT_LB / $PORT_GPU0 / $PORT_GPU1 / $OCR_VL
 echo "[Run] STRIP_REFERENCES=$STRIP_REFERENCES"
 status_event "initializing" "run bootstrap started"
 
+LLM_PARALLEL_BASE_URLS="${LLM_PARALLEL_BASE_URLS:-http://127.0.0.1:${PORT_GPU0}/v1,http://127.0.0.1:${PORT_GPU1}/v1}"
+
 if command -v module >/dev/null 2>&1; then
   module purge || true
   module load GCCcore/11.3.0 || true
@@ -648,11 +650,16 @@ llama_supports_flag() {
   grep -Fq -- "$flag" <<<"$LLAMA_HELP"
 }
 LLM_SERVER_EXTRA_ARGS=()
-if flag_enabled "$LLM_DISABLE_THINKING"; then
-  if llama_supports_flag "--reasoning-budget"; then
+if llama_supports_flag "--reasoning-budget"; then
+  if flag_enabled "$LLM_DISABLE_THINKING"; then
+    LLM_SERVER_EXTRA_ARGS+=(--reasoning-budget 0)
+    echo "[LLM] Thinking disabled via --reasoning-budget=0"
+  else
     LLM_SERVER_EXTRA_ARGS+=(--reasoning-budget "$LLM_REASONING_BUDGET")
-    echo "[LLM] Thinking disabled via --reasoning-budget=${LLM_REASONING_BUDGET}"
-  elif llama_supports_flag "--chat-template-kwargs"; then
+    echo "[LLM] Reasoning budget ingesteld via --reasoning-budget=${LLM_REASONING_BUDGET}"
+  fi
+elif flag_enabled "$LLM_DISABLE_THINKING"; then
+  if llama_supports_flag "--chat-template-kwargs"; then
     LLM_SERVER_EXTRA_ARGS+=(--chat-template-kwargs '{"enable_thinking":false}')
     echo "[LLM] Thinking disabled via --chat-template-kwargs enable_thinking=false"
   elif llama_supports_flag "--reasoning-format"; then
@@ -731,6 +738,7 @@ export COHORT_DYNAMIC_PROMPTS
 export COHORT_PROMPT_SCHEMA_SYNC
 export COHORT_PROMPT_SCHEMA_SYNC_LLM
 export MOLGENIS_EMX2_LOCAL_ROOT="$EMX2_REPO_ROOT"
+export LLM_PARALLEL_BASE_URLS
 export STRIP_REFERENCES
 export OCR_FORCE_USE_PREFETCH
 status_event "runtime_config_ready" "runtime config prepared"

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -512,6 +514,109 @@ def _load_llm_cfg(path: str | None) -> Dict[str, Any]:
     return dict(llm_cfg) if isinstance(llm_cfg, dict) else {}
 
 
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except Exception:
+        return default
+
+
+def _parallel_base_urls(default_base_url: str) -> List[str]:
+    raw = str(os.getenv("LLM_PARALLEL_BASE_URLS") or "").strip()
+    urls: List[str] = []
+    if raw:
+        for part in raw.split(","):
+            url = str(part).strip()
+            if url:
+                urls.append(url)
+    if not urls:
+        urls = [default_base_url]
+    deduped: List[str] = []
+    seen = set()
+    for url in urls:
+        key = url.rstrip("/")
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(url)
+    return deduped
+
+
+def _rewrite_single_changed_task(
+    *,
+    task_name: str,
+    task_report: Dict[str, Any],
+    base_section: Dict[str, Any] | None,
+    old_section: Dict[str, Any],
+    new_section: Dict[str, Any],
+    llm_cfg: Dict[str, Any],
+    llm_model: str | None,
+    base_url: str,
+) -> Tuple[str, Dict[str, Any], str | None]:
+    if not base_section:
+        return task_name, {
+            "rewritten": False,
+            "mode": "deterministic_only",
+            "reason": "no_base_section",
+        }, None
+
+    client = OpenAICompatibleClient(
+        base_url=base_url,
+        api_key=str(llm_cfg.get("api_key", "sk-local")),
+        model=str(llm_model or llm_cfg.get("model", "Qwen/Qwen2.5-32B-Instruct")),
+        use_grammar=bool(llm_cfg.get("use_grammar", False)),
+        use_session=bool(llm_cfg.get("sticky_session", False)),
+    )
+
+    field_rewrite, field_report = _rewrite_task_field_blocks_with_llm(
+        client=client,
+        llm_cfg=llm_cfg,
+        task_name=task_name,
+        base_section=base_section,
+        old_section=old_section,
+        new_section=new_section,
+        task_report=task_report,
+    )
+    if field_rewrite:
+        return task_name, {
+            "rewritten": True,
+            "mode": "field_blocks",
+            "instruction_length": len(field_rewrite),
+            "fields": field_report,
+        }, field_rewrite
+
+    messages = _build_rewrite_messages(
+        task_name=task_name,
+        base_section=base_section,
+        old_section=old_section,
+        new_section=new_section,
+        diff={
+            "added_fields": list(task_report.get("added_fields") or []),
+            "removed_fields": list(task_report.get("removed_fields") or []),
+            "changed_fields": list(task_report.get("changed_fields") or []),
+        },
+    )
+    raw = client.chat(
+        messages,
+        temperature=float(llm_cfg.get("temperature", 0.0)),
+        max_tokens=int(llm_cfg.get("max_tokens", 8000)),
+        response_format={"type": "json_object"},
+        timeout=int(llm_cfg.get("timeout", 900)),
+    )
+    payload = json.loads(raw)
+    rewritten = str(payload.get("instructions") or "").strip()
+    if not rewritten:
+        raise RuntimeError(f"LLM returned empty instructions for {task_name}")
+    return task_name, {
+        "rewritten": True,
+        "mode": "full_task",
+        "instruction_length": len(rewritten),
+    }, rewritten
+
+
 def _build_rewrite_messages(
     *,
     task_name: str,
@@ -758,77 +863,74 @@ def rewrite_changed_tasks_with_llm(
 ) -> Dict[str, Any]:
     if not llm_cfg:
         raise RuntimeError("No [llm] config available for changed-task rewrite.")
-
-    client = OpenAICompatibleClient(
-        base_url=str(llm_cfg.get("base_url", "http://127.0.0.1:8080/v1")),
-        api_key=str(llm_cfg.get("api_key", "sk-local")),
-        model=str(llm_model or llm_cfg.get("model", "Qwen/Qwen2.5-32B-Instruct")),
-        use_grammar=bool(llm_cfg.get("use_grammar", False)),
-        use_session=bool(llm_cfg.get("sticky_session", False)),
-    )
-
-    rewrite_report: Dict[str, Any] = {}
+    task_inputs: List[Dict[str, Any]] = []
     for task_name, task_report in sorted((report.get("tasks") or {}).items()):
         if not isinstance(task_report, dict) or not task_report.get("changed"):
             continue
         base_section = base_prompts.get(task_name)
         old_section = old_generated.get(task_name, {})
         new_section = updated_cfg.get(task_name) or new_generated.get(task_name, {})
-        if not base_section:
-            rewrite_report[task_name] = {
-                "rewritten": False,
-                "mode": "deterministic_only",
-                "reason": "no_base_section",
+        task_inputs.append(
+            {
+                "task_name": task_name,
+                "task_report": task_report,
+                "base_section": base_section,
+                "old_section": old_section,
+                "new_section": new_generated.get(task_name, new_section),
             }
-            continue
-        field_rewrite, field_report = _rewrite_task_field_blocks_with_llm(
-            client=client,
-            llm_cfg=llm_cfg,
-            task_name=task_name,
-            base_section=base_section,
-            old_section=old_section,
-            new_section=new_generated.get(task_name, new_section),
-            task_report=task_report,
         )
-        if field_rewrite:
+
+    if not task_inputs:
+        return {}
+
+    default_base_url = str(llm_cfg.get("base_url", "http://127.0.0.1:8080/v1"))
+    base_urls = _parallel_base_urls(default_base_url)
+    default_workers = min(2, len(task_inputs))
+    workers = _env_int("COHORT_PROMPT_SCHEMA_SYNC_LLM_WORKERS", default_workers)
+    workers = max(1, min(workers, len(task_inputs), len(base_urls)))
+
+    results: Dict[str, Tuple[Dict[str, Any], str | None]] = {}
+    if workers == 1:
+        for idx, inp in enumerate(task_inputs):
+            task_name, entry, rewritten = _rewrite_single_changed_task(
+                task_name=str(inp["task_name"]),
+                task_report=dict(inp["task_report"]),
+                base_section=inp["base_section"],
+                old_section=dict(inp["old_section"]),
+                new_section=dict(inp["new_section"]),
+                llm_cfg=llm_cfg,
+                llm_model=llm_model,
+                base_url=base_urls[idx % len(base_urls)],
+            )
+            results[task_name] = (entry, rewritten)
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = []
+            for idx, inp in enumerate(task_inputs):
+                futures.append(
+                    pool.submit(
+                        _rewrite_single_changed_task,
+                        task_name=str(inp["task_name"]),
+                        task_report=dict(inp["task_report"]),
+                        base_section=inp["base_section"],
+                        old_section=dict(inp["old_section"]),
+                        new_section=dict(inp["new_section"]),
+                        llm_cfg=llm_cfg,
+                        llm_model=llm_model,
+                        base_url=base_urls[idx % len(base_urls)],
+                    )
+                )
+            for fut in as_completed(futures):
+                task_name, entry, rewritten = fut.result()
+                results[task_name] = (entry, rewritten)
+
+    rewrite_report: Dict[str, Any] = {}
+    for task_name in sorted(results.keys()):
+        entry, rewritten = results[task_name]
+        if rewritten:
             updated_cfg[task_name] = dict(updated_cfg[task_name])
-            updated_cfg[task_name]["instructions"] = field_rewrite
-            rewrite_report[task_name] = {
-                "rewritten": True,
-                "mode": "field_blocks",
-                "instruction_length": len(field_rewrite),
-                "fields": field_report,
-            }
-            continue
-        messages = _build_rewrite_messages(
-            task_name=task_name,
-            base_section=base_section,
-            old_section=old_section,
-            new_section=new_generated.get(task_name, new_section),
-            diff={
-                "added_fields": list(task_report.get("added_fields") or []),
-                "removed_fields": list(task_report.get("removed_fields") or []),
-                "changed_fields": list(task_report.get("changed_fields") or []),
-            },
-        )
-        raw = client.chat(
-            messages,
-            temperature=float(llm_cfg.get("temperature", 0.0)),
-            max_tokens=int(llm_cfg.get("max_tokens", 8000)),
-            response_format={"type": "json_object"},
-            timeout=int(llm_cfg.get("timeout", 900)),
-        )
-        payload = json.loads(raw)
-        rewritten = str(payload.get("instructions") or "").strip()
-        if not rewritten:
-            raise RuntimeError(f"LLM returned empty instructions for {task_name}")
-        updated_cfg[task_name] = dict(updated_cfg[task_name])
-        updated_cfg[task_name]["instructions"] = rewritten
-        rewrite_report[task_name] = {
-            "rewritten": True,
-            "mode": "full_task",
-            "instruction_length": len(rewritten),
-        }
+            updated_cfg[task_name]["instructions"] = rewritten
+        rewrite_report[task_name] = entry
     return rewrite_report
 
 

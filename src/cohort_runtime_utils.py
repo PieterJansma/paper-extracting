@@ -5,6 +5,7 @@ import json
 import logging
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Iterable, Tuple
 
@@ -196,6 +197,54 @@ def _reasoning_print_max_chars() -> int:
         return max(0, int(raw))
     except Exception:
         return 12000
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except Exception:
+        return default
+
+
+def _parallel_base_urls(default_base_url: str) -> List[str]:
+    raw = str(os.getenv("LLM_PARALLEL_BASE_URLS") or "").strip()
+    urls: List[str] = []
+    if raw:
+        for part in raw.split(","):
+            url = str(part).strip()
+            if url:
+                urls.append(url)
+    if not urls:
+        urls = [default_base_url]
+    deduped: List[str] = []
+    seen = set()
+    for url in urls:
+        key = url.rstrip("/")
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(url)
+    return deduped
+
+
+def _build_parallel_clients(base_client: OpenAICompatibleClient, workers: int) -> List[OpenAICompatibleClient]:
+    default_base_url = str(getattr(base_client, "base_url", "http://127.0.0.1:8080/v1"))
+    base_urls = _parallel_base_urls(default_base_url)
+    out: List[OpenAICompatibleClient] = []
+    for idx in range(max(1, workers)):
+        out.append(
+            OpenAICompatibleClient(
+                base_url=base_urls[idx % len(base_urls)],
+                api_key=str(getattr(base_client, "api_key", "")),
+                model=str(getattr(base_client, "model", "")),
+                use_grammar=bool(getattr(base_client, "use_grammar", False)),
+                use_session=bool(getattr(base_client, "use_session", False)),
+            )
+        )
+    return out
 
 
 def _reasoning_trace_dir() -> Path:
@@ -500,7 +549,12 @@ def _extract_subpopulations_two_stage(
     stage2_items: List[Dict[str, Any]] = []
     total = len(seed_items)
     log.info("Two-stage subpopulation extraction: %d seed row(s) found; enriching details per row.", total)
-    for idx, seed_item in enumerate(seed_items, start=1):
+
+    def _run_stage2_detail(
+        idx: int,
+        seed_item: Dict[str, Any],
+        detail_client: OpenAICompatibleClient,
+    ) -> Tuple[int, Dict[str, Any], List[Dict[str, Any]]]:
         focus_name = str(seed_item.get("name") or "").strip()
         focus_pid = str(seed_item.get("pid") or "").strip()
         focus_label = focus_name or focus_pid or f"subpopulation_{idx}"
@@ -522,8 +576,15 @@ def _extract_subpopulations_two_stage(
             )
         ).strip()
 
+        isolated_trace_client = detail_client is not client
+        if isolated_trace_client and hasattr(detail_client, "clear_response_traces"):
+            try:
+                detail_client.clear_response_traces()
+            except Exception:
+                pass
+
         detail_result = extract_fields(
-            client,
+            detail_client,
             paper_text,
             template_json=json.dumps(template_obj, ensure_ascii=False),
             instructions=detail_instructions,
@@ -548,7 +609,44 @@ def _extract_subpopulations_two_stage(
             detail_items = []
         detail_items = [x for x in detail_items if isinstance(x, dict)]
         chosen = _select_subpopulation_detail(seed_item, detail_items)
-        stage2_items.append(_merge_subpopulation_item(seed_item, chosen))
+        merged_item = _merge_subpopulation_item(seed_item, chosen)
+        traces: List[Dict[str, Any]] = []
+        if isolated_trace_client and hasattr(detail_client, "pop_response_traces"):
+            try:
+                traces = detail_client.pop_response_traces()
+            except Exception:
+                traces = []
+        return idx, merged_item, traces
+
+    workers = _env_int("SUBPOPULATION_TWO_STAGE_WORKERS", 2)
+    workers = max(1, min(workers, total))
+    if workers > 1 and total > 1:
+        worker_clients = _build_parallel_clients(client, workers)
+        by_idx: Dict[int, Dict[str, Any]] = {}
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = []
+            for idx, seed_item in enumerate(seed_items, start=1):
+                detail_client = worker_clients[(idx - 1) % len(worker_clients)]
+                futures.append(pool.submit(_run_stage2_detail, idx, seed_item, detail_client))
+
+            for fut in as_completed(futures):
+                idx, merged_item, traces = fut.result()
+                by_idx[idx] = merged_item
+                if traces:
+                    trace_buf = getattr(client, "_response_traces", None)
+                    if isinstance(trace_buf, list):
+                        trace_buf.extend(traces)
+
+        for idx in sorted(by_idx.keys()):
+            stage2_items.append(by_idx[idx])
+    else:
+        for idx, seed_item in enumerate(seed_items, start=1):
+            _, merged_item, traces = _run_stage2_detail(idx, seed_item, client)
+            stage2_items.append(merged_item)
+            if traces:
+                trace_buf = getattr(client, "_response_traces", None)
+                if isinstance(trace_buf, list):
+                    trace_buf.extend(traces)
 
     return {"subpopulations": _dedupe_subpopulation_items(stage2_items)}
 
