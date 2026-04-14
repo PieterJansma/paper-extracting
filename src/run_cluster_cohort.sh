@@ -25,6 +25,7 @@ LLM_DISABLE_THINKING="${LLM_DISABLE_THINKING:-0}"
 LLM_REASONING_BUDGET="${LLM_REASONING_BUDGET:-0}"
 
 # Optional runtime overrides for [llm] config values (applied to config.runtime.toml).
+LLM_MAX_TOKENS="${LLM_MAX_TOKENS:-}"
 LLM_CHUNKING_ENABLED="${LLM_CHUNKING_ENABLED:-}"
 LLM_LONG_TEXT_THRESHOLD_CHARS="${LLM_LONG_TEXT_THRESHOLD_CHARS:-}"
 LLM_CHUNK_SIZE_CHARS="${LLM_CHUNK_SIZE_CHARS:-}"
@@ -599,6 +600,9 @@ fi
 sed -i -E "s|^(base_url[[:space:]]*=[[:space:]]*\").*(\"[[:space:]]*)$|\1http://127.0.0.1:${PORT_LB}/v1\2|g" "$RUNTIME_CFG"
 if [[ -n "$LLM_CHUNKING_ENABLED" ]]; then
   sed -i -E "s|^(chunking_enabled[[:space:]]*=[[:space:]]*).*$|\1${LLM_CHUNKING_ENABLED}|g" "$RUNTIME_CFG"
+fi
+if [[ -n "$LLM_MAX_TOKENS" ]]; then
+  sed -i -E "s|^(max_tokens[[:space:]]*=[[:space:]]*).*$|\1${LLM_MAX_TOKENS}|g" "$RUNTIME_CFG"
 fi
 if [[ -n "$LLM_LONG_TEXT_THRESHOLD_CHARS" ]]; then
   sed -i -E "s|^(long_text_threshold_chars[[:space:]]*=[[:space:]]*).*$|\1${LLM_LONG_TEXT_THRESHOLD_CHARS}|g" "$RUNTIME_CFG"
