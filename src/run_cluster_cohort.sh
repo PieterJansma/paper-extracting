@@ -2,7 +2,7 @@
 set -euo pipefail
 
 LLAMA_BIN="/groups/umcg-gcc/tmp02/users/umcg-pjansma/Repositories/llama.cpp/build/bin/llama-server"
-MODEL_PATH="/groups/umcg-gcc/tmp02/users/umcg-pjansma/Models/GGUF/Qwen2.5-32B-Instruct/gemma-4-31B-it-Q4_K_M.gguf"
+MODEL_PATH="/groups/umcg-gcc/tmp02/users/umcg-pjansma/Models/GGUF/gemma-4-31B-it-Q4_K_M.gguf"
 
 MODEL_GPU0="$MODEL_PATH"
 MODEL_GPU1="$MODEL_PATH"
