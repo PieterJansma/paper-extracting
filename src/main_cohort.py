@@ -125,6 +125,89 @@ def _serialize_text_field(value: Any) -> str:
     return _serialize_value(value)
 
 
+def _normalize_or_infer_resource_types(overview: Dict[str, Any]) -> List[str]:
+    """Ensure Collections.type is never empty and uses canonical EMX2 labels."""
+    raw_types = overview.get("type")
+    if isinstance(raw_types, list):
+        type_items = [str(x).strip() for x in raw_types if str(x or "").strip()]
+    else:
+        single = str(raw_types or "").strip()
+        type_items = [single] if single else []
+
+    raw_keywords = overview.get("keywords")
+    if isinstance(raw_keywords, list):
+        keyword_items = [str(x).strip() for x in raw_keywords if str(x or "").strip()]
+    else:
+        keyword_items = [str(raw_keywords or "").strip()] if str(raw_keywords or "").strip() else []
+
+    canonical_by_norm = {
+        "biobank": "Biobank",
+        "preclinicalstudy": "Preclinical study",
+        "clinicaltrial": "Clinical trial",
+        "cohortstudy": "Cohort study",
+        "healthrecords": "Health records",
+        "registry": "Registry",
+        "referencedatasource": "Reference data source",
+        "commondatamodel": "Common data model",
+        "catalogue": "Catalogue",
+        "catalog": "Catalogue",
+        "network": "Network",
+        "othertype": "Other type",
+    }
+
+    out: List[str] = []
+    seen: set[str] = set()
+
+    for raw in type_items:
+        key = re.sub(r"[^a-z0-9]+", "", str(raw or "").strip().lower())
+        mapped = canonical_by_norm.get(key)
+        if mapped and mapped not in seen:
+            seen.add(mapped)
+            out.append(mapped)
+
+    if out:
+        return out
+
+    haystack = " ".join(
+        [
+            str(overview.get("name") or ""),
+            str(overview.get("acronym") or ""),
+            str(overview.get("description") or ""),
+            " ".join(keyword_items),
+        ]
+    ).lower()
+
+    inferred_rules: List[Tuple[str, Tuple[str, ...]]] = [
+        ("Biobank", (r"\bbiobank\b", r"\bdata[-\s]?biobank\b")),
+        ("Clinical trial", (r"\bclinical trial\b", r"\brandomi[sz]ed trial\b", r"\btrial\b")),
+        ("Cohort study", (r"\bcohort\b",)),
+        ("Registry", (r"\bregistr(?:y|ies)\b",)),
+        ("Health records", (r"\bhealth records?\b", r"\bmedical records?\b", r"\belectronic health records?\b", r"\behr\b")),
+        ("Network", (r"\bnetwork\b",)),
+        ("Catalogue", (r"\bcatalog(?:ue)?\b",)),
+        ("Preclinical study", (r"\bpreclinical\b",)),
+        ("Common data model", (r"\bcommon data model\b", r"\bcdm\b")),
+        ("Reference data source", (r"\breference data\b",)),
+    ]
+
+    for label, patterns in inferred_rules:
+        if any(re.search(pattern, haystack) for pattern in patterns):
+            out.append(label)
+
+    if out:
+        # Keep stable order and uniqueness.
+        deduped: List[str] = []
+        seen.clear()
+        for label in out:
+            if label in seen:
+                continue
+            seen.add(label)
+            deduped.append(label)
+        return deduped
+
+    return ["Other type"]
+
+
 def _resource_ref(label: str, overview: Dict[str, Any] | None) -> str:
     ov = overview or {}
     for key in ("pid", "name", "acronym"):
@@ -577,7 +660,7 @@ def _resource_row_from_sections(
         "pid": _normalize_identifier_value(overview.get("pid")),
         "name": str(overview.get("name") or label),
         "acronym": _serialize_value(overview.get("acronym")),
-        "type": _serialize_value(overview.get("type")),
+        "type": _serialize_value(_normalize_or_infer_resource_types(overview)),
         "cohort type": _serialize_value(overview.get("cohort_type")),
         "website": _serialize_value(overview.get("website")),
         "description": _serialize_value(overview.get("description")),
