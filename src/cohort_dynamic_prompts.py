@@ -116,12 +116,26 @@ def _as_list_str(value: Any) -> List[str]:
 
 
 def _lookup_field_meta(registry: Dict[str, Any], table_name: str, column_name: str) -> Dict[str, Any] | None:
-    table_meta = registry.get("tables", {}).get(table_name, {})
-    fields = table_meta.get("fields", {})
     wanted = _normalize_key(column_name)
-    for candidate, meta in fields.items():
-        if _normalize_key(candidate) == wanted:
-            return meta
+
+    def _find_in_table(name: str) -> Dict[str, Any] | None:
+        table_meta = registry.get("tables", {}).get(name, {})
+        fields = table_meta.get("fields", {})
+        for candidate, meta in fields.items():
+            if _normalize_key(candidate) == wanted:
+                return meta
+        return None
+
+    meta = _find_in_table(table_name)
+    if meta is not None:
+        return meta
+
+    # Live EMX2 has moved several resource-level fields from Resources -> Collections.
+    # Keep prompt generation stable by transparently resolving these moved fields.
+    if table_name == "Resources":
+        return _find_in_table("Collections")
+    if table_name == "Collections":
+        return _find_in_table("Resources")
     return None
 
 

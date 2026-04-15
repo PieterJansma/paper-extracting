@@ -188,6 +188,26 @@ def _registry_table_columns(registry: Dict[str, Any] | None, table_name: str) ->
     return [str(column_name) for column_name in fields.keys()]
 
 
+def _output_table_columns(
+    table_name: str,
+    *,
+    fallback_columns: List[str],
+    registry: Dict[str, Any] | None,
+) -> List[str]:
+    runtime_columns = _registry_table_columns(registry, table_name)
+    if runtime_columns:
+        return runtime_columns
+    return list(fallback_columns)
+
+
+def _project_row_to_columns(row: Dict[str, Any], columns: List[str]) -> Dict[str, Any]:
+    projected = _blank_row(columns)
+    for column_name in columns:
+        if column_name in row:
+            projected[column_name] = row[column_name]
+    return projected
+
+
 def _registry_field_meta(
     registry: Dict[str, Any] | None,
     table_name: str,
@@ -892,6 +912,7 @@ def cli() -> None:
     }
 
     resource_rows: List[Dict[str, Any]] = []
+    collection_rows: List[Dict[str, Any]] = []
     subpopulation_rows: List[Dict[str, Any]] = []
     count_rows: List[Dict[str, Any]] = []
     external_identifier_rows: List[Dict[str, Any]] = []
@@ -1023,6 +1044,13 @@ def cli() -> None:
 
         resource_row, resource_ref = _resource_row_from_sections(label, pdf_path, per_section_results, run_issues)
         resource_rows.append(resource_row)
+        if dynamic_registry:
+            collection_columns = _registry_table_columns(dynamic_registry, "Collections")
+            if collection_columns:
+                collection_row = _project_row_to_columns(resource_row, collection_columns)
+                if "resource" in collection_row and not str(collection_row.get("resource") or "").strip():
+                    collection_row["resource"] = resource_ref
+                collection_rows.append(collection_row)
 
         overview = per_section_results.get("task_overview", {}) or {}
         internal_ids = overview.get("internal_identifiers", []) or []
@@ -1243,6 +1271,11 @@ def cli() -> None:
             table_name="Resources",
             registry=dynamic_registry,
         )
+        collection_rows = _normalize_rows_with_runtime_schema(
+            collection_rows,
+            table_name="Collections",
+            registry=dynamic_registry,
+        )
         subpopulation_rows = _normalize_rows_with_runtime_schema(
             subpopulation_rows,
             table_name="Subpopulations",
@@ -1314,20 +1347,81 @@ def cli() -> None:
 
     log.info("Writing cohort Excel with engine=%s", excel_engine)
 
+    resources_columns = _output_table_columns(
+        "Resources",
+        fallback_columns=COHORT_SHEETS["Resources"],
+        registry=dynamic_registry,
+    )
+    subpop_columns = _output_table_columns(
+        "Subpopulations",
+        fallback_columns=COHORT_SHEETS["Subpopulations"],
+        registry=dynamic_registry,
+    )
+    subpop_count_columns = _output_table_columns(
+        "Subpopulation counts",
+        fallback_columns=COHORT_SHEETS["Subpopulation counts"],
+        registry=dynamic_registry,
+    )
+    external_id_columns = _output_table_columns(
+        "External identifiers",
+        fallback_columns=COHORT_SHEETS["External identifiers"],
+        registry=dynamic_registry,
+    )
+    internal_id_columns = _output_table_columns(
+        "Internal identifiers",
+        fallback_columns=COHORT_SHEETS["Internal identifiers"],
+        registry=dynamic_registry,
+    )
+    collection_event_columns = _output_table_columns(
+        "Collection events",
+        fallback_columns=COHORT_SHEETS["Collection events"],
+        registry=dynamic_registry,
+    )
+    agent_columns = _output_table_columns(
+        "Agents",
+        fallback_columns=COHORT_SHEETS["Agents"],
+        registry=dynamic_registry,
+    )
+    organisation_columns = _output_table_columns(
+        "Organisations",
+        fallback_columns=COHORT_SHEETS["Organisations"],
+        registry=dynamic_registry,
+    )
+    contact_columns = _output_table_columns(
+        "Contacts",
+        fallback_columns=COHORT_SHEETS["Contacts"],
+        registry=dynamic_registry,
+    )
+    publication_columns = _output_table_columns(
+        "Publications",
+        fallback_columns=COHORT_SHEETS["Publications"],
+        registry=dynamic_registry,
+    )
+    documentation_columns = _output_table_columns(
+        "Documentation",
+        fallback_columns=COHORT_SHEETS["Documentation"],
+        registry=dynamic_registry,
+    )
+
     frames = {
-        "Resources": pd.DataFrame(resource_rows, columns=COHORT_SHEETS["Resources"]),
-        "Subpopulations": pd.DataFrame(subpopulation_rows, columns=COHORT_SHEETS["Subpopulations"]),
-        "Subpopulation counts": pd.DataFrame(count_rows, columns=COHORT_SHEETS["Subpopulation counts"]),
-        "External identifiers": pd.DataFrame(external_identifier_rows, columns=COHORT_SHEETS["External identifiers"]),
-        "Internal identifiers": pd.DataFrame(internal_identifier_rows, columns=COHORT_SHEETS["Internal identifiers"]),
-        "Collection events": pd.DataFrame(collection_event_rows, columns=COHORT_SHEETS["Collection events"]),
-        "Agents": pd.DataFrame(agent_rows, columns=COHORT_SHEETS["Agents"]),
-        "Organisations": pd.DataFrame(organisation_extension_rows, columns=COHORT_SHEETS["Organisations"]),
-        "Contacts": pd.DataFrame(contact_rows, columns=COHORT_SHEETS["Contacts"]),
-        "Publications": pd.DataFrame(publication_rows, columns=COHORT_SHEETS["Publications"]),
-        "Documentation": pd.DataFrame(documentation_rows, columns=COHORT_SHEETS["Documentation"]),
+        "Resources": pd.DataFrame(resource_rows, columns=resources_columns),
+        "Subpopulations": pd.DataFrame(subpopulation_rows, columns=subpop_columns),
+        "Subpopulation counts": pd.DataFrame(count_rows, columns=subpop_count_columns),
+        "External identifiers": pd.DataFrame(external_identifier_rows, columns=external_id_columns),
+        "Internal identifiers": pd.DataFrame(internal_identifier_rows, columns=internal_id_columns),
+        "Collection events": pd.DataFrame(collection_event_rows, columns=collection_event_columns),
+        "Agents": pd.DataFrame(agent_rows, columns=agent_columns),
+        "Organisations": pd.DataFrame(organisation_extension_rows, columns=organisation_columns),
+        "Contacts": pd.DataFrame(contact_rows, columns=contact_columns),
+        "Publications": pd.DataFrame(publication_rows, columns=publication_columns),
+        "Documentation": pd.DataFrame(documentation_rows, columns=documentation_columns),
     }
+    collections_columns = _registry_table_columns(dynamic_registry, "Collections")
+    if collections_columns:
+        frames["Collections"] = pd.DataFrame(collection_rows, columns=collections_columns)
     for table_name, rows in dynamic_table_rows.items():
+        if table_name == "Collections":
+            continue
         columns = _registry_table_columns(dynamic_registry, table_name)
         if not columns:
             continue

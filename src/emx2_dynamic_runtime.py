@@ -114,6 +114,25 @@ def profile_model_paths(
     fallback_schema_csv: str | None = None,
     cache_dir: str | None = None,
 ) -> List[str]:
+    # Prefer the real shared model files that actually contain rows for this profile.
+    # This avoids false lookups like `Collections.csv` when `tableName=Collections`
+    # is defined inside another file (e.g. `Resources.csv`).
+    for root in _candidate_local_roots(local_root):
+        shared_dir = root / "data" / "_models" / "shared"
+        if not shared_dir.is_dir():
+            continue
+        local_paths: List[str] = []
+        for csv_path in sorted(shared_dir.glob("*.csv")):
+            try:
+                rows = _load_csv_rows(csv_path)
+            except Exception:
+                continue
+            if any(profile in _split_profiles(row.get("profiles")) for row in rows):
+                local_paths.append(f"data/_models/shared/{csv_path.name}")
+        if local_paths:
+            return local_paths
+
+    # Fallback: derive paths from table names when local shared model files are unavailable.
     paths: List[str] = []
     seen: set[str] = set()
     for table_name in profile_table_names(
