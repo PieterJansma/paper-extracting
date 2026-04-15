@@ -21,6 +21,7 @@ ARRAY_TYPES = {"ontology_array", "string_array", "ref_array"}
 PASSTHROUGH_TYPES = {"ref", "refback", "ontology", "text"}
 INHERITED_TABLE_SCHEMAS: Dict[str, str] = {
     "Organisations": "Agents",
+    "Collections": "Resources",
 }
 
 REF_FIELD_TARGETS: Dict[tuple[str, str], str] = {
@@ -922,16 +923,13 @@ def _build_ref_index(wb: Any) -> Dict[str, Dict[str, str]]:
     target_tables = set(REF_FIELD_TARGETS.values())
     candidates: Dict[str, set[str]] = {table: set() for table in target_tables}
 
-    for table in target_tables:
-        if table not in wb.sheetnames:
-            continue
-        ws = wb[table]
+    def _collect_sheet_tokens(target_table: str, ws: Any) -> None:
         hdr = _sheet_header_index(ws)
         for col in ("id", "pid", "name", "acronym", "label", "code", "identifier", "email", "organisation", "other organisation"):
             for v in _sheet_column_values(ws, hdr, col):
-                candidates[table].add(v)
+                candidates[target_table].add(v)
 
-        if table == "Contacts":
+        if target_table == "Contacts":
             for row_idx in range(2, ws.max_row + 1):
                 row_values = {
                     key: ws.cell(row=row_idx, column=col_idx).value
@@ -939,7 +937,20 @@ def _build_ref_index(wb: Any) -> Dict[str, Dict[str, str]]:
                 }
                 display = _build_contact_display_name(row_values)
                 if display:
-                    candidates[table].add(display)
+                    candidates[target_table].add(display)
+
+    for table in target_tables:
+        if table not in wb.sheetnames:
+            continue
+        _collect_sheet_tokens(table, wb[table])
+
+    # Include child-table identifiers for parent-table refs (e.g. Collections extends Resources).
+    for child_table, parent_table in INHERITED_TABLE_SCHEMAS.items():
+        if parent_table not in target_tables:
+            continue
+        if child_table not in wb.sheetnames:
+            continue
+        _collect_sheet_tokens(parent_table, wb[child_table])
 
     # Organisations often extends Agents and may not contain own identifier columns.
     if "Organisations" in target_tables and "Agents" in wb.sheetnames:
