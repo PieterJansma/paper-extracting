@@ -125,6 +125,25 @@ def _serialize_text_field(value: Any) -> str:
     return _serialize_value(value)
 
 
+def _serialize_multi_value(value: Any) -> str:
+    """Serialize list-like values as comma-separated scalars (never JSON array text)."""
+    raw_items = legacy_types._parse_array_items(value)
+    if raw_items is None:
+        return _serialize_value(value)
+
+    items: List[str] = []
+    seen: set[str] = set()
+    for raw in raw_items:
+        scalar = legacy_types._extract_ontology_scalar(raw)
+        if not scalar:
+            scalar = str(raw or "").strip()
+        if not scalar or scalar in seen:
+            continue
+        seen.add(scalar)
+        items.append(scalar)
+    return ",".join(items)
+
+
 def _normalize_or_infer_resource_types(overview: Dict[str, Any]) -> List[str]:
     """Ensure Collections.type is never empty and uses canonical EMX2 labels."""
     raw_types = overview.get("type")
@@ -514,7 +533,7 @@ def _build_agent_base_row(resource_ref: str, item: Dict[str, Any]) -> Dict[str, 
         "website": _serialize_value(item.get("website")),
         "email": _serialize_value(item.get("email")),
         "logo": _serialize_value(item.get("logo")),
-        "role": _serialize_value(item.get("role")),
+        "role": _serialize_multi_value(item.get("role")),
     })
     return row
 
@@ -1332,7 +1351,7 @@ def cli() -> None:
             row = _blank_row(COHORT_SHEETS["Contacts"])
             row.update({
                 "resource": resource_ref,
-                "role": _serialize_value(item.get("role")),
+                "role": _serialize_multi_value(item.get("role")),
                 "first name": _serialize_value(item.get("first_name")),
                 "last name": _serialize_value(item.get("last_name")),
                 "statement of consent personal data": _serialize_bool_default_false(consent_raw),
