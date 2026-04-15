@@ -5,6 +5,7 @@ import difflib
 import json
 import os
 import re
+from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -21,6 +22,21 @@ from llm_client import OpenAICompatibleClient
 
 TASK_PREFIX = "task_"
 FIELD_LINE_RE = re.compile(r"^\s*-\s+`([^`]+)`:\s*(.*)$")
+
+
+@contextmanager
+def _without_env(keys: List[str]):
+    saved: Dict[str, str | None] = {key: os.environ.get(key) for key in keys}
+    for key in keys:
+        os.environ.pop(key, None)
+    try:
+        yield
+    finally:
+        for key, value in saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 
 def _load_toml(path: Path) -> Dict[str, Any]:
@@ -1244,12 +1260,23 @@ def main() -> None:
     args = parser.parse_args()
 
     base_cfg = _task_sections(_load_toml(Path(args.base_prompts).expanduser().resolve()))
-    old_registry = build_runtime_registry(
-        args.profile,
-        tables=None,
-        local_root=args.old_local_root,
-        fallback_schema_csv=args.old_schema_csv,
-    )
+    if args.old_local_root:
+        old_registry = build_runtime_registry(
+            args.profile,
+            tables=None,
+            local_root=args.old_local_root,
+            fallback_schema_csv=args.old_schema_csv,
+        )
+    else:
+        # Ensure --old-schema-csv is actually used as the old side when no explicit
+        # old local root is provided, even if runtime exports EMX2 local-root env vars.
+        with _without_env(["MOLGENIS_EMX2_LOCAL_ROOT", "EMX2_LOCAL_ROOT"]):
+            old_registry = build_runtime_registry(
+                args.profile,
+                tables=None,
+                local_root=None,
+                fallback_schema_csv=args.old_schema_csv,
+            )
     new_registry = build_runtime_registry(
         args.profile,
         tables=None,
