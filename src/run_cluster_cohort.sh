@@ -1325,8 +1325,32 @@ validate_emx2_required_paths
 
 if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
   if [[ ! -f "$COHORT_PROMPT_SCHEMA_BASE_CSV" ]]; then
-    echo "⚠️  Skip prompt schema sync: base schema ontbreekt: $COHORT_PROMPT_SCHEMA_BASE_CSV"
-    status_event "warning" "prompt schema sync skipped; base schema missing"
+    echo "ℹ️  Prompt schema base ontbreekt; haal live base-schema op voor profile=${EMX2_PROFILE}..."
+    status_event "prompt_schema_base_bootstrap_started" "base schema missing; attempting live bootstrap"
+    mkdir -p "$(dirname "$COHORT_PROMPT_SCHEMA_BASE_CSV")" 2>/dev/null || true
+
+    if python3 src/emx2_dynamic_runtime.py export-schema-csv \
+      --profile "$EMX2_PROFILE" \
+      --local-root "$MOLGENIS_EMX2_LOCAL_ROOT" \
+      --output "$COHORT_PROMPT_SCHEMA_BASE_CSV" >/dev/null; then
+      echo "  Prompt schema base opgehaald: $COHORT_PROMPT_SCHEMA_BASE_CSV"
+      status_event "prompt_schema_base_bootstrap_ok" "base schema bootstrapped at ${COHORT_PROMPT_SCHEMA_BASE_CSV}"
+    else
+      FALLBACK_BASE_SCHEMA_CSV="${RUN_DIR}/emx2_schema.base.csv"
+      if python3 src/emx2_dynamic_runtime.py export-schema-csv \
+        --profile "$EMX2_PROFILE" \
+        --local-root "$MOLGENIS_EMX2_LOCAL_ROOT" \
+        --output "$FALLBACK_BASE_SCHEMA_CSV" >/dev/null; then
+        COHORT_PROMPT_SCHEMA_BASE_CSV="$FALLBACK_BASE_SCHEMA_CSV"
+        echo "  Prompt schema base opgehaald (fallback pad): $COHORT_PROMPT_SCHEMA_BASE_CSV"
+        status_event "prompt_schema_base_bootstrap_ok" "base schema bootstrapped at fallback path ${COHORT_PROMPT_SCHEMA_BASE_CSV}"
+      fi
+    fi
+  fi
+
+  if [[ ! -f "$COHORT_PROMPT_SCHEMA_BASE_CSV" ]]; then
+    echo "⚠️  Skip prompt schema sync: kon geen base schema ophalen: $COHORT_PROMPT_SCHEMA_BASE_CSV"
+    status_event "warning" "prompt schema sync skipped; base schema bootstrap failed"
   else
     echo "[4a/4] Schema-check voor prompts..."
     LIVE_SCHEMA_CSV="${RUN_DIR}/emx2_schema.live.csv"
