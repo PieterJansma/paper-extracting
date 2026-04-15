@@ -1087,13 +1087,25 @@ def _extract_ontology_scalar(value: Any) -> str:
         s = value.strip()
         if not s:
             return ""
-        if s.startswith("{") and s.endswith("}"):
+
+        # Try to parse serialized structured payloads first.
+        if (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]")):
             try:
                 parsed = json.loads(s)
+                if isinstance(parsed, list):
+                    for item in parsed:
+                        scalar = _extract_ontology_scalar(item)
+                        if scalar:
+                            return scalar
+                    return ""
+                return _extract_ontology_scalar(parsed)
             except Exception:
-                return s
-            return _extract_ontology_scalar(parsed)
-        return s
+                pass
+
+        # Handle partially broken wrappers, e.g. 'Data access provider"]' or '["Data provider'.
+        s = re.sub(r'^[\[\]"\\\']+', "", s)
+        s = re.sub(r'[\[\]"\\\']+$', "", s)
+        return _clean_string(s)
 
     return _clean_string(value)
 
