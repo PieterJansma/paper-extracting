@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
 import os
 import re
@@ -524,6 +525,11 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _env_flag(name: str, default: str = "1") -> bool:
+    raw = str(os.getenv(name, default)).strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
 def _parallel_base_urls(default_base_url: str) -> List[str]:
     raw = str(os.getenv("LLM_PARALLEL_BASE_URLS") or "").strip()
     urls: List[str] = []
@@ -543,6 +549,11 @@ def _parallel_base_urls(default_base_url: str) -> List[str]:
         seen.add(key)
         deduped.append(url)
     return deduped
+
+
+def _has_required_examples(block: str | None) -> bool:
+    text = str(block or "")
+    return bool(re.search(r"(?i)\bpositive example\b", text)) and bool(re.search(r"(?i)\bnegative example\b", text))
 
 
 def _rewrite_single_changed_task(
@@ -642,6 +653,8 @@ def _build_rewrite_messages(
         "- For a newly added field that has no old block, write a new field block in the same style and level of detail as neighboring blocks in the old instructions.\n"
         "- If the old task uses divider-style field sections, keep that formatting.\n"
         "- Do not collapse a detailed original prompt into generic bullet lines.\n"
+        "- Ensure each changed or newly added field block includes one Positive example and one Negative example.\n"
+        "- Examples must map explicit evidence text to the expected output value.\n"
         "- Do not change the template_json; it is provided only for grounding.\n"
         "- Do not invent allowed values.\n"
         "- If the deterministic instructions already include exact current schema values or exact-match rules, preserve them.\n"
@@ -699,6 +712,11 @@ def _build_field_rewrite_messages(
         "- Keep unaffected examples, caveats and rule bullets from the old block.\n"
         "- Use the exact current schema values from new_generated_rule when relevant.\n"
         "- Do not mention removed schema values in the final block.\n"
+        "- For action=replace/add, include exactly one Positive example and one Negative example in the field block.\n"
+        "- Format examples as explicit evidence-to-output mappings, e.g.:\n"
+        "  Positive example: evidence='<explicit quote or near-quote>' -> output=<JSON value>\n"
+        "  Negative example: evidence='<explicit non-evidence or conflicting quote>' -> output=<null/[]/omit row>\n"
+        "- Examples must be field-specific and non-generic.\n"
         "- Return JSON only: {\"action\":\"replace|add|remove\",\"block\":\"...\"}\n\n"
         f"{json.dumps(payload, ensure_ascii=False, indent=2)}"
     )
@@ -903,6 +921,15 @@ def _rewrite_task_field_blocks_with_llm(
             field_path=field_path,
             style=style,
         )
+        require_examples = _env_flag("COHORT_PROMPT_SCHEMA_REQUIRE_EXAMPLES", "1")
+        if (
+            sanitized_block
+            and require_examples
+            and use_action in {"replace", "add"}
+            and not _has_required_examples(sanitized_block)
+        ):
+            sanitized_block = None
+            sanitize_reason = "missing_required_examples"
         if sanitized_block:
             candidate_block = sanitized_block
             field_report[field_path]["source"] = "llm"
@@ -1131,8 +1158,24 @@ def _normalize_block_text(text: str | None) -> str:
     return re.sub(r"\s+", " ", str(text or "").strip())
 
 
+def _field_block_unified_diff(field_path: str, before_block: str, after_block: str) -> str:
+    before_lines = str(before_block or "").splitlines()
+    after_lines = str(after_block or "").splitlines()
+    diff_lines = list(
+        difflib.unified_diff(
+            before_lines,
+            after_lines,
+            fromfile=f"{field_path} (before)",
+            tofile=f"{field_path} (after)",
+            n=1,
+            lineterm="",
+        )
+    )
+    return "\n".join(diff_lines).strip()
+
+
 def _render_before_after_markdown(comparison: Dict[str, Any]) -> str:
-    lines: List[str] = ["# Prompt Schema Before/After", ""]
+    lines: List[str] = ["# Prompt Schema Field Diff", ""]
     tasks = comparison.get("tasks") or {}
     if not tasks:
         lines.extend([
@@ -1162,19 +1205,14 @@ def _render_before_after_markdown(comparison: Dict[str, Any]) -> str:
                 continue
             if _normalize_block_text(before_block) == _normalize_block_text(after_block):
                 continue
+            block_diff = _field_block_unified_diff(field_path, before_block, after_block)
+            if not block_diff:
+                continue
             rendered_any = True
             task_lines.append(f"### `{field_path}`")
             task_lines.append("")
-            task_lines.append("Before")
-            task_lines.append("")
-            task_lines.append("```text")
-            task_lines.append(before_block or "(not present)")
-            task_lines.append("```")
-            task_lines.append("")
-            task_lines.append("After")
-            task_lines.append("")
-            task_lines.append("```text")
-            task_lines.append(after_block or "(not present)")
+            task_lines.append("```diff")
+            task_lines.append(block_diff)
             task_lines.append("```")
             task_lines.append("")
 

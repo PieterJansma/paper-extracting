@@ -3,9 +3,15 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any, Dict, List
+
+try:
+    import tomllib as toml
+except ModuleNotFoundError:
+    import tomli as toml
 
 from emx2_dynamic_runtime import (
     COHORT_RUNTIME_TABLES,
@@ -95,6 +101,7 @@ RESOURCE_TASK_HINTS: List[tuple[str, tuple[str, ...]]] = [
 INLINE_ALLOWED_VALUES_MAX = 8
 INLINE_ALLOWED_VALUES_MEDIUM_MAX = 16
 _BASELINE_PROFILE_TABLES: set[str] | None = None
+_FIELD_EXAMPLES_CACHE: Dict[str, Dict[str, str]] | None = None
 
 
 def _normalize_key(value: Any) -> str:
@@ -113,6 +120,233 @@ def _as_list_str(value: Any) -> List[str]:
         return out
     s = str(value or "").strip()
     return [s] if s else []
+
+
+def _env_flag(name: str, default: str = "1") -> bool:
+    raw = str(os.getenv(name, default)).strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _normalize_example_output(value: Any) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        if value.is_integer():
+            return str(int(value))
+        return str(value)
+    if isinstance(value, (list, dict)):
+        return json.dumps(value, ensure_ascii=False)
+
+    s = str(value or "").strip()
+    if not s:
+        return "null"
+    if s in {"null", "[]", "{}", "true", "false"}:
+        return s
+    if re.fullmatch(r"[+-]?\d+", s):
+        return s
+    return json.dumps(s, ensure_ascii=False)
+
+
+def _field_examples_playbook_path() -> Path:
+    env_path = str(os.getenv("COHORT_FIELD_EXAMPLES_TOML") or "").strip()
+    if env_path:
+        return Path(env_path).expanduser().resolve()
+    return (Path(__file__).resolve().parent.parent / "prompts" / "field_examples.toml").resolve()
+
+
+def _load_field_examples_playbook() -> Dict[str, Dict[str, str]]:
+    global _FIELD_EXAMPLES_CACHE
+    if _FIELD_EXAMPLES_CACHE is not None:
+        return _FIELD_EXAMPLES_CACHE
+
+    out: Dict[str, Dict[str, str]] = {}
+    path = _field_examples_playbook_path()
+    if not path.is_file():
+        _FIELD_EXAMPLES_CACHE = out
+        return out
+
+    try:
+        with path.open("rb") as f:
+            data = toml.load(f)
+    except Exception:
+        _FIELD_EXAMPLES_CACHE = out
+        return out
+
+    rows = data.get("field_example")
+    if not isinstance(rows, list):
+        _FIELD_EXAMPLES_CACHE = out
+        return out
+
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        table = str(row.get("table") or "").strip()
+        column = str(row.get("column") or "").strip()
+        if not table or not column:
+            continue
+        key = f"{_normalize_key(table)}.{_normalize_key(column)}"
+        out[key] = {
+            "positive_evidence": str(row.get("positive_evidence") or "").strip(),
+            "positive_output": str(row.get("positive_output") or "").strip(),
+            "negative_evidence": str(row.get("negative_evidence") or "").strip(),
+            "negative_output": str(row.get("negative_output") or "").strip(),
+        }
+
+    _FIELD_EXAMPLES_CACHE = out
+    return out
+
+
+def _lookup_field_example_override(table_name: str, column_name: str) -> Dict[str, str] | None:
+    cache = _load_field_examples_playbook()
+    if not cache:
+        return None
+
+    norm_table = _normalize_key(table_name)
+    norm_column = _normalize_key(column_name)
+    keys = [f"{norm_table}.{norm_column}"]
+    if norm_table == "resources":
+        keys.append(f"collections.{norm_column}")
+    elif norm_table == "collections":
+        keys.append(f"resources.{norm_column}")
+
+    for key in keys:
+        entry = cache.get(key)
+        if entry:
+            return entry
+    return None
+
+
+def _default_field_examples(spec: Dict[str, Any], meta: Dict[str, Any]) -> Dict[str, str]:
+    column_name = str(spec.get("column") or "").strip()
+    norm_column = _normalize_key(column_name)
+    column_type = str(meta.get("column_type") or "").strip()
+    allowed_values = [str(v or "").strip() for v in list(meta.get("allowed_values") or []) if str(v or "").strip()]
+    nullable = bool(spec.get("nullable", True))
+
+    if norm_column == "accessrights":
+        if "Restricted access" in allowed_values:
+            positive_output = "Restricted access"
+        elif allowed_values:
+            positive_output = allowed_values[0]
+        else:
+            positive_output = "Restricted access"
+        negative_output = "null" if nullable else "omit row"
+        return {
+            "positive_evidence": 'The PDF states: "Data are available upon reasonable request via a data access committee."',
+            "positive_output": _normalize_example_output(positive_output),
+            "negative_evidence": 'The PDF only states: "Open access article under CC-BY license."',
+            "negative_output": negative_output,
+        }
+
+    if norm_column == "applicablelegislation":
+        return {
+            "positive_evidence": 'The PDF explicitly states: "Data Governance Act applies to this resource."',
+            "positive_output": _normalize_example_output(["Data Governance Act"]),
+            "negative_evidence": "The PDF has no explicit legislation statement.",
+            "negative_output": _normalize_example_output([] if column_type.endswith("_array") else (None if nullable else "omit row")),
+        }
+
+    if column_type == "ontology":
+        chosen = allowed_values[0] if allowed_values else "Exact schema label from PDF"
+        return {
+            "positive_evidence": f'The PDF explicitly uses the label "{chosen}".',
+            "positive_output": _normalize_example_output(chosen),
+            "negative_evidence": "No explicit exact schema label appears in the PDF.",
+            "negative_output": "null" if nullable else "omit row",
+        }
+
+    if column_type == "ontology_array":
+        chosen = allowed_values[0] if allowed_values else "Exact schema label from PDF"
+        return {
+            "positive_evidence": f'The PDF explicitly lists "{chosen}" for this field.',
+            "positive_output": _normalize_example_output([chosen]),
+            "negative_evidence": "No explicit exact schema labels are listed in the PDF.",
+            "negative_output": _normalize_example_output([]),
+        }
+
+    if column_type == "ref":
+        return {
+            "positive_evidence": 'The PDF explicitly names: "University Medical Center Groningen".',
+            "positive_output": _normalize_example_output("University Medical Center Groningen"),
+            "negative_evidence": "No explicit entity label or name is given in the PDF.",
+            "negative_output": "null" if nullable else "omit row",
+        }
+
+    if column_type == "ref_array":
+        return {
+            "positive_evidence": 'The PDF explicitly lists: "University Medical Center Groningen" and "RIVM".',
+            "positive_output": _normalize_example_output(["University Medical Center Groningen", "RIVM"]),
+            "negative_evidence": "No explicit entity names are listed in the PDF.",
+            "negative_output": _normalize_example_output([]),
+        }
+
+    if column_type == "bool":
+        return {
+            "positive_evidence": "The PDF explicitly states this is true for the resource.",
+            "positive_output": "true",
+            "negative_evidence": "The PDF does not explicitly state true or false.",
+            "negative_output": "null" if nullable else "omit row",
+        }
+
+    if column_type in {"int", "non_negative_int"}:
+        return {
+            "positive_evidence": 'The PDF states: "N=1200 participants".',
+            "positive_output": "1200",
+            "negative_evidence": "The PDF contains no explicit numeric value for this field.",
+            "negative_output": "null" if nullable else "omit row",
+        }
+
+    if column_type in {"date", "datetime"}:
+        return {
+            "positive_evidence": 'The PDF states: "Data collection started on 2014-01-15".',
+            "positive_output": _normalize_example_output("2014-01-15"),
+            "negative_evidence": "No explicit date or datetime is provided in the PDF.",
+            "negative_output": "null" if nullable else "omit row",
+        }
+
+    if column_type in {"string_array", "text"}:
+        return {
+            "positive_evidence": 'The PDF explicitly states: "Inclusion required confirmed diagnosis and age >=18."',
+            "positive_output": _normalize_example_output(["confirmed diagnosis", "age >=18"] if column_type == "string_array" else "confirmed diagnosis and age >=18"),
+            "negative_evidence": "No explicit statement is provided for this field.",
+            "negative_output": _normalize_example_output([] if column_type == "string_array" else (None if nullable else "omit row")),
+        }
+
+    return {
+        "positive_evidence": "The PDF contains an explicit statement for this field.",
+        "positive_output": _normalize_example_output("explicit value from PDF"),
+        "negative_evidence": "No explicit statement is present in the PDF.",
+        "negative_output": "null" if nullable else "omit row",
+    }
+
+
+def _field_example_lines(spec: Dict[str, Any], meta: Dict[str, Any]) -> List[str]:
+    # Keep deterministic examples optional. When enabled, this acts as a fallback
+    # for runs where changed-task LLM rewriting is unavailable.
+    if not _env_flag("COHORT_PROMPT_INCLUDE_EXAMPLES", "0"):
+        return []
+
+    table_name = str(spec.get("table") or "").strip()
+    column_name = str(spec.get("column") or "").strip()
+    if not table_name or not column_name:
+        return []
+
+    entry = _lookup_field_example_override(table_name, column_name) or _default_field_examples(spec, meta)
+    positive_evidence = str(entry.get("positive_evidence") or "").strip()
+    positive_output = str(entry.get("positive_output") or "").strip()
+    negative_evidence = str(entry.get("negative_evidence") or "").strip()
+    negative_output = str(entry.get("negative_output") or "").strip()
+    if not (positive_evidence and positive_output and negative_evidence and negative_output):
+        return []
+
+    return [
+        f"  - Positive example: evidence='{positive_evidence}' -> output={positive_output}",
+        f"  - Negative example: evidence='{negative_evidence}' -> output={negative_output}",
+    ]
 
 
 def _lookup_field_meta(registry: Dict[str, Any], table_name: str, column_name: str) -> Dict[str, Any] | None:
@@ -818,6 +1052,7 @@ def _render_reused_auto_generated_field_lines(
     lines.append("  Rules:")
     for rule in rules:
         lines.append(f"  - {rule}")
+    lines.extend(_field_example_lines(spec, meta))
     if field_key not in {"accessrights", "applicablelegislation"}:
         lines.append(f"  - {_generic_rule_from_meta(meta, nullable=bool(spec.get('nullable', True)))}")
     return lines
@@ -858,7 +1093,9 @@ def _render_field_lines(spec: Dict[str, Any], registry: Dict[str, Any], prefix: 
     ref = _field_reference(spec)
     if ref:
         parts.append(f"Source: {ref}")
-    return [f"- `{full_key}`: {' '.join(parts)}"]
+    lines = [f"- `{full_key}`: {' '.join(parts)}"]
+    lines.extend(_field_example_lines(spec, meta))
+    return lines
 
 
 def _render_auto_generated_field_lines(
@@ -906,7 +1143,9 @@ def _render_auto_generated_field_lines(
     if allowed_note:
         parts.append(allowed_note)
     parts.append(_generic_rule_from_meta(meta, nullable=bool(spec.get("nullable", True))))
-    return [f"- `{full_key}`: {' '.join(parts)}"]
+    lines = [f"- `{full_key}`: {' '.join(parts)}"]
+    lines.extend(_field_example_lines(spec, meta))
+    return lines
 
 
 def _spec_coverage(spec: Dict[str, Any], out: Dict[str, set[str]]) -> None:
