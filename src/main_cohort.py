@@ -208,6 +208,31 @@ def _project_row_to_columns(row: Dict[str, Any], columns: List[str]) -> Dict[str
     return projected
 
 
+def _drop_parent_rows_with_child_ids(
+    parent_rows: List[Dict[str, Any]],
+    child_rows: List[Dict[str, Any]],
+    *,
+    id_column: str = "id",
+) -> Tuple[List[Dict[str, Any]], int]:
+    child_ids = {
+        str(row.get(id_column) or "").strip()
+        for row in child_rows
+        if str(row.get(id_column) or "").strip()
+    }
+    if not child_ids:
+        return parent_rows, 0
+
+    kept_rows: List[Dict[str, Any]] = []
+    dropped = 0
+    for row in parent_rows:
+        row_id = str(row.get(id_column) or "").strip()
+        if row_id and row_id in child_ids:
+            dropped += 1
+            continue
+        kept_rows.append(row)
+    return kept_rows, dropped
+
+
 def _registry_field_meta(
     registry: Dict[str, Any] | None,
     table_name: str,
@@ -1264,6 +1289,20 @@ def cli() -> None:
             documentation_rows.append(row)
 
     log.info("--- DONE EXTRACTING ---")
+
+    if dynamic_registry:
+        collection_columns = _registry_table_columns(dynamic_registry, "Collections")
+        if collection_columns:
+            resource_rows, dropped_resource_rows = _drop_parent_rows_with_child_ids(
+                resource_rows,
+                collection_rows,
+                id_column="id",
+            )
+            if dropped_resource_rows:
+                log.info(
+                    "Dropped %d Resources row(s) also present in Collections to avoid inherited-table duplicate ids.",
+                    dropped_resource_rows,
+                )
 
     if dynamic_registry:
         resource_rows = _normalize_rows_with_runtime_schema(
