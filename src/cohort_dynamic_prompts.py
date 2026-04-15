@@ -688,13 +688,19 @@ def _auto_allowed_values_note(meta: Dict[str, Any]) -> str:
 
 
 def _auto_generated_prompt_context(table_name: str, fields_meta: Dict[str, Any]) -> str:
+    norm_table = _normalize_key(table_name)
+    if norm_table in {"resources", "collections"}:
+        return "resource_like"
+    if norm_table in {"subpopulations", "subpopulationcounts"}:
+        return "subgroup_like"
+    if norm_table in {"collectionevents"}:
+        return "event_like"
+
     norm_fields = {_normalize_key(name) for name in fields_meta}
     if {"mainmedicalcondition", "comorbidity", "numberofparticipants", "countries", "regions"} & norm_fields:
         return "subgroup_like"
     if {"areasofinformation", "datacategories", "samplecategories", "standardizedtools"} & norm_fields:
         return "event_like"
-    if table_name == "Resources":
-        return "resource_like"
     return "generic"
 
 
@@ -718,7 +724,8 @@ def _reused_auto_generated_rules(context: str, field_key: str) -> List[str]:
             "Do NOT copy study-level access statements into this row unless the paper explicitly applies them to that subgroup or to all subgroup data.",
             '"Open access" ONLY if explicitly public.',
             '"Restricted access" ONLY if explicitly controlled/restricted (including "available on request").',
-            'Otherwise default "Non public".',
+            '"Non public" ONLY if explicitly stated as non-public/closed.',
+            "If not explicitly stated -> null.",
             'IMPORTANT: article license text (e.g., "Open access article", CC-BY) is NOT evidence for dataset access_rights.',
         ],
         "applicablelegislation": [
@@ -757,7 +764,8 @@ def _reused_auto_generated_rules(context: str, field_key: str) -> List[str]:
         "accessrights": [
             '"Open access" ONLY if data are explicitly publicly available.',
             '"Restricted access" ONLY if explicitly stated controlled/restricted.',
-            'Otherwise default "Non public".',
+            '"Non public" ONLY if explicitly stated as non-public/closed.',
+            "If not explicitly stated -> null.",
             'IMPORTANT: article-level "Open access" publication status is NOT evidence that event-level data are open.',
         ],
         "applicablelegislation": [

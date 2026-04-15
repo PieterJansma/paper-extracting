@@ -156,7 +156,7 @@ def _normalize_publication_doi(value: Any) -> str:
     normalized = re.sub(r"^doi:\s*", "", normalized, flags=re.IGNORECASE)
     normalized = normalized.rstrip(".,;:)")
     if re.fullmatch(r"10\.\d{4,9}/[-._;()/:A-Za-z0-9]+", normalized):
-        return f"https://doi.org/{normalized}"
+        return normalized
     return s
 
 

@@ -1110,6 +1110,11 @@ def _postprocess_section_results(
             m = re.search(rf"[^.]*({request_pat})[^.]*\.", paper_text, flags=re.IGNORECASE)
             if m:
                 access["data_access_conditions_description"] = _normalize_ws(m.group(0))[:400]
+        fee_raw = str(access.get("data_access_fee") or "").strip().lower()
+        if fee_raw in {"1", "true", "yes", "on"}:
+            fee_pat = r"\b(fee|cost|charge|payment|paid|pricing|subscription)\b"
+            if not re.search(fee_pat, paper_text, flags=re.IGNORECASE):
+                access["data_access_fee"] = None
 
     # Clean linkage_options: keep only source-like entries, drop outcomes.
     if isinstance(linkage, dict):
