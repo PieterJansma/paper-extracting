@@ -761,13 +761,14 @@ def cli() -> None:
 
     setup_logging(cfg.get("logging", {}).get("level", "INFO"))
     log = logging.getLogger("main_cohort")
+    emx2_profile = (os.environ.get("EMX2_PROFILE") or "UMCGCohortsStaging").strip() or "UMCGCohortsStaging"
 
     dynamic_registry: Dict[str, Any] | None = None
     dynamic_prompt_summary: Dict[str, List[str]] = {}
     if dynamic_runtime_enabled:
         try:
             dynamic_registry = build_runtime_registry(
-                "UMCGCohortsStaging",
+                emx2_profile,
                 tables=None,
                 local_root=os.environ.get("MOLGENIS_EMX2_LOCAL_ROOT"),
                 fallback_schema_csv=os.environ.get("EMX2_RUNTIME_SCHEMA_CSV"),
@@ -777,7 +778,8 @@ def cli() -> None:
                 replace_task_sections(cfg, build_dynamic_task_sections(dynamic_registry))
             dynamic_prompt_summary = apply_dynamic_constraints_to_config(cfg, dynamic_registry)
             log.info(
-                "Dynamic EMX2 runtime enabled (tables=%d, sources=%d, dynamic_prompts=%s)",
+                "Dynamic EMX2 runtime enabled (profile=%s, tables=%d, sources=%d, dynamic_prompts=%s)",
+                emx2_profile,
                 len(dynamic_registry.get("tables", {})),
                 len(dynamic_registry.get("sources", {})),
                 "on" if dynamic_prompt_generation_enabled else "off",
@@ -1345,7 +1347,7 @@ def cli() -> None:
                 input_path=args.output,
                 output_path=args.output,
                 registry=dynamic_registry,
-                profile="UMCGCohortsStaging",
+                profile=emx2_profile,
                 local_root=os.environ.get("MOLGENIS_EMX2_LOCAL_ROOT"),
                 fallback_schema_csv=os.environ.get("EMX2_RUNTIME_SCHEMA_CSV"),
                 cache_dir=os.environ.get("EMX2_CACHE_DIR"),

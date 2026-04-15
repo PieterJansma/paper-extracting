@@ -7,6 +7,8 @@ import os
 import re
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+from urllib.parse import quote
+from urllib.request import Request, urlopen
 
 
 DEFAULT_PROFILE = "UMCGCohortsStaging"
@@ -86,11 +88,13 @@ def profile_table_names(
     *,
     local_root: str | None = None,
     fallback_schema_csv: str | None = None,
+    cache_dir: str | None = None,
 ) -> List[str]:
     rows, _ = load_profile_model_rows(
         profile,
         local_root=local_root,
         fallback_schema_csv=fallback_schema_csv,
+        cache_dir=cache_dir,
     )
     names: List[str] = []
     seen: set[str] = set()
@@ -108,6 +112,7 @@ def profile_model_paths(
     *,
     local_root: str | None = None,
     fallback_schema_csv: str | None = None,
+    cache_dir: str | None = None,
 ) -> List[str]:
     paths: List[str] = []
     seen: set[str] = set()
@@ -115,6 +120,7 @@ def profile_model_paths(
         profile,
         local_root=local_root,
         fallback_schema_csv=fallback_schema_csv,
+        cache_dir=cache_dir,
     ):
         rel_path = f"data/_models/shared/{table_name}.csv"
         if rel_path in seen:
@@ -162,6 +168,142 @@ def _fallback_schema_csv(explicit_path: str | None = None) -> Path:
     return (_repo_root() / DEFAULT_SCHEMA_CSV).resolve()
 
 
+def _candidate_cache_dirs(explicit_cache_dir: str | None = None) -> List[Path]:
+    candidates = [
+        explicit_cache_dir,
+        os.environ.get("EMX2_CACHE_DIR"),
+        str((_repo_root() / "tmp" / "emx2_runtime_cache").resolve()),
+    ]
+    out: List[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        if not candidate:
+            continue
+        path = Path(candidate).expanduser().resolve()
+        key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(path)
+    return out
+
+
+def _github_repo() -> str:
+    return (os.environ.get("MOLGENIS_EMX2_REPO") or "molgenis/molgenis-emx2").strip() or "molgenis/molgenis-emx2"
+
+
+def _github_refs() -> List[str]:
+    refs = [
+        (os.environ.get("MOLGENIS_EMX2_REF") or "main").strip(),
+        "main",
+        "master",
+    ]
+    out: List[str] = []
+    seen: set[str] = set()
+    for ref in refs:
+        if not ref or ref in seen:
+            continue
+        seen.add(ref)
+        out.append(ref)
+    return out
+
+
+def _http_get_bytes(url: str, timeout_sec: float = 20.0) -> bytes | None:
+    request = Request(
+        url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "paper-extracting-emx2-runtime",
+        },
+    )
+    try:
+        with urlopen(request, timeout=timeout_sec) as response:
+            return response.read()
+    except Exception:
+        return None
+
+
+def _github_shared_model_rel_paths(repo: str, ref: str) -> List[str]:
+    api_url = f"https://api.github.com/repos/{repo}/contents/data/_models/shared?ref={quote(ref, safe='')}"
+    payload = _http_get_bytes(api_url)
+    if not payload:
+        return []
+    try:
+        parsed = json.loads(payload.decode("utf-8"))
+    except Exception:
+        return []
+    if not isinstance(parsed, list):
+        return []
+    out: List[str] = []
+    seen: set[str] = set()
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("type") or "").strip() != "file":
+            continue
+        rel_path = str(item.get("path") or "").strip()
+        if not rel_path.endswith(".csv"):
+            continue
+        if rel_path in seen:
+            continue
+        seen.add(rel_path)
+        out.append(rel_path)
+    return out
+
+
+def _fetch_github_profile_rows(
+    profile: str,
+    *,
+    cache_dir: str | None = None,
+) -> Tuple[List[Dict[str, str]], Dict[str, Any]] | None:
+    repo = _github_repo()
+    refs = _github_refs()
+    cache_roots = _candidate_cache_dirs(cache_dir)
+
+    for ref in refs:
+        rel_paths = _github_shared_model_rel_paths(repo, ref)
+        if not rel_paths:
+            continue
+        for cache_root in cache_roots:
+            repo_root = (cache_root / "repo").resolve()
+            rows: List[Dict[str, str]] = []
+            fetched_files = 0
+            for rel_path in rel_paths:
+                raw_url = (
+                    f"https://raw.githubusercontent.com/{repo}/{quote(ref, safe='')}/"
+                    f"{quote(rel_path, safe='/')}"
+                )
+                payload = _http_get_bytes(raw_url)
+                if not payload:
+                    continue
+                local_path = (repo_root / rel_path).resolve()
+                try:
+                    local_path.parent.mkdir(parents=True, exist_ok=True)
+                    local_path.write_bytes(payload)
+                    fetched_files += 1
+                except Exception:
+                    continue
+
+                try:
+                    file_rows = _load_csv_rows(local_path)
+                except Exception:
+                    continue
+                for row in file_rows:
+                    if profile in _split_profiles(row.get("profiles")):
+                        rows.append(row)
+            if rows:
+                return rows, {
+                    "kind": "github_repo",
+                    "repo": repo,
+                    "ref": ref,
+                    "cache_root": str(cache_root),
+                    "repo_root": str(repo_root),
+                    "shared_dir": str((repo_root / "data" / "_models" / "shared").resolve()),
+                    "fetched_files": fetched_files,
+                }
+    return None
+
+
 def _safe_cache_name(rel_path: str) -> str:
     return rel_path.replace("/", "__").replace(" ", "__")
 
@@ -180,6 +322,7 @@ def load_profile_model_rows(
     *,
     local_root: str | None = None,
     fallback_schema_csv: str | None = None,
+    cache_dir: str | None = None,
 ) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
     for root in _candidate_local_roots(local_root):
         shared_dir = root / "data" / "_models" / "shared"
@@ -198,18 +341,27 @@ def load_profile_model_rows(
                 "shared_dir": str(shared_dir),
             }
 
+    github_result = _fetch_github_profile_rows(profile, cache_dir=cache_dir)
+    if github_result is not None:
+        return github_result
+
     schema_csv = _fallback_schema_csv(fallback_schema_csv)
-    if not schema_csv.is_file():
-        raise FileNotFoundError(f"Could not find fallback schema CSV: {schema_csv}")
-    rows = [
-        row
-        for row in _load_csv_rows(schema_csv)
-        if profile in _split_profiles(row.get("profiles"))
-    ]
-    return rows, {
-        "kind": "fallback_schema_csv",
-        "path": str(schema_csv),
-    }
+    if schema_csv.is_file():
+        rows = [
+            row
+            for row in _load_csv_rows(schema_csv)
+            if profile in _split_profiles(row.get("profiles"))
+        ]
+        if rows:
+            return rows, {
+                "kind": "fallback_schema_csv",
+                "path": str(schema_csv),
+            }
+
+    raise FileNotFoundError(
+        "Could not resolve EMX2 profile model rows. Tried local shared models, "
+        f"fallback schema CSV ({schema_csv}), and GitHub repo {_github_repo()} refs {_github_refs()}."
+    )
 
 
 def _source_rel_paths_for_field(meta: Dict[str, Any]) -> List[str]:
@@ -284,6 +436,7 @@ def build_runtime_registry(
         profile,
         local_root=local_root,
         fallback_schema_csv=fallback_schema_csv,
+        cache_dir=cache_dir,
     )
     selected_tables = set(tables or [])
 
@@ -549,11 +702,13 @@ def export_profile_schema_csv(
     profile: str = DEFAULT_PROFILE,
     local_root: str | None = None,
     fallback_schema_csv: str | None = None,
+    cache_dir: str | None = None,
 ) -> Dict[str, Any]:
     rows, model_source = load_profile_model_rows(
         profile,
         local_root=local_root,
         fallback_schema_csv=fallback_schema_csv,
+        cache_dir=cache_dir,
     )
     if not rows:
         raise RuntimeError(f"No profile rows found for {profile}")
@@ -645,7 +800,14 @@ def main() -> None:
 
     if args.cmd == "model-paths":
         if mode == "cohort":
-            paths = cohort_model_paths()
+            try:
+                paths = profile_model_paths(
+                    args.profile,
+                    local_root=args.local_root,
+                    fallback_schema_csv=args.fallback_schema_csv,
+                )
+            except Exception:
+                paths = cohort_model_paths()
         else:
             paths = profile_model_paths(
                 args.profile,

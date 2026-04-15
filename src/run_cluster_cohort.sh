@@ -79,6 +79,7 @@ STRIP_REFERENCES="${STRIP_REFERENCES:-1}"
 AUTO_FETCH_EMX2_ONTOLOGIES="${AUTO_FETCH_EMX2_ONTOLOGIES:-1}"
 MOLGENIS_EMX2_REPO="${MOLGENIS_EMX2_REPO:-molgenis/molgenis-emx2}"
 MOLGENIS_EMX2_REF="${MOLGENIS_EMX2_REF:-main}"
+EMX2_PROFILE="${EMX2_PROFILE:-UMCGCohortsStaging}"
 EMX2_CACHE_DIR="${EMX2_CACHE_DIR:-${RUN_DIR}/emx2_cache}"
 EMX2_REPO_ROOT="${EMX2_REPO_ROOT:-${EMX2_CACHE_DIR}/repo}"
 EMX2_REQUIRED_PATHS_STRICT="${EMX2_REQUIRED_PATHS_STRICT:-1}"
@@ -514,8 +515,9 @@ from emx2_dynamic_runtime import build_runtime_registry, COHORT_RUNTIME_TABLES
 report_json = Path(sys.argv[1]).resolve()
 report_txt = Path(sys.argv[2]).resolve()
 
+profile = os.environ.get("EMX2_PROFILE", "UMCGCohortsStaging").strip() or "UMCGCohortsStaging"
 registry = build_runtime_registry(
-    "UMCGCohortsStaging",
+    profile,
     tables=COHORT_RUNTIME_TABLES,
     local_root=os.environ.get("MOLGENIS_EMX2_LOCAL_ROOT"),
     fallback_schema_csv=os.environ.get("EMX2_RUNTIME_SCHEMA_CSV"),
@@ -743,6 +745,7 @@ export COHORT_PROMPT_SCHEMA_SYNC_LLM
 export COHORT_PROMPT_SCHEMA_SYNC_LLM_WORKERS
 export SUBPOPULATION_TWO_STAGE
 export SUBPOPULATION_TWO_STAGE_WORKERS
+export EMX2_PROFILE
 export MOLGENIS_EMX2_LOCAL_ROOT="$EMX2_REPO_ROOT"
 export LLM_PARALLEL_BASE_URLS
 export STRIP_REFERENCES
@@ -1291,7 +1294,8 @@ echo "  PDF_EXTRACT_CONFIG=$PDF_EXTRACT_CONFIG"
 echo "  PDF_EXTRACT_PROMPTS=$PDF_EXTRACT_PROMPTS"
 echo "  AUTO_FETCH_EMX2_ONTOLOGIES=$AUTO_FETCH_EMX2_ONTOLOGIES"
 echo "  EMX2 source=${MOLGENIS_EMX2_REPO}@${MOLGENIS_EMX2_REF}"
-status_event "emx2_source_selected" "using EMX2 source ${MOLGENIS_EMX2_REPO}@${MOLGENIS_EMX2_REF}"
+echo "  EMX2 profile=${EMX2_PROFILE}"
+status_event "emx2_source_selected" "using EMX2 source ${MOLGENIS_EMX2_REPO}@${MOLGENIS_EMX2_REF} (profile=${EMX2_PROFILE})"
 
 # Attempt to fetch latest ontology/model sources from molgenis-emx2.
 sync_emx2_shared_model_dir
@@ -1301,20 +1305,20 @@ fetch_emx2_csv "data/_ontologies/Resources.csv" REF_RESOURCES_CSV
 fetch_emx2_csv "data/_ontologies/Organisations.csv" REF_ORGANISATIONS_CSV
 fetch_emx2_csv "data/_models/shared/Subpopulations.csv" REF_SUBPOPULATIONS_CSV
 
-if python3 src/emx2_dynamic_runtime.py required-paths --mode cohort >/dev/null 2>&1; then
+if python3 src/emx2_dynamic_runtime.py required-paths --mode cohort --profile "$EMX2_PROFILE" >/dev/null 2>&1; then
   while IFS= read -r rel_path; do
     [[ -z "$rel_path" ]] && continue
     dyn_var="EMX2_DYNAMIC_$(echo "$rel_path" | tr -c '[:alnum:]' '_' | tr '[:lower:]' '[:upper:]')"
     fetch_emx2_csv "$rel_path" "$dyn_var"
-  done < <(python3 src/emx2_dynamic_runtime.py required-paths --mode cohort)
+  done < <(python3 src/emx2_dynamic_runtime.py required-paths --mode cohort --profile "$EMX2_PROFILE")
 fi
 
-if python3 src/emx2_dynamic_runtime.py model-paths --mode cohort >/dev/null 2>&1; then
+if python3 src/emx2_dynamic_runtime.py model-paths --mode cohort --profile "$EMX2_PROFILE" >/dev/null 2>&1; then
   while IFS= read -r rel_path; do
     [[ -z "$rel_path" ]] && continue
     dyn_var="EMX2_MODEL_$(echo "$rel_path" | tr -c '[:alnum:]' '_' | tr '[:lower:]' '[:upper:]')"
     fetch_emx2_csv "$rel_path" "$dyn_var"
-  done < <(python3 src/emx2_dynamic_runtime.py model-paths --mode cohort)
+  done < <(python3 src/emx2_dynamic_runtime.py model-paths --mode cohort --profile "$EMX2_PROFILE")
 fi
 
 validate_emx2_required_paths
@@ -1361,7 +1365,7 @@ if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
     status_event "prompt_schema_sync_started" "checking EMX2 schema against base prompt"
 
     if python3 src/emx2_dynamic_runtime.py export-schema-csv \
-      --profile UMCGCohortsStaging \
+      --profile "$EMX2_PROFILE" \
       --local-root "$MOLGENIS_EMX2_LOCAL_ROOT" \
       --output "$LIVE_SCHEMA_CSV" >/dev/null; then
 
