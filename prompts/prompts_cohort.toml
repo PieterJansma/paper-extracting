@@ -288,9 +288,9 @@ template_json = """
       "countries": ["verbatim-string"],
       "regions": ["verbatim-string"],
       "inclusion_criteria": ["string"],
-      "other_inclusion_criteria": ["string"],
+      "other_inclusion_criteria": "string|null",
       "exclusion_criteria": ["string"],
-      "other_exclusion_criteria": ["string"],
+      "other_exclusion_criteria": "string|null",
       "issued": "string|null",
       "modified": "string|null",
       "theme": ["string"],
@@ -424,7 +424,8 @@ Rules:
   - If explicit criterion text exists but no allowed category matches, keep category out and put text in `other_*_criteria`.
   - If not explicit -> [].
 - other_inclusion_criteria / other_exclusion_criteria:
-  Keep explicit wording only (short phrases/sentences), no summaries, no inference.
+  Keep explicit wording only (short phrase/sentence), no summaries, no inference.
+  Return a single string (or null), not a list.
 - issued/modified: only if explicit publish/last modified dates for the subpopulation data; else null.
 - theme (required): must include "Health". Allowed: "Health","Agriculture","Environment","Energy","Government and public sector".
 - access_rights (required; STRICT dropdown; single select)
@@ -701,9 +702,9 @@ template_json = """
   "age_min": "integer|null",
   "age_max": "integer|null",
   "inclusion_criteria": ["string"],
-  "other_inclusion_criteria": ["string"],
+  "other_inclusion_criteria": "string|null",
   "exclusion_criteria": ["string"],
-  "other_exclusion_criteria": ["string"],
+  "other_exclusion_criteria": "string|null",
   "population_disease": ["string"],
   "population_oncology_topology": ["string"],
   "population_oncology_morphology": ["string"]
@@ -840,7 +841,7 @@ Rules:
 --------------------------------------------------
 other_inclusion_criteria / other_exclusion_criteria
 --------------------------------------------------
-Free-text lists (paper wording), only if explicit.
+Free-text field (paper wording), only if explicit.
 Rules:
 - Include verbatim or near-verbatim short phrases/sentences from the paper that specify criteria
   that are NOT captured by the checkbox labels above.
@@ -849,7 +850,8 @@ Rules:
 - For explicit exclusions, always copy the concrete wording into other_exclusion_criteria,
   even when a checkbox category is also mapped in exclusion_criteria.
 - Do NOT invent or summarize.
-- If nothing explicit -> [].
+- Return a single string (or null), not a list.
+- If nothing explicit -> null.
 
 --------------------------------------------------
 population_disease

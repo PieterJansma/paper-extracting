@@ -118,6 +118,13 @@ def _display_person_name(person: Dict[str, Any]) -> str:
     return " ".join(p for p in parts if p).strip()
 
 
+def _serialize_text_field(value: Any) -> str:
+    """Serialize text-like values and flatten accidental list outputs to plain text."""
+    if isinstance(value, list):
+        return "; ".join(_as_list_str(value))
+    return _serialize_value(value)
+
+
 def _resource_ref(label: str, overview: Dict[str, Any] | None) -> str:
     ov = overview or {}
     for key in ("pid", "name", "acronym"):
@@ -603,9 +610,9 @@ def _resource_row_from_sections(
         "age min": _serialize_value(population.get("age_min")),
         "age max": _serialize_value(population.get("age_max")),
         "inclusion criteria": _serialize_value(population.get("inclusion_criteria")),
-        "other inclusion criteria": _serialize_value(population.get("other_inclusion_criteria")),
+        "other inclusion criteria": _serialize_text_field(population.get("other_inclusion_criteria")),
         "exclusion criteria": _serialize_value(population.get("exclusion_criteria")),
-        "other exclusion criteria": _serialize_value(population.get("other_exclusion_criteria")),
+        "other exclusion criteria": _serialize_text_field(population.get("other_exclusion_criteria")),
         "organisations involved": _serialize_value(org_ids),
         "publisher": _serialize_value(contributors.get("publisher")),
         "creator": _serialize_value(contributors.get("creator")),
@@ -1141,9 +1148,9 @@ def cli() -> None:
                 "countries": _serialize_value(sub.get("countries")),
                 "regions": _serialize_value(sub.get("regions")),
                 "inclusion criteria": _serialize_value(sub.get("inclusion_criteria")),
-                "other inclusion criteria": _serialize_value(sub.get("other_inclusion_criteria")),
+                "other inclusion criteria": _serialize_text_field(sub.get("other_inclusion_criteria")),
                 "exclusion criteria": _serialize_value(sub.get("exclusion_criteria")),
-                "other exclusion criteria": _serialize_value(sub.get("other_exclusion_criteria")),
+                "other exclusion criteria": _serialize_text_field(sub.get("other_exclusion_criteria")),
                 "issued": _serialize_value(sub.get("issued")),
                 "modified": _serialize_value(sub.get("modified")),
                 "theme": _serialize_value(sub.get("theme")),
