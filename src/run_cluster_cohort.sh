@@ -21,8 +21,9 @@ AUTO_PORTS="${AUTO_PORTS:-1}"
 CTX="${CTX:-20000}"
 SLOTS="${SLOTS:-1}"
 NGL="${NGL:-999}"
-LLM_DISABLE_THINKING="${LLM_DISABLE_THINKING:-0}"
-LLM_REASONING_BUDGET="${LLM_REASONING_BUDGET:-4096}"
+# Default: disable reasoning to reduce truncated reasoning-only responses.
+LLM_DISABLE_THINKING="${LLM_DISABLE_THINKING:-1}"
+LLM_REASONING_BUDGET="${LLM_REASONING_BUDGET:-0}"
 SUBPOPULATION_TWO_STAGE="${SUBPOPULATION_TWO_STAGE:-1}"
 SUBPOPULATION_TWO_STAGE_WORKERS="${SUBPOPULATION_TWO_STAGE_WORKERS:-2}"
 COHORT_PROMPT_SCHEMA_SYNC_LLM_WORKERS="${COHORT_PROMPT_SCHEMA_SYNC_LLM_WORKERS:-2}"
@@ -683,7 +684,7 @@ fi
 
 PROMPTS_SRC="${PDF_EXTRACT_PROMPTS:-prompts/prompts_cohort.toml}"
 DYNAMIC_RUNTIME_FLAG="$(printf '%s' "${COHORT_DYNAMIC_EMX2_RUNTIME:-1}" | tr '[:upper:]' '[:lower:]')"
-DYNAMIC_PROMPTS_FLAG="$(printf '%s' "${COHORT_DYNAMIC_PROMPTS:-1}" | tr '[:upper:]' '[:lower:]')"
+DYNAMIC_PROMPTS_FLAG="$(printf '%s' "${COHORT_DYNAMIC_PROMPTS:-0}" | tr '[:upper:]' '[:lower:]')"
 PROMPTS_OPTIONAL=0
 if flag_enabled "$DYNAMIC_RUNTIME_FLAG"; then
   if flag_enabled "$DYNAMIC_PROMPTS_FLAG"; then
@@ -1220,15 +1221,19 @@ rr = itertools.cycle(BACKENDS)
 def choose_backend():
     for _ in range(len(BACKENDS) * 2):
         target = next(rr)
+        s = None
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(0.5)
             s.connect(target)
             s.close()
             return target
-        except:
-            try: s.close()
-            except: pass
+        except OSError:
+            if s is not None:
+                try:
+                    s.close()
+                except OSError:
+                    pass
             time.sleep(0.05)
     return BACKENDS[0]
 
@@ -1252,15 +1257,18 @@ def handle_conn(client_sock):
                 if not data:
                     break
                 client_sock.sendall(data)
-    except:
+    except OSError:
         pass
     finally:
-        try: client_sock.close()
-        except: pass
+        try:
+            client_sock.close()
+        except OSError:
+            pass
         try:
             if server_sock is not None:
                 server_sock.close()
-        except: pass
+        except OSError:
+            pass
 
 def main():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
