@@ -125,18 +125,43 @@ def _serialize_text_field(value: Any) -> str:
     return _serialize_value(value)
 
 
-def _serialize_multi_value(value: Any) -> str:
-    """Serialize list-like values as comma-separated scalars (never JSON array text)."""
+def _parse_array_items_loose(value: Any) -> List[Any]:
+    """Parse list-like payloads and tolerate semicolon/newline-delimited strings."""
     raw_items = legacy_types._parse_array_items(value)
     if raw_items is None:
-        return _serialize_value(value)
+        if value is None:
+            return []
+        text = str(value).strip()
+        if not text:
+            return []
+        return [text]
+
+    if len(raw_items) == 1 and isinstance(raw_items[0], str):
+        text = str(raw_items[0]).strip()
+        if text and any(sep in text for sep in (";", "\n", "|")):
+            return [part.strip() for part in re.split(r"[;\n|]+", text) if part.strip()]
+    return raw_items
+
+
+def _clean_ref_token(value: Any) -> str:
+    scalar = legacy_types._extract_ref_scalar(value)
+    if not scalar:
+        scalar = legacy_types._extract_ontology_scalar(value)
+    else:
+        scalar = legacy_types._extract_ontology_scalar(scalar)
+    return str(scalar or "").strip()
+
+
+def _serialize_multi_value(value: Any) -> str:
+    """Serialize list-like values as comma-separated scalars (never JSON array text)."""
+    raw_items = _parse_array_items_loose(value)
+    if not raw_items:
+        return ""
 
     items: List[str] = []
     seen: set[str] = set()
     for raw in raw_items:
-        scalar = legacy_types._extract_ontology_scalar(raw)
-        if not scalar:
-            scalar = str(raw or "").strip()
+        scalar = _clean_ref_token(raw)
         if not scalar or scalar in seen:
             continue
         seen.add(scalar)
@@ -285,7 +310,7 @@ def _task_cfg_json_map(task_cfg: Dict[str, Any], key: str) -> Dict[str, str]:
         return {}
     try:
         parsed = json.loads(text)
-    except Exception:
+    except json.JSONDecodeError:
         return {}
     if not isinstance(parsed, dict):
         return {}
@@ -385,25 +410,32 @@ def _serialize_runtime_array_value(
     meta: Dict[str, Any],
     value: Any,
 ) -> str:
-    raw_items = legacy_types._parse_array_items(value)
-    if raw_items is None:
-        return _serialize_value(value)
+    raw_items = _parse_array_items_loose(value)
+    if not raw_items:
+        return ""
 
     column_type = str(meta.get("column_type") or "").strip()
     allowed_values = _registry_allowed_values(meta)
+    allowed_lookup = {item.casefold(): item for item in allowed_values}
     items: List[str] = []
     seen: set[str] = set()
     for raw in raw_items:
         if column_type == "ref_array":
-            scalar = legacy_types._extract_ref_scalar(raw)
+            scalar = _clean_ref_token(raw)
         else:
             scalar = legacy_types._extract_ontology_scalar(raw)
             if not scalar:
                 scalar = str(raw or "").strip()
         if not scalar or scalar in seen:
             continue
-        if allowed_values and scalar not in allowed_values:
-            continue
+        if allowed_values:
+            if scalar in allowed_values:
+                pass
+            else:
+                mapped = allowed_lookup.get(scalar.casefold())
+                if not mapped:
+                    continue
+                scalar = mapped
         seen.add(scalar)
         items.append(scalar)
 
@@ -542,6 +574,64 @@ def _normalize_org_ref_key(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", "", str(value or "").strip().lower())
 
 
+def _slugify_identifier(value: Any) -> str:
+    token = re.sub(r"[^a-z0-9]+", "-", str(value or "").strip().lower()).strip("-")
+    return token[:80]
+
+
+def _ensure_organisation_ids(
+    organisations: List[Dict[str, Any]],
+    *,
+    paper_label: str,
+    pdf_path: str,
+    issues: List[Dict[str, Any]],
+) -> None:
+    """Guarantee every organisation contributor has a stable local ID."""
+    used_ids: set[str] = set()
+    for item in organisations:
+        if not isinstance(item, dict) or not _is_organisation_contributor(item):
+            continue
+        existing = str(item.get("id") or "").strip()
+        if existing:
+            used_ids.add(existing)
+
+    for idx, item in enumerate(organisations, start=1):
+        if not isinstance(item, dict) or not _is_organisation_contributor(item):
+            continue
+        existing = str(item.get("id") or "").strip()
+        if existing:
+            continue
+
+        seed = (
+            item.get("name")
+            or item.get("organisation")
+            or item.get("acronym")
+            or item.get("other_organisation")
+            or f"organisation-{idx}"
+        )
+        base_id = _slugify_identifier(seed) or f"organisation-{idx}"
+        candidate = base_id
+        suffix = 2
+        while candidate in used_ids:
+            candidate = f"{base_id}-{suffix}"
+            suffix += 1
+
+        item["id"] = candidate
+        used_ids.add(candidate)
+        issues.append(
+            {
+                "paper": paper_label,
+                "pdf_path": pdf_path,
+                "severity": "warning",
+                "kind": "generated_organisation_id",
+                "message": (
+                    "Contributor organisation had no explicit id; "
+                    f"generated local id '{candidate}'."
+                ),
+            }
+        )
+
+
 def _build_local_organisation_ref_map(organisations: List[Dict[str, Any]]) -> Dict[str, str]:
     """
     Build a local name->id map so cross-sheet references always use Organisation IDs.
@@ -647,7 +737,7 @@ def _env_int(name: str, default: int) -> int:
     raw = str(os.environ.get(name, str(default))).strip()
     try:
         return int(raw)
-    except Exception:
+    except (TypeError, ValueError):
         return default
 
 
@@ -721,7 +811,7 @@ def _resource_row_from_sections(
         "pid": _normalize_identifier_value(overview.get("pid")),
         "name": str(overview.get("name") or label),
         "acronym": _serialize_value(overview.get("acronym")),
-        "type": _serialize_value(_normalize_or_infer_resource_types(overview)),
+        "type": _serialize_multi_value(_normalize_or_infer_resource_types(overview)),
         "cohort type": _serialize_value(overview.get("cohort_type")),
         "website": _serialize_value(overview.get("website")),
         "description": _serialize_value(overview.get("description")),
@@ -980,7 +1070,7 @@ def cli() -> None:
                 len(dynamic_registry.get("sources", {})),
                 "on" if dynamic_prompt_generation_enabled else "off",
             )
-        except Exception as e:
+        except (OSError, ValueError, TypeError, KeyError, RuntimeError, json.JSONDecodeError) as e:
             dynamic_runtime_enabled = False
             dynamic_registry = None
             dynamic_prompt_summary = {}
@@ -990,7 +1080,7 @@ def cli() -> None:
         try:
             write_task_prompts_toml(cfg, f"{args.output}.dynamic_prompts.toml")
             log.info("Wrote dynamic prompts TOML: %s.dynamic_prompts.toml", args.output)
-        except Exception as e:
+        except OSError as e:
             log.warning("Could not write dynamic prompts TOML: %s", e)
 
     llm_cfg = cfg["llm"]
@@ -1004,7 +1094,7 @@ def cli() -> None:
 
     client = OpenAICompatibleClient(
         base_url=llm_cfg.get("base_url", "http://127.0.0.1:8080/v1"),
-        api_key=llm_cfg.get("api_key", "sk-local"),
+        api_key=str(llm_cfg.get("api_key") or os.environ.get("LLM_API_KEY", "")),
         model=llm_cfg.get("model", "numind/NuExtract-2.0-8B"),
         use_grammar=bool(llm_cfg.get("use_grammar", False)),
         use_session=bool(llm_cfg.get("sticky_session", False)),
@@ -1218,6 +1308,7 @@ def cli() -> None:
                 "message": "Combined resource row has no payload after extraction.",
             })
 
+        overview = per_section_results.get("task_overview", {}) or {}
         resource_row, resource_ref = _resource_row_from_sections(label, pdf_path, per_section_results, run_issues)
         resource_rows.append(resource_row)
         if dynamic_registry:
@@ -1226,9 +1317,10 @@ def cli() -> None:
                 collection_row = _project_row_to_columns(resource_row, collection_columns)
                 if "resource" in collection_row and not str(collection_row.get("resource") or "").strip():
                     collection_row["resource"] = resource_ref
+                if "type" in collection_row and not str(collection_row.get("type") or "").strip():
+                    collection_row["type"] = _serialize_multi_value(_normalize_or_infer_resource_types(overview))
                 collection_rows.append(collection_row)
 
-        overview = per_section_results.get("task_overview", {}) or {}
         internal_ids = overview.get("internal_identifiers", []) or []
         external_ids = overview.get("external_identifiers", []) or []
 
@@ -1301,6 +1393,8 @@ def cli() -> None:
                 "access rights": _serialize_value(sub.get("access_rights")),
                 "applicable legislation": _serialize_value(sub.get("applicable_legislation")),
             })
+            if not str(row.get("resource") or "").strip():
+                row["resource"] = resource_ref
             subpopulation_rows.append(row)
 
             count_rows.extend(
@@ -1371,6 +1465,12 @@ def cli() -> None:
         contributors = per_section_results.get("task_contributors", {}) or {}
         organisations = contributors.get("organisations_involved", []) or []
         people = contributors.get("people_involved", []) or []
+        _ensure_organisation_ids(
+            [item for item in organisations if isinstance(item, dict)],
+            paper_label=label,
+            pdf_path=pdf_path,
+            issues=run_issues,
+        )
         org_ref_map = _build_local_organisation_ref_map(
             [item for item in organisations if isinstance(item, dict)]
         )
@@ -1658,7 +1758,7 @@ def cli() -> None:
                 "on" if dynamic_ontology_llm_fallback else "off",
                 dynamic_ontology_llm_threshold,
             )
-        except Exception as e:
+        except (OSError, ValueError, TypeError, KeyError, RuntimeError, json.JSONDecodeError) as e:
             log.warning("Could not normalize workbook with dynamic EMX2 runtime: %s", e)
             schema_xlsx = _resolve_schema_xlsx(args.schema_xlsx)
             if schema_xlsx:
@@ -1671,7 +1771,7 @@ def cli() -> None:
                         ref_organisations_csv=ref_organisations_csv,
                     )
                     log.info("Fell back to legacy schema-based datatype normalization using %s", schema_xlsx)
-                except Exception as inner_e:
+                except (OSError, ValueError, TypeError, RuntimeError) as inner_e:
                     log.warning("Legacy fallback normalization also failed with schema %s: %s", schema_xlsx, inner_e)
     else:
         schema_xlsx = _resolve_schema_xlsx(args.schema_xlsx)
@@ -1689,7 +1789,7 @@ def cli() -> None:
                     log.info("Applied organisation ontology mapping using %s", ref_organisations_csv)
                 else:
                     log.info("No Organisations.csv found; skipping organisation ontology mapping.")
-            except Exception as e:
+            except (OSError, ValueError, TypeError, RuntimeError) as e:
                 log.warning("Could not normalize workbook datatypes with schema %s: %s", schema_xlsx, e)
         else:
             log.warning("No schema workbook found; skipping datatype normalization.")
@@ -1698,19 +1798,19 @@ def cli() -> None:
         try:
             write_json(f"{args.output}.dynamic_emx2_registry.json", dynamic_registry)
             log.info("Wrote dynamic EMX2 registry: %s.dynamic_emx2_registry.json", args.output)
-        except Exception as e:
+        except (OSError, TypeError, ValueError) as e:
             log.warning("Could not write dynamic EMX2 registry dump: %s", e)
         try:
             write_json(f"{args.output}.dynamic_prompt_constraints.json", dynamic_prompt_summary)
             log.info("Wrote dynamic prompt constraints: %s.dynamic_prompt_constraints.json", args.output)
-        except Exception as e:
+        except (OSError, TypeError, ValueError) as e:
             log.warning("Could not write dynamic prompt constraints dump: %s", e)
 
     try:
         with open(issue_file, "w", encoding="utf-8") as f:
             json.dump(run_issues, f, ensure_ascii=False, indent=2)
         log.info("Wrote issues report: %s", issue_file)
-    except Exception as e:
+    except (OSError, TypeError, ValueError) as e:
         log.warning("Could not write issues report %s: %s", issue_file, e)
 
     log.info("Done. Cohort workbook written to %s", args.output)

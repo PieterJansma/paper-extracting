@@ -197,7 +197,7 @@ def _resolve_choice_with_llm(
         choice = payload.get("choice")
         if isinstance(choice, str) and choice in candidates:
             return choice
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, KeyError, json.JSONDecodeError):
         return None
     return None
 

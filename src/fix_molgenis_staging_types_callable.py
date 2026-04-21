@@ -455,13 +455,13 @@ def parse_list_like(value: Any) -> list[str] | None:
             data = json.loads(s)
             if isinstance(data, list):
                 return [str(x).strip() for x in data if str(x).strip()]
-        except Exception:
+        except json.JSONDecodeError:
             pass
         try:
             data = ast.literal_eval(s)
             if isinstance(data, list):
                 return [str(x).strip() for x in data if str(x).strip()]
-        except Exception:
+        except (ValueError, SyntaxError):
             pass
 
     if "," in s:
@@ -540,13 +540,13 @@ def _parse_array_items(value: Any) -> list[Any] | None:
             data = json.loads(s)
             if isinstance(data, list):
                 return data
-        except Exception:
+        except json.JSONDecodeError:
             pass
         try:
             data = ast.literal_eval(s)
             if isinstance(data, list):
                 return data
-        except Exception:
+        except (ValueError, SyntaxError):
             pass
 
     # CSV-style parsing to preserve commas inside quoted values.
@@ -558,7 +558,7 @@ def _parse_array_items(value: Any) -> list[Any] | None:
         row = next(reader, None)
         if row is not None and len(row) > 1:
             return [part for part in row]
-    except Exception:
+    except (csv.Error, OSError):
         pass
 
     if "," in s:
@@ -726,7 +726,7 @@ def _extract_ref_scalar(value: Any) -> str:
         if s.startswith("{") and s.endswith("}"):
             try:
                 parsed = json.loads(s)
-            except Exception:
+            except json.JSONDecodeError:
                 return s
             return _extract_ref_scalar(parsed)
         return s
@@ -1099,7 +1099,7 @@ def _extract_ontology_scalar(value: Any) -> str:
                             return scalar
                     return ""
                 return _extract_ontology_scalar(parsed)
-            except Exception:
+            except json.JSONDecodeError:
                 pass
 
         # Handle partially broken wrappers, e.g. 'Data access provider"]' or '["Data provider'.

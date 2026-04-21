@@ -13,6 +13,7 @@ import tempfile
 from typing import Optional, Dict, Any, List, Tuple, Union
 
 from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 import requests
 
 from llm_client import OpenAICompatibleClient
@@ -332,7 +333,7 @@ def _load_pdf_text_pypdf(
 ) -> str:
     try:
         reader = PdfReader(path)
-    except Exception as e:
+    except (OSError, PdfReadError, ValueError) as e:
         log.error("Failed to read PDF %r: %s", path, e)
         return ""
 
@@ -349,7 +350,7 @@ def _load_pdf_text_pypdf(
                 extracted = p.extract_text()
             if extracted:
                 texts.append(extracted)
-        except Exception as e:
+        except (OSError, RuntimeError, TypeError, ValueError) as e:
             log.warning("Page %d could not be extracted: %s", i + 1, e)
     return "\n\n".join(texts)
 
@@ -599,13 +600,13 @@ def _render_pdf_pages_to_png_pdfium(path: str, page_limit: Optional[int]) -> Lis
             finally:
                 try:
                     page.close()
-                except Exception:
-                    pass
+                except (OSError, RuntimeError, AttributeError) as e:
+                    log.debug("Could not close rendered PDF page %d for %s: %s", i + 1, path, e)
         try:
             doc.close()
-        except Exception:
-            pass
-    except Exception as e:
+        except (OSError, RuntimeError, AttributeError) as e:
+            log.debug("Could not close rendered PDF document for %s: %s", path, e)
+    except (OSError, RuntimeError, ValueError) as e:
         log.warning("Vision OCR render with pypdfium2 failed for %s: %s", path, e)
         return []
 
@@ -687,7 +688,7 @@ def _json_load_stripping_fences(s: str) -> Dict[str, Any]:
     t = _strip_markdown_fences(s)
 
     # Sometimes models prepend text. Try to find the first JSON object.
-    # (Conservatief: alleen objecten, geen arrays.)
+    # Conservative: objects only, no arrays.
     if not t.startswith("{"):
         m = re.search(r"\{", t)
         if m:
@@ -711,7 +712,7 @@ def _json_load_stripping_fences(s: str) -> Dict[str, Any]:
                 sum(len(v) for v in salvaged.values() if isinstance(v, list)),
             )
             return salvaged
-        # Dit is belangrijk om te zien waarom passes "leeg" lijken.
+        # This is important for debugging why passes may look "empty".
         log.warning("JSON decode failed (%s). Raw head: %r", e, t[:400])
         return {}
 
@@ -1134,7 +1135,7 @@ def extract_fields(
                 extra_body={"cache_prompt": True} if cache_prompt else None,
                 timeout=int(timeout),
             )
-        except Exception as e:
+        except (requests.RequestException, RuntimeError, ValueError, TypeError, KeyError, json.JSONDecodeError) as e:
             log.error("LLM Call failed: %s", e)
             had_llm_error = True
             had_context_overflow = _is_context_overflow_error(e)
@@ -1168,7 +1169,7 @@ def extract_fields(
                 retry_parsed = _json_load_stripping_fences(retry_raw)
                 if retry_parsed:
                     parsed = retry_parsed
-            except Exception as e:
+            except (requests.RequestException, RuntimeError, ValueError, TypeError, KeyError, json.JSONDecodeError) as e:
                 log.warning("Retry after invalid JSON failed: %s", e)
 
         parsed = _normalize_values(parsed)

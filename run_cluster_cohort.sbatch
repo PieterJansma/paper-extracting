@@ -15,17 +15,17 @@ set -euo pipefail
 cd "${SLURM_SUBMIT_DIR:-$PWD}"
 
 if [[ ! -f "src/run_cluster_cohort.sh" ]]; then
-  echo "ERROR: src/run_cluster_cohort.sh niet gevonden in ${PWD}"
+  echo "ERROR: src/run_cluster_cohort.sh not found in ${PWD}"
   exit 1
 fi
 
-# Live EMX2 defaults (kan je overschrijven via sbatch --export=...).
+# Live EMX2 defaults (override with sbatch --export=...).
 export MOLGENIS_EMX2_REPO="${MOLGENIS_EMX2_REPO:-molgenis/molgenis-emx2}"
 export MOLGENIS_EMX2_REF="${MOLGENIS_EMX2_REF:-main}"
 export EMX2_PROFILE="${EMX2_PROFILE:-UMCGCohortsStaging}"
 export AUTO_FETCH_EMX2_ONTOLOGIES="${AUTO_FETCH_EMX2_ONTOLOGIES:-1}"
 
-# Geen args meegegeven? Gebruik een veilige standaardrun.
+# No args passed? Use a safe default run.
 if [[ $# -gt 0 ]]; then
   RUN_ARGS=("$@")
 else

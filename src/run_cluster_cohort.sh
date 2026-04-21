@@ -43,8 +43,8 @@ STATUS_LOG="${RUN_DIR}/status.jsonl"
 # Sync destination:
 # - If LOCAL_RSYNC_HOST is empty, destination is interpreted on the cluster node.
 # - If LOCAL_RSYNC_HOST is set, destination is interpreted on that remote host.
-LOCAL_RSYNC_DEST="/Users/p.jansma/Documents/cluster_data/"
-LOCAL_RSYNC_HOST=""
+LOCAL_RSYNC_DEST="${LOCAL_RSYNC_DEST:-}"
+LOCAL_RSYNC_HOST="${LOCAL_RSYNC_HOST:-}"
 SYNC_OUTPUT_ENABLE="${SYNC_OUTPUT_ENABLE:-1}"
 SYNC_REQUIRED="${SYNC_REQUIRED:-0}"
 
@@ -136,7 +136,7 @@ for ((i=0; i<${#INPUT_ARGS[@]}; i++)); do
     --ocr-dump-dir)
       OCR_DUMP_COMPARE=1
       if (( i + 1 >= ${#INPUT_ARGS[@]} )); then
-        echo "❌ ERROR: --ocr-dump-dir vereist een pad."
+        echo "❌ ERROR: --ocr-dump-dir requires a directory path."
         exit 1
       fi
       i=$((i + 1))
@@ -315,12 +315,12 @@ push_prompt_schema_diff_to_git() {
     return 0
   fi
   if [[ ! -f "$diff_file" ]]; then
-    echo "⚠️  Git push overgeslagen: prompt diff ontbreekt: $diff_file"
+    echo "⚠️  Git push skipped: prompt diff missing: $diff_file"
     status_event "warning" "git push skipped; prompt diff missing"
     return 0
   fi
   if ! command -v git >/dev/null 2>&1; then
-    echo "⚠️  Git push overgeslagen: git niet beschikbaar."
+    echo "⚠️  Git push skipped: git not available."
     status_event "warning" "git push skipped; git not available"
     return 0
   fi
@@ -328,7 +328,7 @@ push_prompt_schema_diff_to_git() {
   local repo_root
   repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
   if [[ -z "$repo_root" ]]; then
-    echo "⚠️  Git push overgeslagen: geen git repository gevonden."
+    echo "⚠️  Git push skipped: no git repository found."
     status_event "warning" "git push skipped; not inside git repository"
     return 0
   fi
@@ -364,13 +364,13 @@ push_prompt_schema_diff_to_git() {
     git add -- "$push_rel"
     if [[ -n "$baseline_rel" ]]; then
       if git diff --cached --quiet -- "$push_rel" "$baseline_rel"; then
-        echo "  Git push: geen nieuwe wijzigingen voor ${push_rel}"
+        echo "  Git push: no new changes for ${push_rel}"
         exit 0
       fi
       git commit -m "$commit_msg" -- "$push_rel" "$baseline_rel" >/dev/null
     else
       if git diff --cached --quiet -- "$push_rel"; then
-        echo "  Git push: geen nieuwe wijzigingen voor ${push_rel}"
+        echo "  Git push: no new changes for ${push_rel}"
         exit 0
       fi
       git commit -m "$commit_msg" -- "$push_rel" >/dev/null
@@ -381,7 +381,7 @@ push_prompt_schema_diff_to_git() {
       git push "$COHORT_PROMPT_SCHEMA_PUSH_REMOTE" HEAD >/dev/null
     fi
   )
-  echo "  Prompt wijziging gepusht naar git: ${push_rel}"
+  echo "  Prompt change pushed to git: ${push_rel}"
   status_event "prompt_schema_sync_git_pushed" "prompt change pushed to git at ${push_rel}"
 }
 
@@ -576,7 +576,7 @@ PY
   fi
 
   if [[ "$rc" == "2" ]]; then
-    echo "❌ Ontbrekende ontology allowed-values gedetecteerd. Zie: $report_txt"
+    echo "❌ Missing ontology allowed-values detected. See: $report_txt"
     status_event "warning" "missing ontology allowed-values detected"
     if [[ "$EMX2_REQUIRED_PATHS_STRICT" == "1" ]]; then
       status_event "failed" "missing ontology allowed-values; aborting run"
@@ -585,7 +585,7 @@ PY
     return 0
   fi
 
-  echo "⚠️  EMX2 preflight check kon niet worden uitgevoerd (exit=$rc)."
+  echo "⚠️  EMX2 preflight check could not be executed (exit=$rc)."
   status_event "warning" "emx2 preflight check failed (exit=${rc})"
   if [[ "$EMX2_REQUIRED_PATHS_STRICT" == "1" ]]; then
     status_event "failed" "emx2 preflight check failed; aborting run"
@@ -635,8 +635,8 @@ if [[ -f ".venv/bin/activate" ]]; then
   echo "[Setup] Activating Virtual Environment (.venv)..."
   source .venv/bin/activate
 else
-  echo "❌ ERROR: Geen .venv gevonden!"
-  echo "   Maak er een aan met:"
+  echo "❌ ERROR: No .venv found!"
+  echo "   Create one with:"
   echo "   module load Python/3.10.4-GCCcore-11.3.0"
   echo "   python3 -m venv .venv"
   echo "   source .venv/bin/activate"
@@ -645,7 +645,7 @@ else
 fi
 
 if [[ ! -x "$LLAMA_BIN" ]]; then
-  echo "❌ ERROR: llama-server niet gevonden op $LLAMA_BIN"
+  echo "❌ ERROR: llama-server not found at $LLAMA_BIN"
   exit 1
 fi
 
@@ -661,7 +661,7 @@ if llama_supports_flag "--reasoning-budget"; then
     echo "[LLM] Thinking disabled via --reasoning-budget=0"
   else
     LLM_SERVER_EXTRA_ARGS+=(--reasoning-budget "$LLM_REASONING_BUDGET")
-    echo "[LLM] Reasoning budget ingesteld via --reasoning-budget=${LLM_REASONING_BUDGET}"
+    echo "[LLM] Reasoning budget set via --reasoning-budget=${LLM_REASONING_BUDGET}"
   fi
 elif flag_enabled "$LLM_DISABLE_THINKING"; then
   if llama_supports_flag "--chat-template-kwargs"; then
@@ -671,13 +671,13 @@ elif flag_enabled "$LLM_DISABLE_THINKING"; then
     LLM_SERVER_EXTRA_ARGS+=(--reasoning-format none)
     echo "[LLM] Thinking-disable fallback via --reasoning-format none"
   else
-    echo "[LLM] Waarschuwing: geen bekende thinking-disable flags gevonden in deze llama-server build."
+    echo "[LLM] Warning: no known thinking-disable flags found in this llama-server build."
   fi
 fi
 
 if [[ ! -f "config.cohort.toml" ]]; then
-  echo "❌ ERROR: config.cohort.toml ontbreekt in ${PWD}"
-  echo "   main_cohort.py verwacht standaard config.cohort.toml (of zet PDF_EXTRACT_CONFIG)"
+  echo "❌ ERROR: config.cohort.toml is missing in ${PWD}"
+  echo "   main_cohort.py expects config.cohort.toml by default (or set PDF_EXTRACT_CONFIG)"
   exit 1
 fi
 
@@ -692,16 +692,16 @@ if flag_enabled "$DYNAMIC_RUNTIME_FLAG"; then
 fi
 if [[ ! -f "$PROMPTS_SRC" ]]; then
   if [[ "$PROMPTS_OPTIONAL" == "1" ]]; then
-    echo "ℹ️  Geen prompts bestand gevonden; main_cohort.py genereert de task-prompts dynamisch uit EMX2."
+    echo "ℹ️  No prompts file found; main_cohort.py will generate task prompts dynamically from EMX2."
     PROMPTS_SRC=""
   else
-    echo "❌ ERROR: prompts bestand ontbreekt: $PROMPTS_SRC"
-    echo "   Zet PDF_EXTRACT_PROMPTS of plaats prompts/prompts_cohort.toml in ${PWD}"
+    echo "❌ ERROR: prompts file missing: $PROMPTS_SRC"
+    echo "   Set PDF_EXTRACT_PROMPTS or place prompts/prompts_cohort.toml in ${PWD}"
     exit 1
   fi
 fi
 
-echo "[0/4] Runtime config maken met base_url via Load Balancer..."
+echo "[0/4] Creating runtime config with base_url via Load Balancer..."
 RUNTIME_CFG="${RUN_DIR}/config.runtime.toml"
 cp -f "config.cohort.toml" "$RUNTIME_CFG"
 RUNTIME_PROMPTS=""
@@ -762,7 +762,7 @@ if [[ "$OCR_DUMP_COMPARE" == "1" ]]; then
 fi
 
 if [[ "$OCR_FORCE_USE_PREFETCH" == "1" ]]; then
-  echo "[OCR] OCR_FORCE_USE_PREFETCH=1: prefetched OCR text krijgt voorrang op pypdf."
+  echo "[OCR] OCR_FORCE_USE_PREFETCH=1: prefetched OCR text takes precedence over pypdf."
 fi
 
 pids=()
@@ -775,7 +775,7 @@ PDF_TARGETS=()
 cleanup() {
   local exit_code=$?
   echo
-  echo "[CLEANUP] Stoppen..."
+  echo "[CLEANUP] Stopping..."
   if [[ -n "${OCR_PID}" ]]; then
     kill "${OCR_PID}" 2>/dev/null || true
   fi
@@ -797,7 +797,7 @@ start_server() {
   local gpu="$1" model="$2" port="$3" log="$4"
   local model_name
   model_name="$(basename "$model")"
-  echo "[START] Model ${model_name} op GPU ${gpu} (Poort ${port})..."
+  echo "[START] Model ${model_name} on GPU ${gpu} (Port ${port})..."
   CUDA_VISIBLE_DEVICES="$gpu" nohup "$LLAMA_BIN" \
     -m "$model" -fa on \
     -ngl "$NGL" -c "$CTX" --parallel "$SLOTS" \
@@ -809,7 +809,7 @@ start_server() {
 
 wait_health_ok() {
   local port="$1"
-  echo -n "  ⏳ Wachten tot /health status=ok op poort $port"
+  echo -n "  ⏳ Waiting for /health status=ok on port $port"
 
   for i in {1..600}; do
     if curl -sS -m 5 "http://127.0.0.1:${port}/health" \
@@ -846,9 +846,9 @@ PY
     return 0
   fi
 
-  echo "❌ ERROR: OCR_VLM_ENABLE=1, maar geen PDF page renderer beschikbaar."
-  echo "   Installeer in .venv: pip3 install pypdfium2 pillow"
-  echo "   Of zorg dat pdftoppm in PATH staat."
+  echo "❌ ERROR: OCR_VLM_ENABLE=1, but no PDF page renderer is available."
+  echo "   Install in .venv: pip3 install pypdfium2 pillow"
+  echo "   Or ensure pdftoppm is available in PATH."
   exit 1
 }
 
@@ -858,19 +858,19 @@ start_ocr_server_if_enabled() {
   fi
 
   if [[ ! -x "$OCR_VLM_LLAMA_BIN" ]]; then
-    echo "❌ ERROR: OCR llama-server niet gevonden op $OCR_VLM_LLAMA_BIN"
+    echo "❌ ERROR: OCR llama-server not found at $OCR_VLM_LLAMA_BIN"
     exit 1
   fi
 
   if [[ -z "$OCR_VLM_MODEL_PATH" ]]; then
-    echo "❌ ERROR: OCR_VLM_ENABLE=1 maar OCR_VLM_MODEL_PATH is leeg."
-    echo "   Bijvoorbeeld:"
+    echo "❌ ERROR: OCR_VLM_ENABLE=1 but OCR_VLM_MODEL_PATH is empty."
+    echo "   For example:"
     echo "   export OCR_VLM_MODEL_PATH=/path/to/vision-model.gguf"
     exit 1
   fi
 
   if [[ ! -f "$OCR_VLM_MODEL_PATH" ]]; then
-    echo "❌ ERROR: OCR model niet gevonden: $OCR_VLM_MODEL_PATH"
+    echo "❌ ERROR: OCR model not found: $OCR_VLM_MODEL_PATH"
     exit 1
   fi
 
@@ -917,7 +917,7 @@ start_ocr_server_if_enabled() {
 
   if [[ -n "$OCR_VLM_MMPROJ_PATH" ]]; then
     if [[ ! -f "$OCR_VLM_MMPROJ_PATH" ]]; then
-      echo "❌ ERROR: OCR mmproj niet gevonden: $OCR_VLM_MMPROJ_PATH"
+      echo "❌ ERROR: OCR mmproj not found: $OCR_VLM_MMPROJ_PATH"
       exit 1
     fi
     cmd+=(--mmproj "$OCR_VLM_MMPROJ_PATH")
@@ -935,19 +935,19 @@ start_ocr_server_if_enabled() {
         if supports_flag "--main-gpu"; then
           cmd+=(--main-gpu "$OCR_VLM_MAIN_GPU")
         fi
-        echo "[OCR] Multi-GPU tensor split actief: tensor_split=$split split_mode=$OCR_VLM_SPLIT_MODE main_gpu=$OCR_VLM_MAIN_GPU"
+        echo "[OCR] Multi-GPU tensor split active: tensor_split=$split split_mode=$OCR_VLM_SPLIT_MODE main_gpu=$OCR_VLM_MAIN_GPU"
       else
-        echo "[OCR] Waarschuwing: OCR llama-server ondersteunt --tensor-split niet. OCR kan dan vooral op 1 GPU draaien."
+        echo "[OCR] Warning: OCR llama-server does not support --tensor-split. OCR may then run mostly on one GPU."
       fi
     fi
   fi
 
-  echo "[OCR] Starten vision OCR server op poort $OCR_VLM_PORT..."
+  echo "[OCR] Starting vision OCR server on port $OCR_VLM_PORT..."
   if [[ -n "$OCR_VLM_GPU" ]]; then
     echo "[OCR] CUDA_VISIBLE_DEVICES=$OCR_VLM_GPU"
     CUDA_VISIBLE_DEVICES="$OCR_VLM_GPU" nohup "${cmd[@]}" >>"$LOG_DIR/ocr.log" 2>&1 &
   else
-    echo "[OCR] Geen OCR_VLM_GPU gezet; starten zonder GPU pinning."
+    echo "[OCR] No OCR_VLM_GPU set; starting without GPU pinning."
     nohup "${cmd[@]}" >>"$LOG_DIR/ocr.log" 2>&1 &
   fi
   OCR_PID=$!
@@ -1048,7 +1048,7 @@ run_ocr_prefetch_if_enabled() {
     resolve_pdf_targets
   fi
   if [[ ${#PDF_TARGETS[@]} -eq 0 ]]; then
-    echo "[OCR] Geen PDF targets gevonden; skip OCR prefetch."
+    echo "[OCR] No PDF targets found; skipping OCR prefetch."
     OCR_VLM_ENABLE=0
     status_event "ocr_prefetch_skipped" "no PDF targets resolved for OCR prefetch"
     return 0
@@ -1060,10 +1060,10 @@ run_ocr_prefetch_if_enabled() {
   check_ocr_render_deps
 
   if [[ "$OCR_FORCE_ALL" == "1" ]]; then
-    echo "[OCR] --ocr actief: force OCR voor alle geselecteerde PDFs."
+    echo "[OCR] --ocr active: forcing OCR for all selected PDFs."
     printf '%s\n' "${PDF_TARGETS[@]}" > "$WEAK_PDFS_FILE"
   else
-  echo "[OCR] Scannen welke PDFs echt OCR nodig hebben..."
+  echo "[OCR] Scanning which PDFs actually need OCR..."
   PYTHONPATH=src PDF_TARGET_FILE="${LOG_DIR}/pdf_targets.txt" WEAK_PDFS_FILE="$WEAK_PDFS_FILE" python3 - <<'PY'
 from pathlib import Path
 import os
@@ -1090,13 +1090,13 @@ PY
   local weak_count
   weak_count="$(count_nonempty_lines "$WEAK_PDFS_FILE")"
   if [[ "${weak_count:-0}" -eq 0 ]]; then
-    echo "[OCR] Geen zwakke PDFs gevonden; OCR server wordt niet gestart."
+    echo "[OCR] No weak PDFs found; OCR server will not be started."
     OCR_VLM_ENABLE=0
     status_event "ocr_prefetch_skipped" "no weak PDFs needed OCR prefetch"
     return 0
   fi
 
-  echo "[OCR] Zwakke PDFs: $weak_count. OCR prefetch start..."
+  echo "[OCR] Weak PDFs: $weak_count. Starting OCR prefetch..."
   status_event "ocr_prefetch_running" "prefetching OCR text for weak PDFs"
   mkdir -p "$OCR_PREFETCH_DIR"
   start_ocr_server_if_enabled
@@ -1144,7 +1144,7 @@ PY
   fi
   unset OCR_VLM_BASE_URL OCR_VLM_MODEL
   export OCR_PREFETCH_DIR
-  echo "[OCR] Prefetch klaar. OCR_PREFETCH_DIR=$OCR_PREFETCH_DIR"
+  echo "[OCR] Prefetch complete. OCR_PREFETCH_DIR=$OCR_PREFETCH_DIR"
   status_event "ocr_prefetch_completed" "OCR prefetch completed"
 
   # Prevent starting live OCR server concurrently with Qwen servers.
@@ -1153,15 +1153,15 @@ PY
 
 warmup_chat() {
   local port="$1"
-  echo "  🔥 Warmup chat op poort $port..."
+  echo "  🔥 Warmup chat on port $port..."
   local payload
-  payload='{"model":"local","messages":[{"role":"user","content":"Warmup: antwoord met OK."}],"temperature":0.0,"max_tokens":32}'
+  payload='{"model":"local","messages":[{"role":"user","content":"Warmup: reply with OK."}],"temperature":0.0,"max_tokens":32}'
   curl -sS -m 60 \
     -H "Content-Type: application/json" \
     -d "$payload" \
     "http://127.0.0.1:${port}/v1/chat/completions" >/dev/null 2>&1 || true
 
-  payload='{"model":"local","messages":[{"role":"user","content":"Warmup 2: korte test."}],"temperature":0.0,"max_tokens":32}'
+  payload='{"model":"local","messages":[{"role":"user","content":"Warmup 2: short test."}],"temperature":0.0,"max_tokens":32}'
   curl -sS -m 60 \
     -H "Content-Type: application/json" \
     -d "$payload" \
@@ -1170,7 +1170,7 @@ warmup_chat() {
 
 wait_lb_ready() {
   local port="$1"
-  echo -n "  ⏳ Wachten tot LB verkeer doorstuurt op poort $port"
+  echo -n "  ⏳ Waiting for LB traffic forwarding on port $port"
   for _ in {1..120}; do
     if curl -sS -m 5 "http://127.0.0.1:${port}/health" \
       | tr -d '\n' \
@@ -1190,24 +1190,24 @@ resolve_pdf_targets
 validate_pdf_targets
 status_event "pdf_targets_resolved" "resolved ${#PDF_TARGETS[@]} PDF target(s)"
 
-echo "[0b/4] OCR prefetch (indien nodig) vóór Qwen startup..."
+echo "[0b/4] OCR prefetch (if needed) before Qwen startup..."
 run_ocr_prefetch_if_enabled
 
-echo "[1/4] Starten Servers..."
+echo "[1/4] Starting servers..."
 status_event "qwen_starting" "starting Qwen servers"
 start_server 0 "$MODEL_GPU0" "$PORT_GPU0" "$LOG_DIR/gpu0.log"
 start_server 1 "$MODEL_GPU1" "$PORT_GPU1" "$LOG_DIR/gpu1.log"
 
-echo "[2/4] Wachten tot modellen echt klaar zijn (health=ok)..."
+echo "[2/4] Waiting until models are fully ready (health=ok)..."
 wait_health_ok "$PORT_GPU0" || exit 1
 wait_health_ok "$PORT_GPU1" || exit 1
 
-echo "[2b/4] Warmup (voorkomt 503 Loading model bij eerste zware prompt)..."
+echo "[2b/4] Warmup (prevents 503 Loading model on first heavy prompt)..."
 warmup_chat "$PORT_GPU0"
 warmup_chat "$PORT_GPU1"
 status_event "qwen_ready" "Qwen servers healthy and warmed"
 
-echo "[3/4] Starten Load Balancer..."
+echo "[3/4] Starting load balancer..."
 LB_SCRIPT="${RUN_DIR}/tcp_lb.py"
 cat > "$LB_SCRIPT" <<EOF
 import socket, threading, select, itertools, time
@@ -1283,13 +1283,13 @@ wait_lb_ready "$PORT_LB" || exit 1
 status_event "lb_ready" "load balancer ready"
 
 if [[ "$OCR_VLM_ENABLE" == "1" && "$OCR_VLM_PREFETCH_MODE" != "1" ]]; then
-  echo "[3b/4] Starten Vision OCR endpoint (live fallback mode)..."
+  echo "[3b/4] Starting Vision OCR endpoint (live fallback mode)..."
   start_ocr_server_if_enabled
 else
-  echo "[3b/4] Vision OCR live start overgeslagen (prefetch mode)."
+  echo "[3b/4] Vision OCR live start skipped (prefetch mode)."
 fi
 
-echo "[4/4] Starten main_cohort.py (PDF extractie → Excel)..."
+echo "[4/4] Starting main_cohort.py (PDF extraction -> Excel)..."
 echo "  PDF_EXTRACT_CONFIG=$PDF_EXTRACT_CONFIG"
 echo "  PDF_EXTRACT_PROMPTS=$PDF_EXTRACT_PROMPTS"
 echo "  AUTO_FETCH_EMX2_ONTOLOGIES=$AUTO_FETCH_EMX2_ONTOLOGIES"
@@ -1325,7 +1325,7 @@ validate_emx2_required_paths
 
 if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
   if [[ ! -f "$COHORT_PROMPT_SCHEMA_BASE_CSV" ]]; then
-    echo "ℹ️  Prompt schema base ontbreekt; haal live base-schema op voor profile=${EMX2_PROFILE}..."
+    echo "ℹ️  Prompt schema base missing; fetching live base schema for profile=${EMX2_PROFILE}..."
     status_event "prompt_schema_base_bootstrap_started" "base schema missing; attempting live bootstrap"
     mkdir -p "$(dirname "$COHORT_PROMPT_SCHEMA_BASE_CSV")" 2>/dev/null || true
 
@@ -1333,7 +1333,7 @@ if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
       --profile "$EMX2_PROFILE" \
       --local-root "$MOLGENIS_EMX2_LOCAL_ROOT" \
       --output "$COHORT_PROMPT_SCHEMA_BASE_CSV" >/dev/null; then
-      echo "  Prompt schema base opgehaald: $COHORT_PROMPT_SCHEMA_BASE_CSV"
+      echo "  Prompt schema base fetched: $COHORT_PROMPT_SCHEMA_BASE_CSV"
       status_event "prompt_schema_base_bootstrap_ok" "base schema bootstrapped at ${COHORT_PROMPT_SCHEMA_BASE_CSV}"
     else
       FALLBACK_BASE_SCHEMA_CSV="${RUN_DIR}/emx2_schema.base.csv"
@@ -1342,17 +1342,17 @@ if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
         --local-root "$MOLGENIS_EMX2_LOCAL_ROOT" \
         --output "$FALLBACK_BASE_SCHEMA_CSV" >/dev/null; then
         COHORT_PROMPT_SCHEMA_BASE_CSV="$FALLBACK_BASE_SCHEMA_CSV"
-        echo "  Prompt schema base opgehaald (fallback pad): $COHORT_PROMPT_SCHEMA_BASE_CSV"
+        echo "  Prompt schema base fetched (fallback path): $COHORT_PROMPT_SCHEMA_BASE_CSV"
         status_event "prompt_schema_base_bootstrap_ok" "base schema bootstrapped at fallback path ${COHORT_PROMPT_SCHEMA_BASE_CSV}"
       fi
     fi
   fi
 
   if [[ ! -f "$COHORT_PROMPT_SCHEMA_BASE_CSV" ]]; then
-    echo "⚠️  Skip prompt schema sync: kon geen base schema ophalen: $COHORT_PROMPT_SCHEMA_BASE_CSV"
+    echo "⚠️  Skip prompt schema sync: could not fetch base schema: $COHORT_PROMPT_SCHEMA_BASE_CSV"
     status_event "warning" "prompt schema sync skipped; base schema bootstrap failed"
   else
-    echo "[4a/4] Schema-check voor prompts..."
+    echo "[4a/4] Schema check for prompts..."
     LIVE_SCHEMA_CSV="${RUN_DIR}/emx2_schema.live.csv"
     SCHEMA_SYNC_PROMPTS="${RUN_DIR}/prompts.schema_sync.runtime.toml"
     SCHEMA_SYNC_REPORT_JSON="${RUN_DIR}/prompt_schema_sync.report.json"
@@ -1426,8 +1426,8 @@ if [[ "$SCHEMA_SYNC_ACTIVE" == "1" ]]; then
         fi
         export PDF_EXTRACT_PROMPTS="$SCHEMA_SYNC_PROMPTS"
         RUNTIME_PROMPTS="$SCHEMA_SYNC_PROMPTS"
-        echo "  Prompt schema sync: geen wijziging in live EMX2 sources; cached prompt gebruikt."
-        echo "  Vergelijking: $SCHEMA_SYNC_COMPARE_MD"
+        echo "  Prompt schema sync: no changes in live EMX2 sources; using cached prompt."
+        echo "  Comparison: $SCHEMA_SYNC_COMPARE_MD"
         if [[ -f "$SCHEMA_SYNC_LLM_PROMPT_DIFF" ]]; then
           echo "  Prompt diff: $SCHEMA_SYNC_LLM_PROMPT_DIFF"
         elif [[ -f "$SCHEMA_SYNC_PROMPT_DIFF" ]]; then
@@ -1476,13 +1476,13 @@ PY
         RUNTIME_PROMPTS="$SCHEMA_SYNC_PROMPTS"
         echo "  Prompt schema sync: changed_tasks=${SCHEMA_SYNC_CHANGED_TASKS}"
         echo "  PDF_EXTRACT_PROMPTS=$PDF_EXTRACT_PROMPTS"
-        echo "  Vergelijking: $SCHEMA_SYNC_COMPARE_MD"
+        echo "  Comparison: $SCHEMA_SYNC_COMPARE_MD"
         echo "  Prompt diff: $SCHEMA_SYNC_PROMPT_DIFF"
         echo "  Prompt before/after: $SCHEMA_SYNC_BEFORE_AFTER_MD"
         status_event "prompt_schema_sync_ready" "prompt schema sync ready with ${SCHEMA_SYNC_CHANGED_TASKS} changed task(s)"
 
         if [[ "${SCHEMA_SYNC_CHANGED_TASKS:-0}" -gt 0 ]] && flag_enabled "$COHORT_PROMPT_SCHEMA_SYNC_LLM"; then
-          echo "  Schema gewijzigd; LLM herschrijft alleen de changed tasks..."
+          echo "  Schema changed; LLM rewrites only the changed tasks..."
           if python3 src/cohort_prompt_schema_updater.py \
             --base-prompts "$SCHEMA_SYNC_BASE_PROMPTS" \
             --old-schema-csv "$COHORT_PROMPT_SCHEMA_BASE_CSV" \
@@ -1505,13 +1505,13 @@ PY
               "$SCHEMA_SYNC_LLM_PROMPT_DIFF" \
               "prompts/prompts_cohort.toml" \
               "prompts.schema_sync.llm.runtime.toml"
-            echo "  LLM prompt sync actief: $PDF_EXTRACT_PROMPTS"
-            echo "  LLM vergelijking: $SCHEMA_SYNC_LLM_COMPARE_MD"
+            echo "  LLM prompt sync active: $PDF_EXTRACT_PROMPTS"
+            echo "  LLM comparison: $SCHEMA_SYNC_LLM_COMPARE_MD"
             echo "  LLM prompt diff: $SCHEMA_SYNC_LLM_PROMPT_DIFF"
             echo "  Prompt before/after: $SCHEMA_SYNC_BEFORE_AFTER_MD"
             status_event "prompt_schema_sync_llm_done" "LLM rewrote changed prompt tasks"
           else
-            echo "⚠️  LLM prompt sync mislukte; fallback naar deterministische schema-sync prompt."
+            echo "⚠️  LLM prompt sync failed; falling back to deterministic schema-sync prompt."
             status_event "warning" "LLM prompt sync failed; using deterministic schema-sync prompt"
           fi
         fi
@@ -1524,14 +1524,14 @@ PY
             "$COHORT_PROMPT_SCHEMA_HISTORY_DIR" \
             "$SCHEMA_SYNC_BEFORE_AFTER_MD"
         )"; then
-          echo "  Prompt wijziging opgeslagen: $SCHEMA_SYNC_HISTORY_SAVED_AT"
+          echo "  Prompt change saved: $SCHEMA_SYNC_HISTORY_SAVED_AT"
           status_event "prompt_schema_sync_archived" "prompt change archived at ${SCHEMA_SYNC_HISTORY_SAVED_AT}"
           if ! push_prompt_schema_diff_to_git "$SCHEMA_SYNC_HISTORY_SAVED_AT" "$SCHEMA_SYNC_CHANGED_TASKS"; then
-            echo "⚠️  Git push van prompt wijziging mislukte; lokale wijziging blijft behouden."
+            echo "⚠️  Git push of prompt change failed; local change remains."
             status_event "warning" "git push of prompt change failed; local change retained"
           fi
         else
-          echo "⚠️  Prompt wijziging kon niet worden opgeslagen; before/after bestand ontbreekt."
+          echo "⚠️  Prompt change could not be saved; before/after file is missing."
           status_event "warning" "prompt change archive skipped; before/after file missing"
         fi
 
@@ -1575,11 +1575,11 @@ PY
           rm -f "$SCHEMA_SYNC_STATE_LLM_PROMPT_DIFF"
         fi
       else
-        echo "⚠️  Prompt schema sync mislukte; doorgaan met bestaande runtime prompt."
+        echo "⚠️  Prompt schema sync failed; continuing with existing runtime prompt."
         status_event "warning" "prompt schema sync failed; using existing runtime prompt"
       fi
     else
-      echo "⚠️  Prompt schema sync mislukte; doorgaan met bestaande runtime prompt."
+      echo "⚠️  Prompt schema sync failed; continuing with existing runtime prompt."
       status_event "warning" "live schema export failed; using existing runtime prompt"
     fi
   fi
@@ -1606,7 +1606,15 @@ if [[ -n "$LOCAL_RSYNC_HOST" ]]; then
 fi
 
 if [[ "$SYNC_OUTPUT_ENABLE" == "1" ]]; then
-  echo "[4b/4] Sync output naar lokaal..."
+  echo "[4b/4] Sync output to local destination..."
+  if [[ -z "$LOCAL_RSYNC_DEST" ]]; then
+    echo "⚠️  Skip sync: LOCAL_RSYNC_DEST is empty."
+    echo "   Retrieve the file manually with:"
+    echo "   rsync -avhP tunnel+nibbler:${PWD}/$OUTPUT_FILE \"\$HOME/Documents/cluster_data/\""
+    status_event "sync_skipped" "LOCAL_RSYNC_DEST is empty"
+    echo "✅ Done."
+    exit 0
+  fi
   sync_failed=0
   if [[ -n "$LOCAL_RSYNC_HOST" ]]; then
     # Ensure destination directory exists on remote receiver before syncing.
@@ -1618,8 +1626,8 @@ if [[ "$SYNC_OUTPUT_ENABLE" == "1" ]]; then
   else
     # Guard: on cluster nodes, macOS paths like /Users/... are not local paths.
     if [[ "$LOCAL_RSYNC_DEST" == /Users/* ]]; then
-      echo "⚠️  Skip sync: '$LOCAL_RSYNC_DEST' is een macOS pad en bestaat niet op de cluster node."
-      echo "   Haal het bestand op vanaf je Mac met:"
+      echo "⚠️  Skip sync: '$LOCAL_RSYNC_DEST' is a macOS path and does not exist on the cluster node."
+      echo "   Retrieve the file from your Mac with:"
       echo "   rsync -avhP tunnel+nibbler:${PWD}/$OUTPUT_FILE \"$LOCAL_RSYNC_DEST\""
       status_event "sync_skipped" "destination appears local macOS path on cluster node"
     else
@@ -1645,4 +1653,4 @@ else
   status_event "sync_skipped" "SYNC_OUTPUT_ENABLE=0"
 fi
 
-echo "✅ Klaar."
+echo "✅ Done."

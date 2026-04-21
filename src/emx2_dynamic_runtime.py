@@ -125,7 +125,7 @@ def profile_model_paths(
         for csv_path in sorted(shared_dir.glob("*.csv")):
             try:
                 rows = _load_csv_rows(csv_path)
-            except Exception:
+            except (OSError, UnicodeDecodeError, csv.Error):
                 continue
             if any(profile in _split_profiles(row.get("profiles")) for row in rows):
                 local_paths.append(f"data/_models/shared/{csv_path.name}")
@@ -238,7 +238,7 @@ def _http_get_bytes(url: str, timeout_sec: float = 20.0) -> bytes | None:
     try:
         with urlopen(request, timeout=timeout_sec) as response:
             return response.read()
-    except Exception:
+    except OSError:
         return None
 
 
@@ -249,7 +249,7 @@ def _github_shared_model_rel_paths(repo: str, ref: str) -> List[str]:
         return []
     try:
         parsed = json.loads(payload.decode("utf-8"))
-    except Exception:
+    except (UnicodeDecodeError, json.JSONDecodeError):
         return []
     if not isinstance(parsed, list):
         return []
@@ -300,12 +300,12 @@ def _fetch_github_profile_rows(
                     local_path.parent.mkdir(parents=True, exist_ok=True)
                     local_path.write_bytes(payload)
                     fetched_files += 1
-                except Exception:
+                except OSError:
                     continue
 
                 try:
                     file_rows = _load_csv_rows(local_path)
-                except Exception:
+                except (OSError, UnicodeDecodeError, csv.Error):
                     continue
                 for row in file_rows:
                     if profile in _split_profiles(row.get("profiles")):
@@ -575,7 +575,7 @@ def _parse_template_json(template_json: str | None) -> Dict[str, Any]:
         return {}
     try:
         return json.loads(template_json)
-    except Exception:
+    except json.JSONDecodeError:
         return {}
 
 
@@ -825,7 +825,7 @@ def main() -> None:
                     local_root=args.local_root,
                     fallback_schema_csv=args.fallback_schema_csv,
                 )
-            except Exception:
+            except (OSError, UnicodeDecodeError, csv.Error, ValueError):
                 paths = cohort_model_paths()
         else:
             paths = profile_model_paths(

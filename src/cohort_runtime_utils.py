@@ -17,6 +17,8 @@ except ModuleNotFoundError:
 from llm_client import OpenAICompatibleClient
 from extract_pipeline import extract_fields
 
+TOML_DECODE_ERROR = getattr(toml, "TOMLDecodeError", ValueError)
+
 # ==============================================================================
 # Helpers
 # ==============================================================================
@@ -37,7 +39,7 @@ def _load_toml_file(path: str) -> Dict[str, Any]:
             data = toml.load(f)
     except FileNotFoundError:
         raise SystemExit(f"Config file not found: {path}")
-    except Exception as e:
+    except (OSError, TOML_DECODE_ERROR) as e:
         raise SystemExit(f"Could not parse TOML file {path}: {e}")
 
     if not isinstance(data, dict):
@@ -111,7 +113,7 @@ def _ordered_keys_from_template(template_json: str | None) -> List[str]:
     )
     try:
         tpl = json.loads(template_json)
-    except Exception:
+    except json.JSONDecodeError:
         return []
     if not isinstance(tpl, dict):
         return []
@@ -133,7 +135,7 @@ def _ordered_item_keys_from_template(template_json: str | None, list_key: str) -
     )
     try:
         tpl = json.loads(template_json)
-    except Exception:
+    except json.JSONDecodeError:
         return []
 
     if not isinstance(tpl, dict):
@@ -187,7 +189,7 @@ def _reasoning_trace_max_chars() -> int:
     raw = str(os.getenv("LLM_REASONING_TRACE_MAX_CHARS", "12000")).strip()
     try:
         return max(0, int(raw))
-    except Exception:
+    except (TypeError, ValueError):
         return 12000
 
 
@@ -195,7 +197,7 @@ def _reasoning_print_max_chars() -> int:
     raw = str(os.getenv("LLM_REASONING_PRINT_MAX_CHARS", "12000")).strip()
     try:
         return max(0, int(raw))
-    except Exception:
+    except (TypeError, ValueError):
         return 12000
 
 
@@ -205,7 +207,7 @@ def _env_int(name: str, default: int) -> int:
         return default
     try:
         return int(raw)
-    except Exception:
+    except (TypeError, ValueError):
         return default
 
 
@@ -351,7 +353,7 @@ def _subpopulation_template_from_task(task_cfg: Dict[str, Any]) -> tuple[str, Di
         return None
     try:
         template_obj = json.loads(template_raw)
-    except Exception:
+    except json.JSONDecodeError:
         return None
     if not isinstance(template_obj, dict):
         return None
@@ -580,8 +582,8 @@ def _extract_subpopulations_two_stage(
         if isolated_trace_client and hasattr(detail_client, "clear_response_traces"):
             try:
                 detail_client.clear_response_traces()
-            except Exception:
-                pass
+            except (AttributeError, RuntimeError, OSError, TypeError) as e:
+                log.debug("Could not clear isolated response traces: %s", e)
 
         detail_result = extract_fields(
             detail_client,
@@ -614,7 +616,8 @@ def _extract_subpopulations_two_stage(
         if isolated_trace_client and hasattr(detail_client, "pop_response_traces"):
             try:
                 traces = detail_client.pop_response_traces()
-            except Exception:
+            except (AttributeError, RuntimeError, OSError, TypeError) as e:
+                log.debug("Could not collect isolated response traces: %s", e)
                 traces = []
         return idx, merged_item, traces
 
@@ -662,7 +665,7 @@ def _collect_pass_result(
     prefix_messages: List[Dict[str, str]] | None = None,
 ) -> Dict[str, Any]:
     if not task_cfg:
-        log.warning("Sectie is leeg of ontbreekt: %s", name)
+        log.warning("Section is empty or missing: %s", name)
         return {}
 
     log.info("--- Running %s ---", name)
@@ -670,7 +673,8 @@ def _collect_pass_result(
     if trace_capture_enabled:
         try:
             client.clear_response_traces()
-        except Exception:
+        except (AttributeError, RuntimeError, OSError, TypeError) as e:
+            log.debug("Could not clear response traces before %s: %s", name, e)
             trace_capture_enabled = False
 
     try:
@@ -722,7 +726,7 @@ def _collect_pass_result(
                         traces=traces,
                         log=log,
                     )
-            except Exception as e:
+            except (AttributeError, RuntimeError, OSError, TypeError, ValueError) as e:
                 log.warning("Could not write reasoning trace for %s: %s", name, e)
 
 
@@ -952,7 +956,7 @@ def _extract_participant_count_hint(text: str) -> int | None:
         return None
     try:
         return int(m.group(1))
-    except Exception:
+    except (TypeError, ValueError):
         return None
 
 
@@ -1093,7 +1097,7 @@ def _postprocess_section_results(
         try:
             if "adult (18+ years)" in groups and age_min is not None and float(age_min) < 18:
                 population["age_min"] = None
-        except Exception:
+        except (TypeError, ValueError):
             pass
 
         if _is_empty_value(population.get("number_of_participants")):

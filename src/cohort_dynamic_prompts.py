@@ -172,7 +172,7 @@ def _load_field_examples_playbook() -> Dict[str, Dict[str, str]]:
     try:
         with path.open("rb") as f:
             data = toml.load(f)
-    except Exception:
+    except (OSError, TOML_DECODE_ERROR):
         _FIELD_EXAMPLES_CACHE = out
         return out
 
@@ -1632,3 +1632,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+TOML_DECODE_ERROR = getattr(toml, "TOMLDecodeError", ValueError)

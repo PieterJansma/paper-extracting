@@ -109,7 +109,7 @@ class OpenAICompatibleClient:
         def _is_context_overflow_error(resp: requests.Response) -> bool:
             try:
                 txt = (resp.text or "").lower()
-            except Exception:
+            except (AttributeError, UnicodeDecodeError):
                 txt = ""
             return (
                 "exceed_context_size_error" in txt
@@ -153,7 +153,7 @@ class OpenAICompatibleClient:
                     txt = ""
                     try:
                         txt = resp.text or ""
-                    except Exception:
+                    except (AttributeError, UnicodeDecodeError):
                         pass
                     if "Loading model" in txt:
                         log.warning("LLM 503 Loading model (attempt %d/%d). Retrying...", attempt + 1, max_retries)
@@ -173,7 +173,7 @@ class OpenAICompatibleClient:
                 if resp.status_code >= 400:
                     try:
                         log.error("LLM %s: %s", resp.status_code, (resp.text or "")[:2000])
-                    except Exception:
+                    except (AttributeError, UnicodeDecodeError):
                         pass
 
                 resp.raise_for_status()
@@ -245,7 +245,7 @@ class OpenAICompatibleClient:
                     _sleep(attempt)
                     continue
                 raise
-            except Exception as e:
+            except (RuntimeError, ValueError, TypeError, KeyError, json.JSONDecodeError, requests.RequestException) as e:
                 last_err = e
                 # Context overflow is deterministic for this request body; do not retry.
                 if "exceed_context_size_error" in str(e).lower():

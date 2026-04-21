@@ -4,6 +4,7 @@ import argparse
 import ast
 import csv
 import json
+import os
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -45,13 +46,13 @@ def _parse_list_like(value: Any) -> List[str]:
             parsed = json.loads(s)
             if isinstance(parsed, list):
                 return [str(x).strip() for x in parsed if str(x).strip()]
-        except Exception:
+        except json.JSONDecodeError:
             pass
         try:
             parsed = ast.literal_eval(s)
             if isinstance(parsed, list):
                 return [str(x).strip() for x in parsed if str(x).strip()]
-        except Exception:
+        except (ValueError, SyntaxError):
             pass
 
     if "," in s:
@@ -171,7 +172,7 @@ class RegionMapper:
             choice = payload.get("choice")
             if isinstance(choice, str) and choice in candidates:
                 return choice
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, KeyError, json.JSONDecodeError):
             return None
         return None
 
@@ -319,7 +320,7 @@ def cli() -> None:
     parser.add_argument("--values-json", required=True, help="JSON array of values")
     parser.add_argument("--llm-fallback", action="store_true", help="Enable LLM fallback for unresolved values")
     parser.add_argument("--llm-base-url", default="http://127.0.0.1:8080/v1", help="LLM base URL")
-    parser.add_argument("--llm-api-key", default="sk-local", help="LLM API key")
+    parser.add_argument("--llm-api-key", default=os.getenv("LLM_API_KEY", ""), help="LLM API key")
     parser.add_argument("--llm-model", default="numind/NuExtract-2.0-8B", help="LLM model")
     args = parser.parse_args()
 

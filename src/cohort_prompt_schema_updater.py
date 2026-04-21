@@ -60,7 +60,7 @@ def _parse_template_json(template_json: str | None) -> Any:
         return {}
     try:
         return json.loads(template_json)
-    except Exception:
+    except json.JSONDecodeError:
         return {}
 
 
@@ -537,7 +537,7 @@ def _env_int(name: str, default: int) -> int:
         return default
     try:
         return int(raw)
-    except Exception:
+    except (TypeError, ValueError):
         return default
 
 
@@ -592,7 +592,7 @@ def _rewrite_single_changed_task(
 
     client = OpenAICompatibleClient(
         base_url=base_url,
-        api_key=str(llm_cfg.get("api_key", "sk-local")),
+        api_key=str(llm_cfg.get("api_key") or os.getenv("LLM_API_KEY", "")),
         model=str(llm_model or llm_cfg.get("model", "Qwen/Qwen2.5-32B-Instruct")),
         use_grammar=bool(llm_cfg.get("use_grammar", False)),
         use_session=bool(llm_cfg.get("sticky_session", False)),
