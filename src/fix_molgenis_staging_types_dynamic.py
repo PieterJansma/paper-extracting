@@ -5,8 +5,18 @@ import csv
 import difflib
 import json
 from dataclasses import dataclass
+from io import StringIO
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+
+def _csv_join(items: List[str]) -> str:
+    """Comma-join array items with CSV quoting so values containing commas stay intact."""
+    if not items:
+        return ""
+    buf = StringIO()
+    csv.writer(buf, lineterminator="").writerow(items)
+    return buf.getvalue()
 
 from openpyxl import load_workbook
 
@@ -292,8 +302,13 @@ def _coerce_dynamic_ontology_array(
             return []
         if "," not in candidate:
             return [candidate]
-        # Some ontology labels contain commas, but downstream import uses comma-separated
-        # arrays. Split and keep only tokens that can be mapped to canonical ontology terms.
+        # Ontology labels may legitimately contain commas (e.g. top-level Areas of
+        # information categories). If the whole candidate already resolves to a canonical
+        # ontology value, keep it intact rather than splitting it into invalid tokens.
+        if source_path:
+            whole = _match_choice(source_path, candidate)
+            if whole.mapped:
+                return [whole.mapped]
         out: list[str] = []
         seen_local: set[str] = set()
         for token in candidate.split(","):
@@ -353,7 +368,7 @@ def _coerce_dynamic_ontology_array(
     elif not source_path:
         return legacy.coerce_array(meta["table_name"], meta["column_name"], value)
 
-    return ",".join(items)
+    return _csv_join(items)
 
 
 def _coerce_dynamic_external_ref(meta: Dict[str, Any], value: Any) -> Any:
@@ -388,7 +403,7 @@ def _coerce_dynamic_external_ref_array(meta: Dict[str, Any], value: Any) -> Any:
             continue
         seen.add(mapped)
         items.append(mapped)
-    return ",".join(items)
+    return _csv_join(items)
 
 
 def _build_schema_from_registry(registry: Dict[str, Any]) -> Dict[str, Dict[str, Dict[str, Any]]]:

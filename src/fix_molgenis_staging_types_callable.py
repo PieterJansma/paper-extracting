@@ -7,10 +7,20 @@ import difflib
 import json
 import re
 from datetime import date, datetime
+from io import StringIO
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from openpyxl import load_workbook
+
+
+def _csv_join(items: list[str]) -> str:
+    """Comma-join array items with CSV quoting so values containing commas stay intact."""
+    if not items:
+        return ""
+    buf = StringIO()
+    csv.writer(buf, lineterminator="").writerow(items)
+    return buf.getvalue()
 
 DEFAULT_SCHEMA_WORKBOOK = (
     Path(__file__).resolve().parent.parent / "schemas" / "molgenis_UMCGCohortsStaging.xlsx"
@@ -585,7 +595,7 @@ def coerce_array(table: str, column: str, value: Any) -> Any:
     if allowed is not None:
         items = [x for x in items if x in allowed]
 
-    return ",".join(items)
+    return _csv_join(items)
 
 
 def coerce_bool(value: Any) -> Any:
@@ -1048,7 +1058,7 @@ def coerce_ref_array(table: str, column: str, value: Any, ref_index: Dict[str, D
 
     target_table = REF_ARRAY_FIELD_TARGETS.get((table, column))
     if not target_table or not ref_index:
-        return ",".join(items)
+        return _csv_join(items)
 
     target_idx = ref_index.get(target_table)
     if not target_idx:
@@ -1062,7 +1072,7 @@ def coerce_ref_array(table: str, column: str, value: Any, ref_index: Dict[str, D
             continue
         resolved_seen.add(mapped)
         resolved.append(mapped)
-    return ",".join(resolved)
+    return _csv_join(resolved)
 
 
 def _extract_ontology_scalar(value: Any) -> str:

@@ -1,12 +1,23 @@
 from __future__ import annotations
 
+import csv
 import os
 import json
 import argparse
 import logging
 import importlib.util
 import re
+from io import StringIO
 from typing import Any, Dict, List, Tuple
+
+
+def _csv_join(items: List[str]) -> str:
+    """Comma-join array items with CSV quoting so values containing commas stay intact."""
+    if not items:
+        return ""
+    buf = StringIO()
+    csv.writer(buf, lineterminator="").writerow(items)
+    return buf.getvalue()
 
 import pandas as pd
 
@@ -164,7 +175,7 @@ def _serialize_multi_value(value: Any) -> str:
             continue
         seen.add(scalar)
         items.append(scalar)
-    return ",".join(items)
+    return _csv_join(items)
 
 
 def _normalize_or_infer_resource_types(overview: Dict[str, Any]) -> List[str]:
@@ -437,7 +448,7 @@ def _serialize_runtime_array_value(
         seen.add(scalar)
         items.append(scalar)
 
-    return ",".join(items)
+    return _csv_join(items)
 
 
 def _serialize_runtime_scalar_value(
