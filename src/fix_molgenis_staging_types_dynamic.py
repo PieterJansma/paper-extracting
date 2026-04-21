@@ -300,22 +300,25 @@ def _coerce_dynamic_ontology_array(
             token = legacy._clean_string(token)
             if not token:
                 continue
-            mapped_token = _map_choice(
-                source_path,
-                token,
-                field_label=f"{meta['table_name']}.{meta['column_name']}",
-                llm_client=llm_client,
-                llm_choice_threshold=llm_choice_threshold,
-                llm_max_candidates=llm_max_candidates,
-                llm_max_lookups=llm_max_lookups,
-                llm_state=llm_state,
-            )
-            if not mapped_token:
+            resolved = token
+            if source_path:
+                mapped_token = _map_choice(
+                    source_path,
+                    token,
+                    field_label=f"{meta['table_name']}.{meta['column_name']}",
+                    llm_client=llm_client,
+                    llm_choice_threshold=llm_choice_threshold,
+                    llm_max_candidates=llm_max_candidates,
+                    llm_max_lookups=llm_max_lookups,
+                    llm_state=llm_state,
+                )
+                if not mapped_token:
+                    continue
+                resolved = mapped_token
+            if resolved in seen_local:
                 continue
-            if mapped_token in seen_local:
-                continue
-            seen_local.add(mapped_token)
-            out.append(mapped_token)
+            seen_local.add(resolved)
+            out.append(resolved)
         return out
 
     items: list[str] = []
@@ -337,7 +340,7 @@ def _coerce_dynamic_ontology_array(
         candidate = mapped if source_path else (mapped or scalar)
         if not candidate:
             continue
-        expanded = _expand_candidate(candidate) if source_path else [candidate]
+        expanded = _expand_candidate(candidate)
         for resolved in expanded:
             if not resolved or resolved in seen:
                 continue
