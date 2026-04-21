@@ -10,15 +10,6 @@ import re
 from io import StringIO
 from typing import Any, Dict, List, Tuple
 
-
-def _csv_join(items: List[str]) -> str:
-    """Comma-join array items with CSV quoting so values containing commas stay intact."""
-    if not items:
-        return ""
-    buf = StringIO()
-    csv.writer(buf, lineterminator="").writerow(items)
-    return buf.getvalue()
-
 import pandas as pd
 
 from llm_client import OpenAICompatibleClient
@@ -57,6 +48,15 @@ from cohort_runtime_utils import (
     _is_empty_value,
     _as_list_str,
 )
+
+
+def _csv_join(items: List[str]) -> str:
+    """Comma-join array items with CSV quoting so values containing commas stay intact."""
+    if not items:
+        return ""
+    buf = StringIO()
+    csv.writer(buf, lineterminator="").writerow(items)
+    return buf.getvalue()
 
 
 AGENT_BASE_COLUMNS: List[str] = [

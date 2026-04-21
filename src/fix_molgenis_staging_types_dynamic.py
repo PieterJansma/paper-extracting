@@ -9,6 +9,12 @@ from io import StringIO
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from openpyxl import load_workbook
+
+import fix_molgenis_staging_types_callable as legacy
+from emx2_dynamic_runtime import build_runtime_registry
+from llm_client import OpenAICompatibleClient
+
 
 def _csv_join(items: List[str]) -> str:
     """Comma-join array items with CSV quoting so values containing commas stay intact."""
@@ -17,12 +23,6 @@ def _csv_join(items: List[str]) -> str:
     buf = StringIO()
     csv.writer(buf, lineterminator="").writerow(items)
     return buf.getvalue()
-
-from openpyxl import load_workbook
-
-import fix_molgenis_staging_types_callable as legacy
-from emx2_dynamic_runtime import build_runtime_registry
-from llm_client import OpenAICompatibleClient
 
 
 _CHOICE_INDEX_CACHE: Dict[str, Dict[str, Any]] = {}
