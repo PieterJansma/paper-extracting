@@ -668,6 +668,14 @@ def _resolve_local_organisation_ref(raw_value: Any, org_ref_map: Dict[str, str])
     return ""
 
 
+def _clear_self_organisation_reference(row: Dict[str, Any]) -> None:
+    """Avoid self-referential organisation FK values (id == organisation)."""
+    row_id = str(row.get("id") or "").strip()
+    org_ref = str(row.get("organisation") or "").strip()
+    if row_id and org_ref and row_id == org_ref:
+        row["organisation"] = ""
+
+
 def _serialize_bool_default_false(value: Any) -> str:
     if _is_empty_value(value):
         return "false"
@@ -1473,7 +1481,7 @@ def cli() -> None:
             base_row = _build_agent_base_row(resource_ref, item)
             if _is_organisation_contributor(item):
                 base_row["organisation"] = _resolve_local_organisation_ref(
-                    item.get("organisation") or item.get("name") or item.get("id"),
+                    item.get("organisation"),
                     org_ref_map,
                 )
             else:
@@ -1481,6 +1489,7 @@ def cli() -> None:
                     item.get("organisation"),
                     org_ref_map,
                 )
+            _clear_self_organisation_reference(base_row)
             if _is_organisation_contributor(item):
                 org_row = _blank_row(COHORT_SHEETS["Organisations"])
                 org_row.update(base_row)

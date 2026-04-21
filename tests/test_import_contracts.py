@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from main_cohort import (
     _build_local_organisation_ref_map,
+    _clear_self_organisation_reference,
     _ensure_organisation_ids,
     _normalize_or_infer_resource_types,
     _resolve_local_organisation_ref,
@@ -46,6 +47,12 @@ def test_generated_organisation_ids_enable_local_reference_resolution() -> None:
     ref_map = _build_local_organisation_ref_map(organisations)
     resolved = _resolve_local_organisation_ref("UK Medical Research Council", ref_map)
     assert resolved == organisations[0]["id"]
+
+
+def test_self_organisation_reference_is_cleared_to_avoid_fk_error() -> None:
+    row = {"id": "MRC", "organisation": "MRC"}
+    _clear_self_organisation_reference(row)
+    assert row["organisation"] == ""
 
 
 def test_resource_row_contract_has_non_empty_type() -> None:
