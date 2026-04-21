@@ -10,7 +10,7 @@ import re
 import shutil
 import subprocess
 import tempfile
-from typing import Optional, Dict, Any, List, Tuple, Union
+from typing import Optional, Dict, Any, List, Tuple
 
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError

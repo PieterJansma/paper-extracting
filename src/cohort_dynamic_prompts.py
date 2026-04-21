@@ -18,7 +18,6 @@ from emx2_dynamic_runtime import (
     DEFAULT_PROFILE,
     DEFAULT_SCHEMA_CSV,
     build_runtime_registry,
-    load_profile_model_rows,
     write_task_prompts_toml,
 )
 
@@ -1445,7 +1444,7 @@ def build_dynamic_task_sections(registry: Dict[str, Any]) -> Dict[str, Dict[str,
         lines = [
             "Return ONLY valid JSON matching the template. No extra text.",
             "",
-            f"TASK",
+            "TASK",
             f"- {spec['purpose']}",
         ]
         for scope_line in spec.get("scope", []):
