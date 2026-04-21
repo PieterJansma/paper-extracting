@@ -6,7 +6,6 @@ import argparse
 import logging
 import importlib.util
 import re
-from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import pandas as pd
@@ -41,7 +40,6 @@ from cohort_runtime_utils import (
     _serialize_value,
     _collect_pass_result,
     _build_resource_row,
-    _build_list_rows,
     _combine_contributor_results,
     _combine_collection_event_results,
     _postprocess_section_results,
@@ -752,7 +750,6 @@ def _resource_row_from_sections(
     design = per_section_results.get("task_design_structure", {}) or {}
     population = per_section_results.get("task_population", {}) or {}
     contributors = per_section_results.get("task_contributors", {}) or {}
-    aoi = per_section_results.get("task_areas_of_information", {}) or {}
     linkage = per_section_results.get("task_linkage", {}) or {}
     access = per_section_results.get("task_access_conditions", {}) or {}
     info = per_section_results.get("task_information", {}) or {}
@@ -1220,11 +1217,6 @@ def cli() -> None:
 
         prefix_messages: List[Dict[str, str]] | None = None
         prompt_cache_enabled = bool(llm_cfg.get("prompt_cache", False))
-        chunking_enabled = bool(llm_cfg.get("chunking_enabled", True))
-        long_text_threshold = int(llm_cfg.get("long_text_threshold_chars", 60000))
-        chunk_size_chars = int(llm_cfg.get("chunk_size_chars", 45000))
-        chunk_overlap_chars = int(llm_cfg.get("chunk_overlap_chars", 4000))
-        max_chunks = llm_cfg.get("max_chunks")
 
         if prompt_cache_enabled:
             prefix_messages = build_context_prefix_messages(paper_text)
