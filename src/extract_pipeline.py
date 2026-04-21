@@ -19,7 +19,7 @@ from llm_client import OpenAICompatibleClient
 
 try:
     from .llm_grammar import GRAMMAR_JSON_INT_OR_NULL
-except Exception:
+except ImportError:
     GRAMMAR_JSON_INT_OR_NULL = None  # type: ignore
 
 log = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ def _env_int(name: str, default: int) -> int:
         return default
     try:
         return int(raw)
-    except Exception:
+    except (TypeError, ValueError):
         return default
 
 
@@ -253,7 +253,7 @@ def _load_prefetched_ocr_text(pdf_path: str) -> str:
         with open(candidate, "r", encoding="utf-8") as f:
             txt = f.read()
         return txt if txt.strip() else ""
-    except Exception as e:
+    except OSError as e:
         log.warning("Failed reading prefetched OCR text %s: %s", candidate, e)
         return ""
 
@@ -267,7 +267,7 @@ def _write_compare_artifacts(
 ) -> None:
     try:
         os.makedirs(out_dir, exist_ok=True)
-    except Exception as e:
+    except OSError as e:
         log.warning("Could not create OCR compare dir %r: %s", out_dir, e)
         return
 
@@ -320,7 +320,7 @@ def _write_compare_artifacts(
             pdf_path,
             out_dir,
         )
-    except Exception as e:
+    except OSError as e:
         log.warning("Failed to write OCR compare artifacts for %s: %s", pdf_path, e)
 
 
@@ -457,7 +457,7 @@ def _load_pdf_text_with_vlm_ocr(path: str, max_pages: Optional[int] = None) -> s
                     if page_txt.strip():
                         break
                     last_err = "empty response"
-                except Exception as e:
+                except (requests.RequestException, json.JSONDecodeError, ValueError) as e:
                     last_err = str(e)
                     continue
 
@@ -550,7 +550,7 @@ def _normalize_image_for_vlm(img_bytes: bytes, max_side: int) -> bytes:
     """
     try:
         from PIL import Image  # type: ignore
-    except Exception:
+    except ImportError:
         return img_bytes
 
     try:
@@ -566,21 +566,21 @@ def _normalize_image_for_vlm(img_bytes: bytes, max_side: int) -> bytes:
                 nh = max(1, int(round(h * scale)))
                 try:
                     resample = Image.Resampling.LANCZOS  # Pillow>=9
-                except Exception:
+                except AttributeError:
                     resample = Image.LANCZOS
                 im = im.resize((nw, nh), resample=resample)
 
             out = io.BytesIO()
             im.save(out, format="PNG", optimize=True)
             return out.getvalue()
-    except Exception:
+    except (OSError, ValueError):
         return img_bytes
 
 
 def _render_pdf_pages_to_png_pdfium(path: str, page_limit: Optional[int]) -> List[bytes]:
     try:
         import pypdfium2 as pdfium  # type: ignore
-    except Exception:
+    except ImportError:
         return []
 
     out: List[bytes] = []
@@ -637,7 +637,7 @@ def _render_pdf_pages_to_png_pdftoppm(path: str, page_limit: Optional[int]) -> L
             err = (e.stderr or e.stdout or "").strip()
             log.warning("Vision OCR render with pdftoppm failed for %s: %s", path, err[:500])
             return []
-        except Exception as e:
+        except (OSError, ValueError) as e:
             log.warning("Vision OCR render with pdftoppm failed for %s: %s", path, e)
             return []
 
@@ -657,7 +657,7 @@ def _render_pdf_pages_to_png_pdftoppm(path: str, page_limit: Optional[int]) -> L
             try:
                 with open(p, "rb") as f:
                     out.append(f.read())
-            except Exception:
+            except OSError:
                 continue
         return out
 
@@ -789,7 +789,7 @@ def _salvage_top_level_list_output(raw: str) -> Dict[str, Any]:
                 obj = json.loads(snippet)
                 if isinstance(obj, dict):
                     items.append(obj)
-            except Exception:
+            except json.JSONDecodeError:
                 continue
         if items:
             return {key: items}
@@ -926,7 +926,7 @@ def _parse_template_schema(template_json: Optional[str]) -> SchemaSpec:
 
     try:
         tpl = json.loads(template_json)
-    except Exception as e:
+    except json.JSONDecodeError as e:
         log.warning("Template JSON is not valid JSON (%s). No schema completion applied.", e)
         return {}
 

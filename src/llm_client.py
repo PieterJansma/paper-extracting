@@ -238,7 +238,7 @@ class OpenAICompatibleClient:
                 status = None
                 try:
                     status = e.response.status_code  # type: ignore[union-attr]
-                except Exception:
+                except AttributeError:
                     pass
                 if status is not None and 500 <= status < 600 and attempt + 1 < max_retries:
                     log.warning("LLM HTTP %s (attempt %d/%d). Retrying...", status, attempt + 1, max_retries)

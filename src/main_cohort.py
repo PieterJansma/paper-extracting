@@ -538,6 +538,48 @@ def _build_agent_base_row(resource_ref: str, item: Dict[str, Any]) -> Dict[str, 
     return row
 
 
+def _normalize_org_ref_key(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").strip().lower())
+
+
+def _build_local_organisation_ref_map(organisations: List[Dict[str, Any]]) -> Dict[str, str]:
+    """
+    Build a local name->id map so cross-sheet references always use Organisation IDs.
+    """
+    out: Dict[str, str] = {}
+    for item in organisations:
+        if not isinstance(item, dict) or not _is_organisation_contributor(item):
+            continue
+        org_id = str(item.get("id") or "").strip()
+        if not org_id:
+            continue
+        for candidate in (
+            item.get("id"),
+            item.get("name"),
+            item.get("organisation"),
+            item.get("other_organisation"),
+            item.get("acronym"),
+        ):
+            key = _normalize_org_ref_key(candidate)
+            if key and key not in out:
+                out[key] = org_id
+    return out
+
+
+def _resolve_local_organisation_ref(raw_value: Any, org_ref_map: Dict[str, str]) -> str:
+    """
+    Resolve free-text organisation labels to local Organisation IDs.
+    Return empty string for unknown refs to avoid FK import failures.
+    """
+    raw = str(raw_value or "").strip()
+    if not raw:
+        return ""
+    key = _normalize_org_ref_key(raw)
+    if key in org_ref_map:
+        return org_ref_map[key]
+    return ""
+
+
 def _serialize_bool_default_false(value: Any) -> str:
     if _is_empty_value(value):
         return "false"
@@ -582,7 +624,7 @@ def _resolve_ref_organisations_csv(explicit_path: str | None = None) -> str | No
         os.path.join(os.getcwd(), "Organisations.csv"),
         os.path.join(os.getcwd(), "data", "_ontologies", "Organisations.csv"),
         os.path.join(os.getcwd(), "data", "ontologies", "Organisations.csv"),
-        "/Users/p.jansma/Downloads/Organisations.csv",
+        os.path.join(os.path.expanduser("~"), "Downloads", "Organisations.csv"),
     ]
     seen: set[str] = set()
     for candidate in candidates:
@@ -1329,11 +1371,24 @@ def cli() -> None:
         contributors = per_section_results.get("task_contributors", {}) or {}
         organisations = contributors.get("organisations_involved", []) or []
         people = contributors.get("people_involved", []) or []
+        org_ref_map = _build_local_organisation_ref_map(
+            [item for item in organisations if isinstance(item, dict)]
+        )
 
         for item in organisations:
             if not isinstance(item, dict):
                 continue
             base_row = _build_agent_base_row(resource_ref, item)
+            if _is_organisation_contributor(item):
+                base_row["organisation"] = _resolve_local_organisation_ref(
+                    item.get("organisation") or item.get("name") or item.get("id"),
+                    org_ref_map,
+                )
+            else:
+                base_row["organisation"] = _resolve_local_organisation_ref(
+                    item.get("organisation"),
+                    org_ref_map,
+                )
             if _is_organisation_contributor(item):
                 org_row = _blank_row(COHORT_SHEETS["Organisations"])
                 org_row.update(base_row)
@@ -1358,7 +1413,7 @@ def cli() -> None:
                 "prefix": _serialize_value(item.get("prefix")),
                 "initials": _serialize_value(item.get("initials")),
                 "title": _serialize_value(item.get("title")),
-                "organisation": _serialize_value(item.get("organisation")),
+                "organisation": _resolve_local_organisation_ref(item.get("organisation"), org_ref_map),
                 "email": _serialize_value(item.get("email")),
                 "orcid": _serialize_value(item.get("orcid")),
                 "homepage": _serialize_value(item.get("homepage")),
