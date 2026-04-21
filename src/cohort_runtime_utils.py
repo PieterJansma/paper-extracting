@@ -38,9 +38,9 @@ def _load_toml_file(path: str) -> Dict[str, Any]:
         with open(path, "rb") as f:
             data = toml.load(f)
     except FileNotFoundError:
-        raise SystemExit(f"Config file not found: {path}")
+        raise SystemExit(f"Config file not found: {path}") from None
     except (OSError, TOML_DECODE_ERROR) as e:
-        raise SystemExit(f"Could not parse TOML file {path}: {e}")
+        raise SystemExit(f"Could not parse TOML file {path}: {e}") from e
 
     if not isinstance(data, dict):
         raise SystemExit(f"Invalid TOML root in {path}: expected table/dict at top-level.")
