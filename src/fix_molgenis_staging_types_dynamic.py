@@ -250,8 +250,9 @@ def _coerce_dynamic_ontology(
     llm_max_lookups: int = 50,
     llm_state: Optional[Dict[str, int]] = None,
 ) -> Any:
+    source_path = meta.get("source_path")
     mapped = _map_choice(
-        meta.get("source_path"),
+        source_path,
         legacy._extract_ontology_scalar(value),
         field_label=f"{meta['table_name']}.{meta['column_name']}",
         llm_client=llm_client,
@@ -262,6 +263,11 @@ def _coerce_dynamic_ontology(
     )
     if mapped:
         return mapped
+    if source_path:
+        # Strict mode for source-backed ontology fields:
+        # if we cannot map to a canonical term, drop the value
+        # instead of passing through raw text that can break FK imports.
+        return ""
     return legacy.coerce_ontology(meta["table_name"], meta["column_name"], value)
 
 
@@ -275,6 +281,7 @@ def _coerce_dynamic_ontology_array(
     llm_max_lookups: int = 50,
     llm_state: Optional[Dict[str, int]] = None,
 ) -> Any:
+    source_path = meta.get("source_path")
     raw_items = legacy._parse_array_items(value)
     if raw_items is None:
         return value
@@ -286,7 +293,7 @@ def _coerce_dynamic_ontology_array(
         if not scalar:
             continue
         mapped = _map_choice(
-            meta.get("source_path"),
+            source_path,
             scalar,
             field_label=f"{meta['table_name']}.{meta['column_name']}",
             llm_client=llm_client,
@@ -294,16 +301,17 @@ def _coerce_dynamic_ontology_array(
             llm_max_candidates=llm_max_candidates,
             llm_max_lookups=llm_max_lookups,
             llm_state=llm_state,
-        ) or scalar
-        if not mapped or mapped in seen:
+        )
+        candidate = mapped if source_path else (mapped or scalar)
+        if not candidate or candidate in seen:
             continue
-        seen.add(mapped)
-        items.append(mapped)
+        seen.add(candidate)
+        items.append(candidate)
 
     allowed = set(meta.get("allowed_values") or [])
     if allowed:
         items = [item for item in items if item in allowed]
-    elif not meta.get("source_path"):
+    elif not source_path:
         return legacy.coerce_array(meta["table_name"], meta["column_name"], value)
 
     return ",".join(items)
