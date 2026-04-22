@@ -4,6 +4,7 @@ from main_cohort import (
     _build_local_organisation_ref_map,
     _clear_self_organisation_reference,
     _ensure_organisation_ids,
+    _registry_import_columns,
     _normalize_or_infer_resource_types,
     _resolve_local_organisation_ref,
     _resource_row_from_sections,
@@ -82,3 +83,21 @@ def test_resource_row_contract_has_non_empty_type() -> None:
     assert resource_ref == "10.1186/s12967-019-2122-x"
     assert row["type"]
     assert _normalize_or_infer_resource_types({"name": "OncoLifeS biobank"})
+
+
+def test_collections_import_columns_keep_inherited_id() -> None:
+    registry = {
+        "tables": {
+            "Collections": {
+                "extends": "Resources",
+                "fields": {
+                    "id": {"column_type": "string"},
+                    "type": {"column_type": "ontology_array"},
+                    "keywords": {"column_type": "string_array"},
+                },
+                "direct_field_names": ["type", "keywords"],
+            }
+        }
+    }
+
+    assert _registry_import_columns(registry, "Collections") == ["id", "type", "keywords"]

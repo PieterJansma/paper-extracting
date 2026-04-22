@@ -344,6 +344,20 @@ def _registry_direct_columns(registry: Dict[str, Any] | None, table_name: str) -
     return _registry_table_columns(registry, table_name)
 
 
+def _registry_import_columns(registry: Dict[str, Any] | None, table_name: str) -> List[str]:
+    """Return sheet columns for child tables that still need their inherited key.
+
+    EMX2 child tables such as Collections extend a parent table but still require the shared
+    key column (`id`) to be present in the import sheet. Keep the direct child columns, but
+    add the inherited key back when the runtime schema exposes it.
+    """
+    columns = list(_registry_direct_columns(registry, table_name))
+    all_columns = _registry_table_columns(registry, table_name)
+    if "id" in all_columns and "id" not in columns:
+        return ["id", *columns]
+    return columns
+
+
 def _output_table_columns(
     table_name: str,
     *,
@@ -1311,9 +1325,11 @@ def cli() -> None:
         resource_row, resource_ref = _resource_row_from_sections(label, pdf_path, per_section_results, run_issues)
         resource_rows.append(resource_row)
         if dynamic_registry:
-            collection_columns = _registry_direct_columns(dynamic_registry, "Collections")
+            collection_columns = _registry_import_columns(dynamic_registry, "Collections")
             if collection_columns:
                 collection_row = _project_row_to_columns(resource_row, collection_columns)
+                if "id" in collection_row and not str(collection_row.get("id") or "").strip():
+                    collection_row["id"] = resource_ref
                 if "resource" in collection_row and not str(collection_row.get("resource") or "").strip():
                     collection_row["resource"] = resource_ref
                 if "type" in collection_row and not str(collection_row.get("type") or "").strip():
@@ -1710,7 +1726,7 @@ def cli() -> None:
         "Publications": pd.DataFrame(publication_rows, columns=publication_columns),
         "Documentation": pd.DataFrame(documentation_rows, columns=documentation_columns),
     }
-    collections_columns = _registry_direct_columns(dynamic_registry, "Collections")
+    collections_columns = _registry_import_columns(dynamic_registry, "Collections")
     if collections_columns:
         frames["Collections"] = pd.DataFrame(collection_rows, columns=collections_columns)
     for table_name, rows in dynamic_table_rows.items():
