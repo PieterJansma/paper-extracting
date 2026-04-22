@@ -345,41 +345,16 @@ def _registry_direct_columns(registry: Dict[str, Any] | None, table_name: str) -
 
 
 def _registry_import_columns(registry: Dict[str, Any] | None, table_name: str) -> List[str]:
-    """Return sheet columns for child tables that inherit from a parent.
+    """Return sheet columns for a child table's own xlsx sheet.
 
-    EMX2 child tables such as Collections (extends Resources) must still carry inherited
-    columns that MOLGENIS validates per-sheet:
-
-      * primary-key and other key columns (`key=1,2,3,...`): needed to match parent row
-      * columns marked `required=TRUE`: MOLGENIS rejects the row if they are missing,
-        even when the parent sheet supplies them elsewhere.
-
-    Non-key, non-required inherited columns (e.g. publisher, contact point) stay out of
-    the child sheet; their data travels on the parent sheet with a shared id.
+    For an EMX2 tableExtends relationship, MOLGENIS treats the child and parent as one
+    record (shared primary-key space). All parent fields are valid on the child sheet.
+    Writing a parallel parent-row with the same id triggers a duplicate-key constraint,
+    so the child sheet must carry *everything*: direct child columns plus every inherited
+    parent column. The parent sheet should be filtered to exclude rows whose id now lives
+    on the child.
     """
-    direct_columns = list(_registry_direct_columns(registry, table_name))
-    direct_set = {str(c) for c in direct_columns}
-    fields = ((registry or {}).get("tables", {}).get(table_name, {}) or {}).get("fields", {}) or {}
-
-    def _needs_inherit(meta: Dict[str, Any]) -> bool:
-        if str((meta or {}).get("key") or "").strip():
-            return True
-        required = str((meta or {}).get("required") or "").strip().upper()
-        return required in {"TRUE", "1", "YES"}
-
-    inherited_needed: List[str] = []
-    for column_name, meta in fields.items():
-        name = str(column_name)
-        if name in direct_set:
-            continue
-        if _needs_inherit(meta or {}):
-            inherited_needed.append(name)
-
-    if not inherited_needed and "id" in fields and "id" not in direct_set:
-        # fallback for older registries that did not capture key/required metadata
-        inherited_needed = ["id"]
-
-    return inherited_needed + direct_columns
+    return _registry_table_columns(registry, table_name)
 
 
 def _output_table_columns(
@@ -400,6 +375,30 @@ def _project_row_to_columns(row: Dict[str, Any], columns: List[str]) -> Dict[str
         if column_name in row:
             projected[column_name] = row[column_name]
     return projected
+
+
+def _drop_parent_rows_with_child_ids(
+    parent_rows: List[Dict[str, Any]],
+    child_rows: List[Dict[str, Any]],
+    *,
+    id_column: str = "id",
+) -> Tuple[List[Dict[str, Any]], int]:
+    child_ids = {
+        str(row.get(id_column) or "").strip()
+        for row in child_rows
+        if str(row.get(id_column) or "").strip()
+    }
+    if not child_ids:
+        return parent_rows, 0
+    kept: List[Dict[str, Any]] = []
+    dropped = 0
+    for row in parent_rows:
+        row_id = str(row.get(id_column) or "").strip()
+        if row_id and row_id in child_ids:
+            dropped += 1
+            continue
+        kept.append(row)
+    return kept, dropped
 
 
 def _registry_field_meta(
@@ -1594,10 +1593,24 @@ def cli() -> None:
 
     log.info("--- DONE EXTRACTING ---")
 
-    # Previously we dropped Resources rows whose id also appeared in Collections to avoid
-    # duplicate ids. That was wrong for EMX2 tableExtends: the parent (Resources) row carries
-    # the parent-only columns (e.g. publisher, contact point) and must reach MOLGENIS so those
-    # fields land on the shared record. Keep both rows; MOLGENIS merges them via shared id.
+    # EMX2 tableExtends share a primary-key space: a Collections row with id=X and a
+    # Resources row with id=X would be the same record, so MOLGENIS rejects them as a
+    # duplicate-key conflict. Drop Resources rows whose id is already in Collections;
+    # inherited parent fields (e.g. publisher, contact point) travel on the Collections
+    # sheet as inherited columns and land on the shared record via tableExtends.
+    if dynamic_registry:
+        collection_columns = _registry_table_columns(dynamic_registry, "Collections")
+        if collection_columns:
+            resource_rows, dropped_resource_rows = _drop_parent_rows_with_child_ids(
+                resource_rows,
+                collection_rows,
+                id_column="id",
+            )
+            if dropped_resource_rows:
+                log.info(
+                    "Dropped %d Resources row(s) also present in Collections to avoid duplicate primary keys in inherited table.",
+                    dropped_resource_rows,
+                )
 
     if dynamic_registry:
         resource_rows = _normalize_rows_with_runtime_schema(
