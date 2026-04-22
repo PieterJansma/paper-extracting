@@ -57,7 +57,8 @@ What this script does:
   5. Download GLM-OCR-Q8_0.gguf and mmproj-GLM-OCR-Q8_0.gguf (OCR VLM) with wget
   6. Verify both GLM-OCR files against sha256 hashes
   7. Create/update a dedicated cluster venv for this repo
-  8. Install this project plus the extra OCR/Excel runtime packages
+  8. Install pinned deps from requirements.lock if present (exact snapshot),
+     otherwise install latest compatible versions plus OCR/Excel extras
   9. Optionally build llama.cpp if BUILD_LLAMA=1
 
 Important:
@@ -286,17 +287,27 @@ setup_venv() {
   log "upgrading pip/setuptools/wheel in $VENV_DIR"
   "$pip_python" -m pip install --upgrade pip setuptools wheel
 
-  if [[ "$PIP_INSTALL_PROJECT" == "1" ]]; then
-    log "installing project from $SCRIPT_DIR into $VENV_DIR"
-    "$pip_python" -m pip install -e "$SCRIPT_DIR" --no-build-isolation
-  fi
-
-  if [[ -n "$PIP_EXTRA_PACKAGES" ]]; then
-    local extra_packages=()
-    read -r -a extra_packages <<<"$PIP_EXTRA_PACKAGES"
-    if [[ ${#extra_packages[@]} -gt 0 ]]; then
-      log "installing extra runtime packages: $PIP_EXTRA_PACKAGES"
-      "$pip_python" -m pip install "${extra_packages[@]}"
+  local lock_file="$SCRIPT_DIR/requirements.lock"
+  if [[ -f "$lock_file" ]]; then
+    log "installing pinned dependencies from $lock_file"
+    "$pip_python" -m pip install -r "$lock_file"
+    if [[ "$PIP_INSTALL_PROJECT" == "1" ]]; then
+      log "installing project from $SCRIPT_DIR into $VENV_DIR (--no-deps; lock controls versions)"
+      "$pip_python" -m pip install -e "$SCRIPT_DIR" --no-build-isolation --no-deps
+    fi
+  else
+    log "no requirements.lock found; falling back to unpinned install"
+    if [[ "$PIP_INSTALL_PROJECT" == "1" ]]; then
+      log "installing project from $SCRIPT_DIR into $VENV_DIR"
+      "$pip_python" -m pip install -e "$SCRIPT_DIR" --no-build-isolation
+    fi
+    if [[ -n "$PIP_EXTRA_PACKAGES" ]]; then
+      local extra_packages=()
+      read -r -a extra_packages <<<"$PIP_EXTRA_PACKAGES"
+      if [[ ${#extra_packages[@]} -gt 0 ]]; then
+        log "installing extra runtime packages: $PIP_EXTRA_PACKAGES"
+        "$pip_python" -m pip install "${extra_packages[@]}"
+      fi
     fi
   fi
 }
