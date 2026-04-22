@@ -347,15 +347,24 @@ def _registry_direct_columns(registry: Dict[str, Any] | None, table_name: str) -
 def _registry_import_columns(registry: Dict[str, Any] | None, table_name: str) -> List[str]:
     """Return sheet columns for child tables that still need their inherited key.
 
-    EMX2 child tables such as Collections extend a parent table but still require the shared
-    key column (`id`) to be present in the import sheet. Keep the direct child columns, but
-    add the inherited key back when the runtime schema exposes it.
+    EMX2 child tables such as Collections extend a parent table but still require the
+    primary-key column(s) to be present in the import sheet. Keep the direct child columns
+    and prepend any inherited columns whose `key=1` metadata marks them as the PK.
     """
-    columns = list(_registry_direct_columns(registry, table_name))
-    all_columns = _registry_table_columns(registry, table_name)
-    if "id" in all_columns and "id" not in columns:
-        return ["id", *columns]
-    return columns
+    direct_columns = list(_registry_direct_columns(registry, table_name))
+    direct_set = {str(c) for c in direct_columns}
+    fields = ((registry or {}).get("tables", {}).get(table_name, {}) or {}).get("fields", {}) or {}
+    inherited_pk: List[str] = []
+    for column_name, meta in fields.items():
+        name = str(column_name)
+        if name in direct_set:
+            continue
+        if str((meta or {}).get("key") or "").strip() == "1":
+            inherited_pk.append(name)
+    if not inherited_pk and "id" in fields and "id" not in direct_set:
+        # fallback for older registries that did not capture `key` metadata
+        inherited_pk = ["id"]
+    return inherited_pk + direct_columns
 
 
 def _output_table_columns(

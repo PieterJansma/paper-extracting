@@ -480,6 +480,7 @@ def build_runtime_registry(
             {
                 "column_name": column,
                 "column_type": str(row.get("columnType") or "").strip(),
+                "key": str(row.get("key") or "").strip(),
                 "ref_schema": str(row.get("refSchema") or "").strip(),
                 "ref_table": str(row.get("refTable") or "").strip(),
                 "ref_link": str(row.get("refLink") or "").strip(),
