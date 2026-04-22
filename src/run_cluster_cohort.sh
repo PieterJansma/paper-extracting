@@ -71,8 +71,8 @@ SYNC_REQUIRED="${SYNC_REQUIRED:-0}"
 # Defaults below are set for this cluster/user setup.
 # You can still override them via environment variables if needed.
 OCR_VLM_ENABLE="${OCR_VLM_ENABLE:-1}"
-OCR_VLM_MODEL_PATH="${OCR_VLM_MODEL_PATH:-/groups/umcg-gcc/tmp02/users/umcg-pjansma/Models/GGUF/GLM-OCR/GLM-OCR-Q8_0.gguf}"
-OCR_VLM_MMPROJ_PATH="${OCR_VLM_MMPROJ_PATH:-/groups/umcg-gcc/tmp02/users/umcg-pjansma/Models/GGUF/GLM-OCR/mmproj-GLM-OCR-Q8_0.gguf}"
+OCR_VLM_MODEL_PATH="${OCR_VLM_MODEL_PATH:-$RUNTIME_ROOT/GGUF/GLM-OCR/GLM-OCR-Q8_0.gguf}"
+OCR_VLM_MMPROJ_PATH="${OCR_VLM_MMPROJ_PATH:-$RUNTIME_ROOT/GGUF/GLM-OCR/mmproj-GLM-OCR-Q8_0.gguf}"
 OCR_VLM_ALIAS="${OCR_VLM_ALIAS:-glm-ocr}"
 if [[ "${OCR_VLM_PORT+x}" == "x" ]]; then
   OCR_VLM_PORT_ENV_SET=1
@@ -87,7 +87,7 @@ OCR_VLM_USE_TENSOR_SPLIT="${OCR_VLM_USE_TENSOR_SPLIT:-1}"
 OCR_VLM_TENSOR_SPLIT="${OCR_VLM_TENSOR_SPLIT:-}"
 OCR_VLM_SPLIT_MODE="${OCR_VLM_SPLIT_MODE:-layer}"
 OCR_VLM_MAIN_GPU="${OCR_VLM_MAIN_GPU:-0}"
-OCR_VLM_LLAMA_BIN="${OCR_VLM_LLAMA_BIN:-/groups/umcg-gcc/tmp02/users/umcg-pjansma/Repositories/llama.cpp-glmtest/build/bin/llama-server}"
+OCR_VLM_LLAMA_BIN="${OCR_VLM_LLAMA_BIN:-$LLAMA_BIN}"
 OCR_VLM_PREFETCH_MODE="${OCR_VLM_PREFETCH_MODE:-1}"
 OCR_PREFETCH_DIR="${OCR_PREFETCH_DIR:-${RUN_DIR}/ocr_prefetch}"
 # Strip trailing references/bibliography block from extracted paper text.

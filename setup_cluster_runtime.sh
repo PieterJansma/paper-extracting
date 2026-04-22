@@ -25,6 +25,14 @@ GEMMA_NAME="gemma-4-31B-it-Q4_K_M.gguf"
 GEMMA_URL="https://huggingface.co/ggml-org/gemma-4-31B-it-GGUF/resolve/main/gemma-4-31B-it-Q4_K_M.gguf"
 GEMMA_SHA256="${GEMMA_SHA256:-3bf13fff7c0d4deff809b7ab168428f54855f3ef0279339dda278a81ea853474}"
 
+GLMOCR_DIR="${GLMOCR_DIR:-$MODELS_DIR/GLM-OCR}"
+GLMOCR_MAIN_NAME="GLM-OCR-Q8_0.gguf"
+GLMOCR_MAIN_URL="https://huggingface.co/ggml-org/GLM-OCR-GGUF/resolve/main/GLM-OCR-Q8_0.gguf"
+GLMOCR_MAIN_SHA256="${GLMOCR_MAIN_SHA256:-58b4b29c3303fc4d7e44d750243b78c475103118ccea1223a8c419f97908c315}"
+GLMOCR_MMPROJ_NAME="mmproj-GLM-OCR-Q8_0.gguf"
+GLMOCR_MMPROJ_URL="https://huggingface.co/ggml-org/GLM-OCR-GGUF/resolve/main/mmproj-GLM-OCR-Q8_0.gguf"
+GLMOCR_MMPROJ_SHA256="${GLMOCR_MMPROJ_SHA256:-9c4b58e33e316ed142eb5dcb41abec3844d3e6e5dc361ffb782c3fa9d175141f}"
+
 usage() {
   cat <<'USAGE'
 Usage:
@@ -46,9 +54,11 @@ What this script does:
   2. Checkout the exact working commit currently used on the cluster
   3. Download gemma-4-31B-it-Q4_K_M.gguf with wget
   4. Verify Gemma against the working sha256 hash
-  5. Create/update a dedicated cluster venv for this repo
-  6. Install this project plus the extra OCR/Excel runtime packages
-  7. Optionally build llama.cpp if BUILD_LLAMA=1
+  5. Download GLM-OCR-Q8_0.gguf and mmproj-GLM-OCR-Q8_0.gguf (OCR VLM) with wget
+  6. Verify both GLM-OCR files against sha256 hashes
+  7. Create/update a dedicated cluster venv for this repo
+  8. Install this project plus the extra OCR/Excel runtime packages
+  9. Optionally build llama.cpp if BUILD_LLAMA=1
 
 Important:
   BUILD_LLAMA=1 should be used on a compute node with the required modules loaded.
@@ -152,6 +162,27 @@ seed_gemma_from_existing() {
   return 1
 }
 
+seed_glm_ocr_from_existing() {
+  local label="$1"                       # "GLM-OCR main" or "GLM-OCR mmproj"
+  local filename="$2"
+  local expected_sha="$3"
+  local source_override="$4"             # may be empty
+  local target="$GLMOCR_DIR/$filename"
+  local candidates=(
+    "$source_override"
+    "$SCRIPT_DIR/.runtime/GGUF/GLM-OCR/$filename"
+    "$WORKDIR/Models/GGUF/GLM-OCR/$filename"
+  )
+
+  local candidate
+  for candidate in "${candidates[@]}"; do
+    if copy_if_verified "$candidate" "$target" "$expected_sha" "$label"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 clone_llama_cpp() {
   mkdir -p "$REPOS_DIR"
   if [[ ! -d "$LLAMA_DIR/.git" ]]; then
@@ -209,6 +240,38 @@ download_gemma() {
   verify_sha256 "$GEMMA_DIR/$GEMMA_NAME" "$GEMMA_SHA256" "Gemma GGUF"
 }
 
+download_glm_ocr_file() {
+  local label="$1"
+  local filename="$2"
+  local url="$3"
+  local expected_sha="$4"
+  local source_override="$5"
+  local target="$GLMOCR_DIR/$filename"
+
+  remove_if_hash_mismatch "$target" "$expected_sha" "$label"
+  if [[ -f "$target" ]]; then
+    verify_sha256 "$target" "$expected_sha" "$label"
+    return 0
+  fi
+
+  if seed_glm_ocr_from_existing "$label" "$filename" "$expected_sha" "$source_override"; then
+    verify_sha256 "$target" "$expected_sha" "$label"
+    return 0
+  fi
+
+  cd "$GLMOCR_DIR"
+  download_file "$url" "$filename"
+  verify_sha256 "$target" "$expected_sha" "$label"
+}
+
+download_glm_ocr() {
+  mkdir -p "$GLMOCR_DIR"
+  download_glm_ocr_file \
+    "GLM-OCR main"   "$GLMOCR_MAIN_NAME"   "$GLMOCR_MAIN_URL"   "$GLMOCR_MAIN_SHA256"   "${GLMOCR_MAIN_SOURCE_FILE:-}"
+  download_glm_ocr_file \
+    "GLM-OCR mmproj" "$GLMOCR_MMPROJ_NAME" "$GLMOCR_MMPROJ_URL" "$GLMOCR_MMPROJ_SHA256" "${GLMOCR_MMPROJ_SOURCE_FILE:-}"
+}
+
 setup_venv() {
   local python_bin="$PYTHON_BIN"
   if [[ ! -x "$VENV_DIR/bin/python" ]]; then
@@ -256,15 +319,21 @@ llama.cpp:
   server:  $LLAMA_DIR/build/bin/llama-server
 
 models:
-  Gemma:  $GEMMA_DIR/$GEMMA_NAME
+  Gemma:         $GEMMA_DIR/$GEMMA_NAME
+  GLM-OCR main:  $GLMOCR_DIR/$GLMOCR_MAIN_NAME
+  GLM-OCR mmproj: $GLMOCR_DIR/$GLMOCR_MMPROJ_NAME
 
 verified sha256:
-  Gemma:  $GEMMA_SHA256
+  Gemma:          $GEMMA_SHA256
+  GLM-OCR main:   $GLMOCR_MAIN_SHA256
+  GLM-OCR mmproj: $GLMOCR_MMPROJ_SHA256
 
 Generated runtime paths:
   VENV_DIR=$VENV_DIR
   LLAMA_BIN=$LLAMA_DIR/build/bin/llama-server
   MODEL_PATH=$GEMMA_DIR/$GEMMA_NAME
+  OCR_VLM_MODEL_PATH=$GLMOCR_DIR/$GLMOCR_MAIN_NAME
+  OCR_VLM_MMPROJ_PATH=$GLMOCR_DIR/$GLMOCR_MMPROJ_NAME
   RUNTIME_ROOT=$RUNTIME_ROOT
 
 Run with:
@@ -293,6 +362,7 @@ main() {
   fi
 
   download_gemma
+  download_glm_ocr
   setup_venv
   print_summary
 }
