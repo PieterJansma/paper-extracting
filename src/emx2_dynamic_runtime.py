@@ -512,9 +512,13 @@ def build_runtime_registry(
 
     for table_name in sorted(direct_fields.keys()):
         fields = resolve_table_fields(table_name)
+        direct_names = [meta["column_name"] for meta in direct_fields.get(table_name, [])]
+        inherited_names = [name for name in fields.keys() if name not in set(direct_names)]
         tables_registry[table_name] = {
             "extends": table_extends.get(table_name, ""),
             "fields": fields,
+            "direct_field_names": direct_names,
+            "inherited_field_names": inherited_names,
         }
         for meta in fields.values():
             rel_paths = _source_rel_paths_for_field(meta)

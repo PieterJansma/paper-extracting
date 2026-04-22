@@ -331,6 +331,19 @@ def _registry_table_columns(registry: Dict[str, Any] | None, table_name: str) ->
     return [str(column_name) for column_name in fields.keys()]
 
 
+def _registry_direct_columns(registry: Dict[str, Any] | None, table_name: str) -> List[str]:
+    """Return only columns declared directly on the table (excluding inherited parent fields).
+
+    Falls back to the full merged column list if the registry has not been built with the
+    direct/inherited split (older cached registries).
+    """
+    table_meta = ((registry or {}).get("tables", {}).get(table_name, {}) or {})
+    direct = table_meta.get("direct_field_names")
+    if isinstance(direct, list) and direct:
+        return [str(name) for name in direct]
+    return _registry_table_columns(registry, table_name)
+
+
 def _output_table_columns(
     table_name: str,
     *,
@@ -349,31 +362,6 @@ def _project_row_to_columns(row: Dict[str, Any], columns: List[str]) -> Dict[str
         if column_name in row:
             projected[column_name] = row[column_name]
     return projected
-
-
-def _drop_parent_rows_with_child_ids(
-    parent_rows: List[Dict[str, Any]],
-    child_rows: List[Dict[str, Any]],
-    *,
-    id_column: str = "id",
-) -> Tuple[List[Dict[str, Any]], int]:
-    child_ids = {
-        str(row.get(id_column) or "").strip()
-        for row in child_rows
-        if str(row.get(id_column) or "").strip()
-    }
-    if not child_ids:
-        return parent_rows, 0
-
-    kept_rows: List[Dict[str, Any]] = []
-    dropped = 0
-    for row in parent_rows:
-        row_id = str(row.get(id_column) or "").strip()
-        if row_id and row_id in child_ids:
-            dropped += 1
-            continue
-        kept_rows.append(row)
-    return kept_rows, dropped
 
 
 def _registry_field_meta(
@@ -1323,7 +1311,7 @@ def cli() -> None:
         resource_row, resource_ref = _resource_row_from_sections(label, pdf_path, per_section_results, run_issues)
         resource_rows.append(resource_row)
         if dynamic_registry:
-            collection_columns = _registry_table_columns(dynamic_registry, "Collections")
+            collection_columns = _registry_direct_columns(dynamic_registry, "Collections")
             if collection_columns:
                 collection_row = _project_row_to_columns(resource_row, collection_columns)
                 if "resource" in collection_row and not str(collection_row.get("resource") or "").strip():
@@ -1566,19 +1554,10 @@ def cli() -> None:
 
     log.info("--- DONE EXTRACTING ---")
 
-    if dynamic_registry:
-        collection_columns = _registry_table_columns(dynamic_registry, "Collections")
-        if collection_columns:
-            resource_rows, dropped_resource_rows = _drop_parent_rows_with_child_ids(
-                resource_rows,
-                collection_rows,
-                id_column="id",
-            )
-            if dropped_resource_rows:
-                log.info(
-                    "Dropped %d Resources row(s) also present in Collections to avoid inherited-table duplicate ids.",
-                    dropped_resource_rows,
-                )
+    # Previously we dropped Resources rows whose id also appeared in Collections to avoid
+    # duplicate ids. That was wrong for EMX2 tableExtends: the parent (Resources) row carries
+    # the parent-only columns (e.g. publisher, contact point) and must reach MOLGENIS so those
+    # fields land on the shared record. Keep both rows; MOLGENIS merges them via shared id.
 
     if dynamic_registry:
         resource_rows = _normalize_rows_with_runtime_schema(
@@ -1731,7 +1710,7 @@ def cli() -> None:
         "Publications": pd.DataFrame(publication_rows, columns=publication_columns),
         "Documentation": pd.DataFrame(documentation_rows, columns=documentation_columns),
     }
-    collections_columns = _registry_table_columns(dynamic_registry, "Collections")
+    collections_columns = _registry_direct_columns(dynamic_registry, "Collections")
     if collections_columns:
         frames["Collections"] = pd.DataFrame(collection_rows, columns=collections_columns)
     for table_name, rows in dynamic_table_rows.items():

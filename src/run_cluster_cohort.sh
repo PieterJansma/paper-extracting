@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-LLAMA_BIN="/groups/umcg-gcc/tmp02/users/umcg-pjansma/Repositories/llama.cpp/build/bin/llama-server"
-MODEL_PATH="/groups/umcg-gcc/tmp02/users/umcg-pjansma/Models/GGUF/gemma-4-31B-it-Q4_K_M.gguf"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+cd "$REPO_ROOT"
+
+SETUP_SUFFIX="${SETUP_SUFFIX:-}"
+RUNTIME_ROOT="${RUNTIME_ROOT:-$REPO_ROOT/.runtime${SETUP_SUFFIX}}"
+LLAMA_BIN="${LLAMA_BIN:-$RUNTIME_ROOT/llama.cpp/build/bin/llama-server}"
+MODEL_PATH="${MODEL_PATH:-$RUNTIME_ROOT/GGUF/gemma-4-31B-it-Q4_K_M.gguf}"
 
 MODEL_GPU0="$MODEL_PATH"
 MODEL_GPU1="$MODEL_PATH"
@@ -11,6 +17,18 @@ DEFAULT_PORT_LB=18000
 DEFAULT_PORT_GPU0=18080
 DEFAULT_PORT_GPU1=18081
 DEFAULT_PORT_OCR=18090
+
+DEFAULT_CLUSTER_VENV="$REPO_ROOT/.venv.cluster${SETUP_SUFFIX}"
+LEGACY_VENV="$REPO_ROOT/.venv"
+if [[ -z "${VENV_DIR:-}" ]]; then
+  if [[ -f "$DEFAULT_CLUSTER_VENV/bin/activate" ]]; then
+    VENV_DIR="$DEFAULT_CLUSTER_VENV"
+  elif [[ -f "$LEGACY_VENV/bin/activate" ]]; then
+    VENV_DIR="$LEGACY_VENV"
+  else
+    VENV_DIR="$DEFAULT_CLUSTER_VENV"
+  fi
+fi
 
 PORT_LB="${PORT_LB:-$DEFAULT_PORT_LB}"
 PORT_GPU0="${PORT_GPU0:-$DEFAULT_PORT_GPU0}"
@@ -632,21 +650,35 @@ if command -v module >/dev/null 2>&1; then
   module load Python/3.10.4-GCCcore-11.3.0 || true
 fi
 
-if [[ -f ".venv/bin/activate" ]]; then
-  echo "[Setup] Activating Virtual Environment (.venv)..."
-  source .venv/bin/activate
+if [[ -f "$VENV_DIR/bin/activate" ]]; then
+  echo "[Setup] Activating Virtual Environment ($VENV_DIR)..."
+  # shellcheck disable=SC1090
+  source "$VENV_DIR/bin/activate"
 else
-  echo "❌ ERROR: No .venv found!"
+  echo "❌ ERROR: No venv found at $VENV_DIR"
+  echo "   Preferred cluster bootstrap:"
+  echo "   bash setup_cluster_runtime.sh"
+  echo "   or"
+  echo "   sbatch setup_cluster_runtime.sbatch"
+  echo "   "
   echo "   Create one with:"
   echo "   module load Python/3.10.4-GCCcore-11.3.0"
-  echo "   python3 -m venv .venv"
-  echo "   source .venv/bin/activate"
+  echo "   python3 -m venv $VENV_DIR"
+  echo "   source $VENV_DIR/bin/activate"
   echo "   pip3 install -e . --no-build-isolation"
+  echo "   pip3 install pypdfium2 pillow xlsxwriter"
   exit 1
 fi
 
 if [[ ! -x "$LLAMA_BIN" ]]; then
   echo "❌ ERROR: llama-server not found at $LLAMA_BIN"
+  echo "   Run: bash setup_cluster_runtime.sh"
+  exit 1
+fi
+
+if [[ ! -f "$MODEL_GPU0" ]]; then
+  echo "❌ ERROR: model not found at $MODEL_GPU0"
+  echo "   Run: bash setup_cluster_runtime.sh"
   exit 1
 fi
 
@@ -848,7 +880,7 @@ PY
   fi
 
   echo "❌ ERROR: OCR_VLM_ENABLE=1, but no PDF page renderer is available."
-  echo "   Install in .venv: pip3 install pypdfium2 pillow"
+  echo "   Install in $VENV_DIR: pip3 install pypdfium2 pillow"
   echo "   Or ensure pdftoppm is available in PATH."
   exit 1
 }

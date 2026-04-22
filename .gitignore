@@ -1,4 +1,5 @@
 .venv/
+.venv.cluster*/
 .history/
 .pycache_local/
 .DS_Store
@@ -12,5 +13,12 @@ dist/
 logs/
 src/logs/
 tmp/
+.runtime*/
 config.runtime.toml
 tcp_lb.py
+
+# Generated spreadsheet outputs
+*.xls
+*.xlsx
+*.xlsm
+*.xlsb
