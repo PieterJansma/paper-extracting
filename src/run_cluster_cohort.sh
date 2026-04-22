@@ -87,7 +87,15 @@ OCR_VLM_USE_TENSOR_SPLIT="${OCR_VLM_USE_TENSOR_SPLIT:-1}"
 OCR_VLM_TENSOR_SPLIT="${OCR_VLM_TENSOR_SPLIT:-}"
 OCR_VLM_SPLIT_MODE="${OCR_VLM_SPLIT_MODE:-layer}"
 OCR_VLM_MAIN_GPU="${OCR_VLM_MAIN_GPU:-0}"
-OCR_VLM_LLAMA_BIN="${OCR_VLM_LLAMA_BIN:-$LLAMA_BIN}"
+_OCR_VLM_GLMTEST_BIN="/groups/umcg-gcc/tmp02/users/umcg-pjansma/Repositories/llama.cpp-glmtest/build/bin/llama-server"
+if [[ -z "${OCR_VLM_LLAMA_BIN:-}" ]]; then
+  if [[ -x "$_OCR_VLM_GLMTEST_BIN" ]]; then
+    OCR_VLM_LLAMA_BIN="$_OCR_VLM_GLMTEST_BIN"
+  else
+    OCR_VLM_LLAMA_BIN="$LLAMA_BIN"
+  fi
+fi
+unset _OCR_VLM_GLMTEST_BIN
 OCR_VLM_PREFETCH_MODE="${OCR_VLM_PREFETCH_MODE:-1}"
 OCR_PREFETCH_DIR="${OCR_PREFETCH_DIR:-${RUN_DIR}/ocr_prefetch}"
 # Strip trailing references/bibliography block from extracted paper text.
