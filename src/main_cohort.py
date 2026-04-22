@@ -345,26 +345,41 @@ def _registry_direct_columns(registry: Dict[str, Any] | None, table_name: str) -
 
 
 def _registry_import_columns(registry: Dict[str, Any] | None, table_name: str) -> List[str]:
-    """Return sheet columns for child tables that still need their inherited key.
+    """Return sheet columns for child tables that inherit from a parent.
 
-    EMX2 child tables such as Collections extend a parent table but still require the
-    primary-key column(s) to be present in the import sheet. Keep the direct child columns
-    and prepend any inherited columns whose `key=1` metadata marks them as the PK.
+    EMX2 child tables such as Collections (extends Resources) must still carry inherited
+    columns that MOLGENIS validates per-sheet:
+
+      * primary-key and other key columns (`key=1,2,3,...`): needed to match parent row
+      * columns marked `required=TRUE`: MOLGENIS rejects the row if they are missing,
+        even when the parent sheet supplies them elsewhere.
+
+    Non-key, non-required inherited columns (e.g. publisher, contact point) stay out of
+    the child sheet; their data travels on the parent sheet with a shared id.
     """
     direct_columns = list(_registry_direct_columns(registry, table_name))
     direct_set = {str(c) for c in direct_columns}
     fields = ((registry or {}).get("tables", {}).get(table_name, {}) or {}).get("fields", {}) or {}
-    inherited_pk: List[str] = []
+
+    def _needs_inherit(meta: Dict[str, Any]) -> bool:
+        if str((meta or {}).get("key") or "").strip():
+            return True
+        required = str((meta or {}).get("required") or "").strip().upper()
+        return required in {"TRUE", "1", "YES"}
+
+    inherited_needed: List[str] = []
     for column_name, meta in fields.items():
         name = str(column_name)
         if name in direct_set:
             continue
-        if str((meta or {}).get("key") or "").strip() == "1":
-            inherited_pk.append(name)
-    if not inherited_pk and "id" in fields and "id" not in direct_set:
-        # fallback for older registries that did not capture `key` metadata
-        inherited_pk = ["id"]
-    return inherited_pk + direct_columns
+        if _needs_inherit(meta or {}):
+            inherited_needed.append(name)
+
+    if not inherited_needed and "id" in fields and "id" not in direct_set:
+        # fallback for older registries that did not capture key/required metadata
+        inherited_needed = ["id"]
+
+    return inherited_needed + direct_columns
 
 
 def _output_table_columns(
