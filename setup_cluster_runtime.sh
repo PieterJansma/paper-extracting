@@ -273,6 +273,7 @@ download_glm_ocr() {
 }
 
 setup_venv() {
+  cd "$SCRIPT_DIR"
   local python_bin="$PYTHON_BIN"
   if [[ ! -x "$VENV_DIR/bin/python" ]]; then
     log "creating venv at $VENV_DIR"
@@ -286,8 +287,8 @@ setup_venv() {
   "$pip_python" -m pip install --upgrade pip setuptools wheel
 
   if [[ "$PIP_INSTALL_PROJECT" == "1" ]]; then
-    log "installing project into $VENV_DIR"
-    "$pip_python" -m pip install -e . --no-build-isolation
+    log "installing project from $SCRIPT_DIR into $VENV_DIR"
+    "$pip_python" -m pip install -e "$SCRIPT_DIR" --no-build-isolation
   fi
 
   if [[ -n "$PIP_EXTRA_PACKAGES" ]]; then
