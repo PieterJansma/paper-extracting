@@ -23,5 +23,5 @@ tcp_lb.py
 *.xlsm
 *.xlsb
 .claude/
-.github/*
+.github/
 .pre-commit-config.yaml
