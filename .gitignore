@@ -22,3 +22,5 @@ tcp_lb.py
 *.xlsx
 *.xlsm
 *.xlsb
+.claude/
+.github/
