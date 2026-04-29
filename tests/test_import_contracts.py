@@ -9,6 +9,7 @@ from fix_molgenis_staging_types_callable import (
 )
 from main_cohort import (
     _build_local_organisation_ref_map,
+    _clear_organisation_parent_reference,
     _clear_self_organisation_reference,
     _ensure_organisation_ids,
     _registry_import_columns,
@@ -61,6 +62,18 @@ def test_self_organisation_reference_is_cleared_to_avoid_fk_error() -> None:
     row = {"id": "MRC", "organisation": "MRC"}
     _clear_self_organisation_reference(row)
     assert row["organisation"] == ""
+
+
+def test_organisation_parent_reference_is_cleared_to_avoid_inherited_fk_error() -> None:
+    row = {
+        "id": "Department of Epidemiology",
+        "type": "Organisation",
+        "organisation": "UMCG",
+        "other organisation": "",
+    }
+    _clear_organisation_parent_reference(row)
+    assert row["organisation"] == ""
+    assert row["other organisation"] == "UMCG"
 
 
 def test_external_organisation_normalizer_does_not_backfill_blank_fk_from_name() -> None:

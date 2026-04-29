@@ -712,6 +712,25 @@ def _clear_self_organisation_reference(row: Dict[str, Any]) -> None:
         row["organisation"] = ""
 
 
+def _clear_organisation_parent_reference(row: Dict[str, Any]) -> None:
+    """
+    Avoid organisation->organisation FK values on organisation rows.
+
+    In the inherited Organisations/Agents import path, these parent-organisation refs
+    can fail because the referenced child organisation row is not yet available when
+    the parent Agents row is inserted. Preserve the human-readable label in
+    `other organisation` when that column is still empty.
+    """
+    if str(row.get("type") or "").strip() != "Organisation":
+        return
+    org_ref = str(row.get("organisation") or "").strip()
+    if not org_ref:
+        return
+    if not str(row.get("other organisation") or "").strip():
+        row["other organisation"] = org_ref
+    row["organisation"] = ""
+
+
 def _serialize_bool_default_false(value: Any) -> str:
     if _is_empty_value(value):
         return "false"
@@ -1528,6 +1547,7 @@ def cli() -> None:
                     org_ref_map,
                 )
             _clear_self_organisation_reference(base_row)
+            _clear_organisation_parent_reference(base_row)
             if _is_organisation_contributor(item):
                 org_row = _blank_row(COHORT_SHEETS["Organisations"])
                 org_row.update(base_row)
