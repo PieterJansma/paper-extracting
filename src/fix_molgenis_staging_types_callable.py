@@ -889,8 +889,6 @@ def _normalize_external_organisation_refs(wb: Any, external_index: Dict[str, Any
         organisation_col = hdr.get("organisation")
         other_col = hdr.get("other organisation")
         type_col = hdr.get("type")
-        name_col = hdr.get("name")
-        id_col = hdr.get("id")
         if not organisation_col:
             continue
 
@@ -903,11 +901,11 @@ def _normalize_external_organisation_refs(wb: Any, external_index: Dict[str, Any
 
             raw_organisation = _clean_string(ws.cell(row=row_idx, column=organisation_col).value)
             raw_other = _clean_string(ws.cell(row=row_idx, column=other_col).value) if other_col else ""
-            raw_name = _clean_string(ws.cell(row=row_idx, column=name_col).value) if name_col else ""
-            raw_id = _clean_string(ws.cell(row=row_idx, column=id_col).value) if id_col else ""
-
             mapped = ""
-            for candidate in (raw_organisation, raw_name, raw_other, raw_id):
+            reference_candidates = [raw_organisation]
+            if raw_other:
+                reference_candidates.append(raw_other)
+            for candidate in reference_candidates:
                 mapped = _match_external_organisation(external_index, candidate)
                 if mapped:
                     break
@@ -918,10 +916,72 @@ def _normalize_external_organisation_refs(wb: Any, external_index: Dict[str, Any
                     ws.cell(row=row_idx, column=other_col).value = ""
                 continue
 
-            fallback = raw_organisation or raw_name or raw_other or raw_id
-            ws.cell(row=row_idx, column=organisation_col).value = ""
-            if other_col and fallback and not raw_other:
-                ws.cell(row=row_idx, column=other_col).value = fallback
+            if raw_organisation:
+                ws.cell(row=row_idx, column=organisation_col).value = ""
+                if other_col and not raw_other:
+                    ws.cell(row=row_idx, column=other_col).value = raw_organisation
+
+
+def _build_organisation_ref_maps(wb: Any) -> tuple[Dict[str, str], Dict[str, str]]:
+    exact: Dict[str, str] = {}
+    norm: Dict[str, str] = {}
+    exact_multi: set[str] = set()
+    norm_multi: set[str] = set()
+
+    def _add_mapping(token: str, canonical: str) -> None:
+        if token in exact and exact[token] != canonical:
+            exact_multi.add(token)
+        else:
+            exact[token] = canonical
+
+        normalized = _normalize_ref_token(token)
+        if not normalized:
+            return
+        if normalized in norm and norm[normalized] != canonical:
+            norm_multi.add(normalized)
+        else:
+            norm[normalized] = canonical
+
+    def _consume(ws: Any, *, require_type_filter: bool) -> None:
+        hdr = _sheet_header_index(ws)
+        type_col = hdr.get("type")
+        id_col = hdr.get("id")
+        name_col = hdr.get("name")
+        other_col = hdr.get("other organisation")
+        for row_idx in range(2, ws.max_row + 1):
+            if require_type_filter and type_col:
+                typ = _clean_string(ws.cell(row=row_idx, column=type_col).value)
+                if typ != "Organisation":
+                    continue
+
+            canonical = ""
+            for col_idx in (id_col, name_col, other_col):
+                if not col_idx:
+                    continue
+                value = _clean_string(ws.cell(row=row_idx, column=col_idx).value)
+                if value:
+                    canonical = value
+                    break
+            if not canonical:
+                continue
+
+            for col_idx in (id_col, name_col, other_col):
+                if not col_idx:
+                    continue
+                token = _clean_string(ws.cell(row=row_idx, column=col_idx).value)
+                if token:
+                    _add_mapping(token, canonical)
+
+    if "Organisations" in wb.sheetnames:
+        _consume(wb["Organisations"], require_type_filter=False)
+    if "Agents" in wb.sheetnames:
+        _consume(wb["Agents"], require_type_filter=True)
+
+    for token in exact_multi:
+        exact.pop(token, None)
+    for token in norm_multi:
+        norm.pop(token, None)
+    return exact, norm
 
 
 def _build_ref_index(wb: Any) -> Dict[str, Dict[str, str]]:
@@ -989,7 +1049,15 @@ def _build_ref_index(wb: Any) -> Dict[str, Dict[str, str]]:
                         candidates["Organisations"].add(organisation_val)
 
     ref_index: Dict[str, Dict[str, str]] = {}
+    organisation_exact, organisation_norm = _build_organisation_ref_maps(wb)
     for table, vals in candidates.items():
+        if table == "Organisations" and (organisation_exact or organisation_norm):
+            canonical_values = set(organisation_exact.values()) | set(organisation_norm.values())
+            ref_index[table] = {"__size__": str(len(canonical_values))}
+            ref_index[table].update({f"e:{k}": v for k, v in organisation_exact.items()})
+            ref_index[table].update({f"n:{k}": v for k, v in organisation_norm.items()})
+            continue
+
         by_exact: Dict[str, str] = {}
         by_norm: Dict[str, str] = {}
         norm_multi: set[str] = set()

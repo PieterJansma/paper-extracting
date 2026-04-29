@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+from openpyxl import Workbook
+
+from fix_molgenis_staging_types_callable import (
+    _build_ref_index,
+    _normalize_external_organisation_refs,
+    coerce_ref,
+)
 from main_cohort import (
     _build_local_organisation_ref_map,
     _clear_self_organisation_reference,
@@ -54,6 +61,105 @@ def test_self_organisation_reference_is_cleared_to_avoid_fk_error() -> None:
     row = {"id": "MRC", "organisation": "MRC"}
     _clear_self_organisation_reference(row)
     assert row["organisation"] == ""
+
+
+def test_external_organisation_normalizer_does_not_backfill_blank_fk_from_name() -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Organisations"
+    ws.append(
+        [
+            "resource",
+            "id",
+            "type",
+            "name",
+            "organisation",
+            "other organisation",
+            "department",
+            "website",
+            "email",
+            "logo",
+            "role",
+            "is lead organisation",
+        ]
+    )
+    ws.append(
+        [
+            "10.1186/s12967-019-2122-x",
+            "umcg-local",
+            "Organisation",
+            "UMCG",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+        ]
+    )
+
+    _normalize_external_organisation_refs(
+        wb,
+        {
+            "exact": {"UMCG": "UMCG"},
+            "norm": {"umcg": "UMCG"},
+        },
+    )
+
+    assert ws.cell(row=2, column=5).value == ""
+
+
+def test_organisation_refs_resolve_to_local_id_not_display_name() -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Organisations"
+    ws.append(
+        [
+            "resource",
+            "id",
+            "type",
+            "name",
+            "organisation",
+            "other organisation",
+            "department",
+            "website",
+            "email",
+            "logo",
+            "role",
+            "is lead organisation",
+        ]
+    )
+    ws.append(
+        [
+            "10.1186/s12967-019-2122-x",
+            "umcg-local",
+            "Organisation",
+            "UMCG",
+            "",
+            "University Medical Center Groningen",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+        ]
+    )
+
+    ref_index = _build_ref_index(wb)
+
+    assert coerce_ref("Resources", "publisher", "UMCG", ref_index) == "umcg-local"
+    assert (
+        coerce_ref(
+            "Resources",
+            "publisher",
+            "University Medical Center Groningen",
+            ref_index,
+        )
+        == "umcg-local"
+    )
 
 
 def test_resource_row_contract_has_non_empty_type() -> None:
