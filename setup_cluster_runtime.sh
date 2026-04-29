@@ -23,15 +23,17 @@ PIP_EXTRA_PACKAGES="${PIP_EXTRA_PACKAGES:-pypdfium2 pillow xlsxwriter}"
 
 GEMMA_DIR="${GEMMA_DIR:-$MODELS_DIR}"
 GEMMA_NAME="gemma-4-31B-it-Q4_K_M.gguf"
-GEMMA_URL="https://huggingface.co/ggml-org/gemma-4-31B-it-GGUF/resolve/main/gemma-4-31B-it-Q4_K_M.gguf"
+GEMMA_REVISION="${GEMMA_REVISION:-31311383e7f05e21e39dc69b39285be9cdeb1257}"
+GEMMA_URL="https://huggingface.co/ggml-org/gemma-4-31B-it-GGUF/resolve/${GEMMA_REVISION}/${GEMMA_NAME}"
 GEMMA_SHA256="${GEMMA_SHA256:-4f369f8fe0e1bedc5caee9abb89316887f548f80f3035398a5d222a737e699e6}"
 
 GLMOCR_DIR="${GLMOCR_DIR:-$MODELS_DIR/GLM-OCR}"
 GLMOCR_MAIN_NAME="GLM-OCR-Q8_0.gguf"
-GLMOCR_MAIN_URL="https://huggingface.co/ggml-org/GLM-OCR-GGUF/resolve/main/GLM-OCR-Q8_0.gguf"
+GLMOCR_REVISION="${GLMOCR_REVISION:-65a42de1148dbed2297e922b5dbc7d9b70c36578}"
+GLMOCR_MAIN_URL="https://huggingface.co/ggml-org/GLM-OCR-GGUF/resolve/${GLMOCR_REVISION}/${GLMOCR_MAIN_NAME}"
 GLMOCR_MAIN_SHA256="${GLMOCR_MAIN_SHA256:-45bc244a6446aff850521dc41f18bc8d7105ad5f0c2c8c28af04e7cc4f4d50b1}"
 GLMOCR_MMPROJ_NAME="mmproj-GLM-OCR-Q8_0.gguf"
-GLMOCR_MMPROJ_URL="https://huggingface.co/ggml-org/GLM-OCR-GGUF/resolve/main/mmproj-GLM-OCR-Q8_0.gguf"
+GLMOCR_MMPROJ_URL="https://huggingface.co/ggml-org/GLM-OCR-GGUF/resolve/${GLMOCR_REVISION}/${GLMOCR_MMPROJ_NAME}"
 GLMOCR_MMPROJ_SHA256="${GLMOCR_MMPROJ_SHA256:-9c4b58e33e316ed142eb5dcb41abec3844d3e6e5dc361ffb782c3fa9d175141f}"
 
 usage() {
@@ -49,13 +51,15 @@ Environment variables:
   LLAMA_COMMIT=e21cdc11a0461d8b0cbd28cc356d993bf6be7282     Exact llama.cpp commit to use
   PYTHON_BIN=python3                                        Python used for the venv
   PIP_EXTRA_PACKAGES="pypdfium2 pillow xlsxwriter"          Extra runtime packages for this repo
+  GEMMA_REVISION=<hf_commit_sha>                            Pinned Hugging Face revision for Gemma GGUF
+  GLMOCR_REVISION=<hf_commit_sha>                           Pinned Hugging Face revision for GLM-OCR GGUFs
 
 What this script does:
   1. Clone ggml-org/llama.cpp into $RUNTIME_ROOT/llama.cpp
   2. Checkout the exact working commit currently used on the cluster
-  3. Download gemma-4-31B-it-Q4_K_M.gguf with wget
+  3. Download gemma-4-31B-it-Q4_K_M.gguf from a pinned Hugging Face revision
   4. Verify Gemma against the working sha256 hash
-  5. Download GLM-OCR-Q8_0.gguf and mmproj-GLM-OCR-Q8_0.gguf (OCR VLM) with wget
+  5. Download GLM-OCR-Q8_0.gguf and mmproj-GLM-OCR-Q8_0.gguf from a pinned Hugging Face revision
   6. Verify both GLM-OCR files against sha256 hashes
   7. Create/update a dedicated cluster venv for this repo
   8. Install pinned deps from requirements.lock if present (exact snapshot),
@@ -64,6 +68,7 @@ What this script does:
 
 Important:
   BUILD_LLAMA=1 should be used on a compute node with the required modules loaded.
+  Model downloads are pinned to exact Hugging Face revisions for reproducibility.
   Default runtime output is inside this repo: .runtime${SETUP_SUFFIX}
   Default cluster venv is inside this repo: .venv.cluster${SETUP_SUFFIX}
 USAGE
@@ -332,9 +337,11 @@ llama.cpp:
   server:  $LLAMA_DIR/build/bin/llama-server
 
 models:
-  Gemma:         $GEMMA_DIR/$GEMMA_NAME
-  GLM-OCR main:  $GLMOCR_DIR/$GLMOCR_MAIN_NAME
+  Gemma:          $GEMMA_DIR/$GEMMA_NAME
+  Gemma revision: $GEMMA_REVISION
+  GLM-OCR main:   $GLMOCR_DIR/$GLMOCR_MAIN_NAME
   GLM-OCR mmproj: $GLMOCR_DIR/$GLMOCR_MMPROJ_NAME
+  GLM-OCR rev:    $GLMOCR_REVISION
 
 verified sha256:
   Gemma:          $GEMMA_SHA256
