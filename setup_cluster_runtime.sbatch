@@ -12,7 +12,8 @@
 set -euo pipefail
 
 REPO_DIR="${REPO_DIR:-${SLURM_SUBMIT_DIR:-$PWD}}"
-WORKDIR="${WORKDIR:-/groups/umcg-gcc/tmp02/users/umcg-pjansma}"
+CURRENT_CLUSTER_USER="${USER:-$(id -un)}"
+WORKDIR="${WORKDIR:-/groups/umcg-gcc/tmp02/users/${CURRENT_CLUSTER_USER}}"
 SETUP_SUFFIX="${SETUP_SUFFIX:-}"
 BUILD_LLAMA="${BUILD_LLAMA:-1}"
 BUILD_JOBS="${BUILD_JOBS:-${SLURM_CPUS_PER_TASK:-4}}"

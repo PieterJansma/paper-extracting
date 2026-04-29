@@ -4,7 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-WORKDIR="${WORKDIR:-/groups/umcg-gcc/tmp02/users/umcg-pjansma}"
+CURRENT_CLUSTER_USER="${USER:-$(id -un)}"
+WORKDIR="${WORKDIR:-/groups/umcg-gcc/tmp02/users/${CURRENT_CLUSTER_USER}}"
 SETUP_SUFFIX="${SETUP_SUFFIX:-}"
 RUNTIME_ROOT="${RUNTIME_ROOT:-$SCRIPT_DIR/.runtime${SETUP_SUFFIX}}"
 REPOS_DIR="${REPOS_DIR:-$RUNTIME_ROOT}"
@@ -23,7 +24,7 @@ PIP_EXTRA_PACKAGES="${PIP_EXTRA_PACKAGES:-pypdfium2 pillow xlsxwriter}"
 GEMMA_DIR="${GEMMA_DIR:-$MODELS_DIR}"
 GEMMA_NAME="gemma-4-31B-it-Q4_K_M.gguf"
 GEMMA_URL="https://huggingface.co/ggml-org/gemma-4-31B-it-GGUF/resolve/main/gemma-4-31B-it-Q4_K_M.gguf"
-GEMMA_SHA256="${GEMMA_SHA256:-3bf13fff7c0d4deff809b7ab168428f54855f3ef0279339dda278a81ea853474}"
+GEMMA_SHA256="${GEMMA_SHA256:-4f369f8fe0e1bedc5caee9abb89316887f548f80f3035398a5d222a737e699e6}"
 
 GLMOCR_DIR="${GLMOCR_DIR:-$MODELS_DIR/GLM-OCR}"
 GLMOCR_MAIN_NAME="GLM-OCR-Q8_0.gguf"
